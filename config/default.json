@@ -1,0 +1,42 @@
+{
+  "host": "localhost",
+  "port": 3030,
+  "public": "./public/",
+  "origins": [
+    "http://localhost:3030"
+  ],
+  "paginate": {
+    "default": 10,
+    "max": 50
+  },
+  "mongodb": "mongodb://127.0.0.1:27017/mockline-back",
+  "authentication": {
+    "entity": "user",
+    "service": "users",
+    "secret": "pYTEAwlku/GHPQ8w/MsCF12R3P74PH9b339",
+    "authStrategies": [
+      "jwt",
+      "local",
+      "firebase"
+    ],
+    "jwtOptions": {
+      "header": {
+        "typ": "access"
+      },
+      "audience": "https://mockline.dev",
+      "algorithm": "HS256",
+      "expiresIn": "1d"
+    },
+    "local": {
+      "usernameField": "email",
+      "passwordField": "password"
+    }
+  },
+  "aws": {
+    "endpoint"       : "https://9a222ebc447fea5517ed52c148c92f14.r2.cloudflarestorage.com",
+    "region"         : "eeur",
+    "accessKeyId"    : "9c5593de35606a43fc4a7172ff753f58",
+    "secretAccessKey": "a80a00f3a7ada514778a78f038bd2f904a60519ea2d45b440d36dc0d9b3f1635",
+    "bucket"         : "mockline-projects"
+  }
+}
