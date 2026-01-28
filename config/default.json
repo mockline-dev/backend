@@ -1,0 +1,42 @@
+{
+  "host": "localhost",
+  "port": 3030,
+  "public": "./public/",
+  "origins": [
+    "http://localhost:3030"
+  ],
+  "paginate": {
+    "default": 10,
+    "max": 50
+  },
+  "mongodb": "mongodb://127.0.0.1:27017/mockline-back",
+  "authentication": {
+    "entity": "user",
+    "service": "users",
+    "secret": "pYTEAwlku/GHPQ8w/MsCF12R3P74PH9b339",
+    "authStrategies": [
+      "jwt",
+      "local",
+      "firebase"
+    ],
+    "jwtOptions": {
+      "header": {
+        "typ": "access"
+      },
+      "audience": "https://mockline.dev",
+      "algorithm": "HS256",
+      "expiresIn": "1d"
+    },
+    "local": {
+      "usernameField": "email",
+      "passwordField": "password"
+    }
+  },
+  "aws": {
+    "endpoint"       : "",
+    "region"         : "eeur",
+    "accessKeyId"    : "",
+    "secretAccessKey": "",
+    "bucket"         : "mockline-projects"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "name": "mockline-back",
+  "description": "",
+  "version": "0.0.1",
+  "homepage": "https://mockline.dev",
+  "private": true,
+  "keywords": [
+    "feathers"
+  ],
+  "author": {
+    "name": "Mockline",
+    "email": "info@mockline.dev",
+    "url": "https://mockline.dev"
+  },
+  "contributors": [
+    {
+      "name": "Shahboz Munirov",
+      "email": "shahboz@mockline.dev",
+      "url": "https://github.com/shakhbozmn"
+    }
+  ],
+  "bugs": {},
+  "engines": {
+    "node": ">= 22.13.1"
+  },
+  "feathers": {
+    "language": "ts",
+    "packager": "npm",
+    "database": "mongodb",
+    "framework": "koa",
+    "transports": [
+      "rest",
+      "websockets"
+    ],
+    "schema": "typebox"
+  },
+  "directories": {
+    "lib": "src",
+    "test": "test"
+  },
+  "files": [
+    "lib/client.js",
+    "lib/**/*.d.ts",
+    "lib/**/*.shared.js"
+  ],
+  "main": "lib/client",
+  "scripts": {
+    "dev": "nodemon -x ts-node src/index.ts",
+    "compile": "shx rm -rf lib/ && tsc --skipLibCheck",
+    "start": "node lib/",
+    "prettier": "npx prettier \"**/*.ts\" --write",
+    "mocha": "cross-env NODE_ENV=test mocha test/ --require ts-node/register --recursive --extension .ts --exit",
+    "test": "npm run mocha",
+    "bundle:client": "npm run compile && npm pack --pack-destination ./public"
+  },
+  "overrides": {
+    "config": "4.1.1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.826.0",
+    "@aws-sdk/s3-request-presigner": "^3.826.0",
+    "@bull-board/api": "^6.12.6",
+    "@bull-board/express": "^6.12.6",
+    "@bull-board/koa": "^6.12.6",
+    "@feathersjs/adapter-commons": "^5.0.34",
+    "@feathersjs/authentication": "^5.0.34",
+    "@feathersjs/authentication-client": "^5.0.34",
+    "@feathersjs/authentication-local": "^5.0.34",
+    "@feathersjs/authentication-oauth": "^5.0.34",
+    "@feathersjs/configuration": "^5.0.34",
+    "@feathersjs/errors": "^5.0.34",
+    "@feathersjs/feathers": "^5.0.34",
+    "@feathersjs/koa": "^5.0.34",
+    "@feathersjs/mongodb": "^5.0.34",
+    "@feathersjs/schema": "^5.0.34",
+    "@feathersjs/socketio": "^5.0.34",
+    "@feathersjs/transport-commons": "^5.0.34",
+    "@feathersjs/typebox": "^5.0.34",
+    "@types/bull": "^3.15.9",
+    "aws-sdk": "^2.1692.0",
+    "bull": "^4.16.5",
+    "bullmq": "^5.58.2",
+    "feathers-hooks-common": "^8.2.1",
+    "firebase-admin": "^13.4.0",
+    "ioredis": "^5.7.0",
+    "mongodb": "^6.16.0",
+    "node-cron": "^4.1.0",
+    "nodemailer": "^7.0.4",
+    "reflect-metadata": "^0.2.2",
+    "s3-blob-store": "^4.1.1",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@feathersjs/cli": "^5.0.34",
+    "@feathersjs/rest-client": "^5.0.34",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.3",
+    "@types/nodemailer": "^6.4.17",
+    "axios": "^1.9.0",
+    "cross-env": "^7.0.3",
+    "mocha": "^11.2.2",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.5.3",
+    "shx": "^0.4.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.8.3"
+  }
+}
