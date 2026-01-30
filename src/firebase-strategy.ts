@@ -18,18 +18,25 @@ interface DecodedToken {
 interface UserData {
   firebaseUid: string
   email: string
+  firstName: string
+  lastName: string
 }
 
 interface AuthenticationPayload {
   accessToken: string
+  userData: {
+    firstName: string
+    lastName: string
+  }
 }
 
 class FirebaseStrategy extends AuthenticationBaseStrategy {
   async authenticate(authentication: AuthenticationPayload, params: Params): Promise<AuthenticationResult> {
+    console.log('Authentication payload:', authentication)
     try {
       const decodedToken = await this.verifyToken(authentication.accessToken)
       console.log('Decoded token:', decodedToken)
-      const user = await this.processUserAuthentication(decodedToken)
+      const user = await this.processUserAuthentication(decodedToken, authentication.userData)
 
       if (params.session) {
         params.session.user = user
@@ -55,17 +62,18 @@ class FirebaseStrategy extends AuthenticationBaseStrategy {
     }
   }
 
-  private async processUserAuthentication(decodedToken: DecodedToken): Promise<UserData> {
+  private async processUserAuthentication(decodedToken: DecodedToken, userData: AuthenticationPayload['userData']): Promise<UserData> {
     const { uid, email } = decodedToken
+    const { firstName, lastName } = userData 
 
     if (!email) {
       throw new BadRequest('Email is required')
     }
 
-    return await this.getOrCreateUser(decodedToken)
+    return await this.getOrCreateUser(decodedToken, firstName, lastName)
   }
 
-  private async getOrCreateUser(decodedToken: DecodedToken): Promise<UserData> {
+  private async getOrCreateUser(decodedToken: DecodedToken, firstName: string, lastName: string): Promise<UserData> {
     const { uid, email } = decodedToken
     const app = this.app as Application
 
@@ -75,8 +83,8 @@ class FirebaseStrategy extends AuthenticationBaseStrategy {
       return await app.service('users').create({
         firebaseUid: uid,
         email: email || '',
-        firstName: '',
-        lastName: ''
+        firstName: firstName || '',
+        lastName: lastName || ''
       })
     }
 
