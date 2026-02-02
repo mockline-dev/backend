@@ -62,9 +62,13 @@ class FirebaseStrategy extends AuthenticationBaseStrategy {
     }
   }
 
-  private async processUserAuthentication(decodedToken: DecodedToken, userData: AuthenticationPayload['userData']): Promise<UserData> {
+  private async processUserAuthentication(
+    decodedToken: DecodedToken,
+    userData?: AuthenticationPayload['userData']
+  ): Promise<UserData> {
+    console.log('User data:', userData)
     const { uid, email } = decodedToken
-    const { firstName, lastName } = userData 
+    const { firstName, lastName } = userData || {}
 
     if (!email) {
       throw new BadRequest('Email is required')
@@ -73,11 +77,17 @@ class FirebaseStrategy extends AuthenticationBaseStrategy {
     return await this.getOrCreateUser(decodedToken, firstName, lastName)
   }
 
-  private async getOrCreateUser(decodedToken: DecodedToken, firstName: string, lastName: string): Promise<UserData> {
+  private async getOrCreateUser(
+    decodedToken: DecodedToken,
+    firstName?: string,
+    lastName?: string
+  ): Promise<UserData> {
+    console.log('Decoded token hellooo:')
     const { uid, email } = decodedToken
     const app = this.app as Application
 
     const users = await app.service('users').find({ query: { firebaseUid: uid } })
+    console.log('Users:', users)
 
     if (users.total === 0) {
       return await app.service('users').create({
