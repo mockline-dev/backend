@@ -3,7 +3,8 @@
   "port": 3030,
   "public": "./public/",
   "origins": [
-    "http://localhost:3030"
+    "http://localhost:3030",
+    "http://localhost:3000"
   ],
   "paginate": {
     "default": 10,
@@ -32,11 +33,15 @@
       "passwordField": "password"
     }
   },
-  "aws": {
-    "endpoint"       : "",
-    "region"         : "eeur",
-    "accessKeyId"    : "",
+  "r2": {
+    "endpoint": "",
+    "region": "eeur",
+    "accessKeyId": "",
     "secretAccessKey": "",
-    "bucket"         : "mockline-projects"
+    "bucket": "mockline-projects"
+  },
+  "aiService": {
+    "url": "http://localhost:11434",
+    "timeout": 300000
   }
 }
