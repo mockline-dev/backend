@@ -3,6 +3,7 @@ import { HookContext as FeathersHookContext, NextFunction } from '@feathersjs/fe
 import { Application as FeathersApplication } from '@feathersjs/koa'
 import { ApplicationConfiguration } from './configuration'
 
+import { AIProjectsService } from './services/ai-projects/ai-projects.class'
 import { ConversationsService } from './services/conversations/conversations.class'
 import { MessagesService } from './services/messages/messages.class'
 import { User } from './services/users/users'
@@ -25,7 +26,7 @@ export interface ServiceTypes {
   r2: any
   conversations: ConversationsService
   messages: MessagesService
-  'ai-projects': any
+  'ai-projects': AIProjectsService
   'ai-files': any
   'ai-file-versions': any
   'ai-models': any

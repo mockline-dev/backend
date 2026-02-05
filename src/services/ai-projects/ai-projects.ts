@@ -10,49 +10,105 @@ import {
 } from './ai-projects.schema'
 
 import { authenticate } from '@feathersjs/authentication'
+import { hooks as schemaHooks } from '@feathersjs/schema'
 import axios from 'axios'
 import type { Application } from '../../declarations'
+import { HookContext } from '../../declarations'
+import { aiProjectMethods, aiProjectPath } from './ai-projects.shared'
 
 export const aiProjects = (app: Application) => {
-  app.use('ai-projects', new AIProjectsService(getOptions(app)))
+  app.use(aiProjectPath, new AIProjectsService(getOptions(app)), {
+    methods: aiProjectMethods,
+    events: []
+  })
 
-  // Register hooks
-  app.service('ai-projects').hooks({
+  // Get the service we just registered
+  const service = app.service(aiProjectPath)
+
+  // Register hooks following Feathers best practices
+  service.hooks({
     around: {
       all: [authenticate('jwt')]
     },
     before: {
-      all: [aiProjectQueryResolver],
-      find: [aiProjectQueryValidator],
-      get: [aiProjectQueryValidator],
-      create: [aiProjectDataValidator, aiProjectDataResolver],
-      update: [aiProjectDataValidator, aiProjectDataResolver],
-      patch: [aiProjectPatchValidator, aiProjectPatchResolver]
+      all: [
+        schemaHooks.validateQuery(aiProjectQueryValidator),
+        schemaHooks.resolveQuery(aiProjectQueryResolver)
+      ],
+      find: [],
+      get: [],
+      create: [
+        schemaHooks.validateData(aiProjectDataValidator),
+        schemaHooks.resolveData(aiProjectDataResolver)
+      ],
+      update: [
+        schemaHooks.validateData(aiProjectDataValidator),
+        schemaHooks.resolveData(aiProjectDataResolver)
+      ],
+      patch: [
+        schemaHooks.validateData(aiProjectPatchValidator),
+        schemaHooks.resolveData(aiProjectPatchResolver)
+      ],
+      remove: []
     },
     after: {
+      all: [],
+      find: [],
+      get: [],
       create: [
-        async (context: any) => {
+        async (context: HookContext) => {
           const project = context.result
-          const aiServiceUrl = app.get('aiService')?.url
+          const aiServiceConfig = app.get('aiService')
+          const aiServiceUrl = aiServiceConfig?.url || 'http://localhost:11434'
 
-          if (aiServiceUrl) {
+          // Don't block the response - trigger AI generation asynchronously
+          process.nextTick(async () => {
             try {
-              // Call AI service to generate code
               await axios.post(`${aiServiceUrl}/api/generate`, {
                 prompt: project.description,
-                model: 'llama3',
+                model: 'phi3:mini',
                 framework: project.framework,
                 language: project.language,
                 projectId: project._id
+              }, {
+                timeout: aiServiceConfig?.timeout || 300000
               })
+              
+              // Update project status to ready after successful generation
+              await service.patch(project._id, { status: 'ready' })
             } catch (error) {
               console.error('Failed to trigger AI generation:', error)
+              // Update project status to error
+              try {
+                await service.patch(project._id, { status: 'error' })
+              } catch (patchError) {
+                console.error('Failed to update project status:', patchError)
+              }
             }
-          }
+          })
+
           return context
         }
-      ]
+      ],
+      update: [],
+      patch: [],
+      remove: []
     },
-    error: {}
+    error: {
+      all: [],
+      find: [],
+      get: [],
+      create: [],
+      update: [],
+      patch: [],
+      remove: []
+    }
   })
+}
+
+// Add this service to the service type index
+declare module '../../declarations' {
+  interface ServiceTypes {
+    [aiProjectPath]: AIProjectsService
+  }
 }
