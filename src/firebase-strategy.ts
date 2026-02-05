@@ -32,15 +32,12 @@ interface AuthenticationPayload {
 
 class FirebaseStrategy extends AuthenticationBaseStrategy {
   async authenticate(authentication: AuthenticationPayload, params: Params): Promise<AuthenticationResult> {
-    console.log('Authentication payload:', authentication)
     try {
       const decodedToken = await this.verifyToken(authentication.accessToken)
-      console.log('Decoded token:', decodedToken)
       const user = await this.processUserAuthentication(decodedToken, authentication.userData)
 
       if (params.session) {
         params.session.user = user
-        console.log('User authenticated:', user)
       }
 
       return {
@@ -66,12 +63,17 @@ class FirebaseStrategy extends AuthenticationBaseStrategy {
     decodedToken: DecodedToken,
     userData?: AuthenticationPayload['userData']
   ): Promise<UserData> {
-    console.log('User data:', userData)
     const { uid, email } = decodedToken
     const { firstName, lastName } = userData || {}
 
     if (!email) {
       throw new BadRequest('Email is required')
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      throw new BadRequest('Invalid email format')
     }
 
     return await this.getOrCreateUser(decodedToken, firstName, lastName)
@@ -82,23 +84,31 @@ class FirebaseStrategy extends AuthenticationBaseStrategy {
     firstName?: string,
     lastName?: string
   ): Promise<UserData> {
-    console.log('Decoded token hellooo:')
     const { uid, email } = decodedToken
     const app = this.app as Application
 
-    const users = await app.service('users').find({ query: { firebaseUid: uid } })
-    console.log('Users:', users)
+    try {
+      const users = await app.service('users').find({ query: { firebaseUid: uid } })
 
-    if (users.total === 0) {
-      return await app.service('users').create({
-        firebaseUid: uid,
-        email: email || '',
-        firstName: firstName || '',
-        lastName: lastName || ''
+      if (users.total === 0) {
+        // Sanitize input data
+        const sanitizedFirstName = firstName?.trim().slice(0, 50) || ''
+        const sanitizedLastName = lastName?.trim().slice(0, 50) || ''
+        
+        return await app.service('users').create({
+          firebaseUid: uid,
+          email: email || '',
+          firstName: sanitizedFirstName,
+          lastName: sanitizedLastName
+        })
+      }
+
+      return users.data[0] as UserData
+    } catch (error) {
+      throw new BadRequest('Failed to process user data', {
+        originalError: error instanceof Error ? error.message : 'Database error'
       })
     }
-
-    return users.data[0] as UserData
   }
 
   private handleError(error: unknown): never {

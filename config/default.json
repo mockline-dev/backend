@@ -3,7 +3,8 @@
   "port": 3030,
   "public": "./public/",
   "origins": [
-    "http://localhost:3030"
+    "http://localhost:3030",
+    "http://localhost:3000"
   ],
   "paginate": {
     "default": 10,
@@ -32,11 +33,15 @@
       "passwordField": "password"
     }
   },
-  "aws": {
-    "endpoint"       : "https://9a222ebc447fea5517ed52c148c92f14.r2.cloudflarestorage.com",
-    "region"         : "eeur",
-    "accessKeyId"    : "9c5593de35606a43fc4a7172ff753f58",
+  "r2": {
+    "endpoint": "https://9a222ebc447fea5517ed52c148c92f14.r2.cloudflarestorage.com",
+    "region": "eeur",
+    "accessKeyId": "9c5593de35606a43fc4a7172ff753f58",
     "secretAccessKey": "a80a00f3a7ada514778a78f038bd2f904a60519ea2d45b440d36dc0d9b3f1635",
-    "bucket"         : "mockline-projects"
+    "bucket": "mockline-projects"
+  },
+  "aiService": {
+    "url": "http://localhost:11434",
+    "timeout": 300000
   }
 }

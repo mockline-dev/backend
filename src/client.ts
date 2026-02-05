@@ -1,6 +1,25 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/client.html
 import type { AuthenticationClientOptions } from '@feathersjs/authentication-client'
 
+import { r2Client } from './services/r2/r2.shared'
+export type { R2, R2Data, R2Query, R2Patch } from './services/r2/r2.shared'
+
+import { messagesClient } from './services/messages/messages.shared'
+export type {
+  Messages,
+  MessagesData,
+  MessagesQuery,
+  MessagesPatch
+} from './services/messages/messages.shared'
+
+import { conversationsClient } from './services/conversations/conversations.shared'
+export type {
+  Conversations,
+  ConversationsData,
+  ConversationsQuery,
+  ConversationsPatch
+} from './services/conversations/conversations.shared'
+
 import { filesClient } from './services/files/files.shared'
 export type { Files, FilesData, FilesQuery, FilesPatch } from './services/files/files.shared'
 
@@ -56,5 +75,8 @@ export const createClient = <Configuration = any,>(
   client.configure(projectsClient)
   client.configure(endpointsClient)
   client.configure(filesClient)
+  client.configure(conversationsClient)
+  client.configure(messagesClient)
+  client.configure(r2Client)
   return client
 }
