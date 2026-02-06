@@ -18,6 +18,8 @@ export interface Configuration extends ApplicationConfiguration {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ServiceTypes {
   'file-stream': any
+  uploads: any,
+  'ai-service': any
 }
 
 // The application instance type that will be used everywhere else

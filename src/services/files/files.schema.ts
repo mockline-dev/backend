@@ -14,6 +14,7 @@ export const filesSchema = Type.Object(
     projectId: ObjectIdSchema(),
     messageId: Type.Optional(ObjectIdSchema()),
     name: Type.String(),
+    key: Type.String(),
     fileType: Type.String(),
     size: Type.Number(),
     currentVersion: Type.Number({default: 1}),
@@ -29,7 +30,7 @@ export const filesResolver = resolve<FilesQuery, HookContext<FilesService>>({})
 export const filesExternalResolver = resolve<Files, HookContext<FilesService>>({})
 
 // Schema for creating new entries
-export const filesDataSchema = Type.Pick(filesSchema, ['projectId', 'messageId', 'name', 'fileType', 'size'], {
+export const filesDataSchema = Type.Pick(filesSchema, ['projectId', 'messageId', 'name', 'key', 'fileType', 'size'], {
   $id: 'FilesData'
 })
 export type FilesData = Static<typeof filesDataSchema>

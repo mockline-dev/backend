@@ -40,8 +40,20 @@
     "secretAccessKey": "a80a00f3a7ada514778a78f038bd2f904a60519ea2d45b440d36dc0d9b3f1635",
     "bucket": "mockline-projects"
   },
+  "r2PublicUrl": "https://pub-d32e9b30083842fca8969036825acfe3.r2.dev",
+  "uploads": {
+    "chunkSize": 5242880,
+    "maxRetries": 3,
+    "retryDelay": 1000,
+    "maxConcurrentUploads": 5,
+    "timeout": 300000,
+    "enableCompression": true
+  },
   "aiService": {
     "url": "http://localhost:8000",
-    "timeout": 300000
+    "timeout": 300000,
+    "maxFileSize": 104857600,
+    "maxFilesPerGeneration": 50,
+    "enableUpload": true
   }
 }

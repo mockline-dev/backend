@@ -7,6 +7,7 @@ import {
   S3Client,
   UploadPartCommand
 } from '@aws-sdk/client-s3'
+import { ObjectId } from 'mongodb'
 import type { Application } from '../../declarations'
 
 export const uploadsPath = 'uploads'
@@ -26,6 +27,13 @@ export const uploads = (app: Application) => {
     async create(data: any) {
       const { key, contentType } = data
 
+      if (!key) {
+        throw new Error('Key is required')
+      }
+      if (!contentType) {
+        throw new Error('ContentType is required')
+      }
+
       const command = new CreateMultipartUploadCommand({
         Bucket: awsConfig.bucket,
         Key: key,
@@ -37,6 +45,13 @@ export const uploads = (app: Application) => {
         uploadId: response.UploadId,
         key: key
       }
+    },
+
+    getPublicUrl(key: string): string {
+      if (!key) {
+        throw new Error('Key is required')
+      }
+      return `${awsConfig.endpoint}/${awsConfig.bucket}/${key}`
     },
 
     async patch(id: string, data: any) {
@@ -69,7 +84,7 @@ export const uploads = (app: Application) => {
     },
 
     async update(id: string, data: any, params: any) {
-      const { uploadId, key, parts, fileType, projectId, messageId } = data
+      const { uploadId, key, parts, fileType, projectId, messageId, originalFilename } = data
       const { user } = params
 
       const command = new CompleteMultipartUploadCommand({
@@ -91,17 +106,18 @@ export const uploads = (app: Application) => {
       const fileSize = headResponse.ContentLength || 0
 
       const payload = {
-        name: key,
+        name: originalFilename || key,
+        key: key,
         size: fileSize,
         fileType: fileType,
-        createdBy: user?._id,
-        projectId: projectId,
-        messageId: messageId
+        projectId: new ObjectId(projectId),
+        messageId: messageId ? new ObjectId(messageId) : undefined
       }
       try {
         const media = await app.service('files').create(payload)
-        return media._id
+        return media._id.toString()
       } catch (error) {
+        console.error('[Uploads] Failed to create file record:', error)
         return null
       }
     },
@@ -137,13 +153,73 @@ export const uploads = (app: Application) => {
       all: []
     },
     before: {
-      all: []
+      all: [],
+      create: [
+        async (context: any) => {
+          const { key, contentType } = context.data
+          if (!key) {
+            throw new Error('Key is required')
+          }
+          if (!contentType) {
+            throw new Error('ContentType is required')
+          }
+          return context
+        }
+      ],
+      patch: [
+        async (context: any) => {
+          const { partNumber, uploadId, key, content } = context.data
+          if (!partNumber) {
+            throw new Error('PartNumber is required')
+          }
+          if (!uploadId) {
+            throw new Error('UploadId is required')
+          }
+          if (!key) {
+            throw new Error('Key is required')
+          }
+          if (!content) {
+            throw new Error('Content is required')
+          }
+          return context
+        }
+      ],
+      update: [
+        async (context: any) => {
+          const { uploadId, key, parts, fileType, originalFilename } = context.data
+          if (!uploadId) {
+            throw new Error('UploadId is required')
+          }
+          if (!key) {
+            throw new Error('Key is required')
+          }
+          if (!parts || !Array.isArray(parts) || parts.length === 0) {
+            throw new Error('Parts array is required')
+          }
+          if (!fileType) {
+            throw new Error('FileType is required')
+          }
+          return context
+        }
+      ]
     },
     after: {
-      all: []
+      all: [],
+      update: [
+        async (context: any) => {
+          const { result, data } = context
+          console.log(`[Uploads] File upload completed: ${data.key}, fileId: ${result}`)
+          return context
+        }
+      ]
     },
     error: {
-      all: []
+      all: [
+        async (context: any) => {
+          console.error(`[Uploads] Error in ${context.method}:`, context.error)
+          return context
+        }
+      ]
     }
   })
 }

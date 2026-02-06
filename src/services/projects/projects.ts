@@ -4,19 +4,19 @@ import { authenticate } from '@feathersjs/authentication'
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
 import {
-  projectsDataValidator,
-  projectsPatchValidator,
-  projectsQueryValidator,
-  projectsResolver,
-  projectsExternalResolver,
   projectsDataResolver,
+  projectsDataValidator,
+  projectsExternalResolver,
   projectsPatchResolver,
-  projectsQueryResolver
+  projectsPatchValidator,
+  projectsQueryResolver,
+  projectsQueryValidator,
+  projectsResolver
 } from './projects.schema'
 
-import type { Application } from '../../declarations'
+import type { Application, HookContext } from '../../declarations'
 import { ProjectsService, getOptions } from './projects.class'
-import { projectsPath, projectsMethods } from './projects.shared'
+import { projectsMethods, projectsPath } from './projects.shared'
 
 export * from './projects.class'
 export * from './projects.schema'
@@ -47,8 +47,14 @@ export const projects = (app: Application) => {
       find: [],
       get: [],
       create: [
+        async (context: HookContext) => {
+        const {user} = context.params
+        context.data.userId = user._id
+        context.data.status = 'initializing'
+        return context
+      },
         schemaHooks.validateData(projectsDataValidator),
-        schemaHooks.resolveData(projectsDataResolver)
+        schemaHooks.resolveData(projectsDataResolver),
       ],
       patch: [
         schemaHooks.validateData(projectsPatchValidator),
@@ -57,7 +63,17 @@ export const projects = (app: Application) => {
       remove: []
     },
     after: {
-      all: []
+      all: [],
+      create: [
+        async (context: HookContext) => {
+          const result = context.result
+          const aiResponse = await app.service('ai-service').create({
+            projectId: result._id,
+            prompt: result.name
+          })
+          return context
+        }
+      ]
     },
     error: {
       all: []

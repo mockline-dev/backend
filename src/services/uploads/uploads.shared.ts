@@ -1,5 +1,4 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.shared.html
-import type { Params } from '@feathersjs/feathers'
 import type { ClientApplication } from '../../client'
 import type { Uploads, UploadsData, UploadsParams, UploadsPatch, UploadsQuery, UploadsService } from './uploads.class'
 
@@ -9,7 +8,7 @@ export type UploadsClientService = Pick<UploadsService<UploadsParams>, (typeof u
 
 export const uploadsPath = 'uploads'
 
-export const uploadsMethods: Array<keyof UploadsService> = ['find', 'get', 'create', 'patch', 'remove']
+export const uploadsMethods: Array<keyof UploadsService> = ['find', 'get', 'create', 'patch', 'update', 'remove', 'getPublicUrl']
 
 export const uploadsClient = (client: ClientApplication) => {
   const connection = client.get('connection')
