@@ -1,14 +1,14 @@
-// Users Service Schema
+// // For more information about this file see https://dove.feathersjs.com/guides/cli/service.schemas.html
 import { resolve } from '@feathersjs/schema'
 import type { Static } from '@feathersjs/typebox'
 import { ObjectIdSchema, Type, getValidator, querySyntax } from '@feathersjs/typebox'
 
 import type { HookContext } from '../../declarations'
 import { dataValidator, queryValidator } from '../../validators'
-import { UserService } from './users.class'
+import type { UsersService } from './users.class'
 
 // Main data model schema
-export const userSchema = Type.Object(
+export const usersSchema = Type.Object(
   {
     _id: ObjectIdSchema(),
     firebaseUid: Type.String(),
@@ -18,58 +18,40 @@ export const userSchema = Type.Object(
     createdAt: Type.Number(),
     updatedAt: Type.Number()
   },
-  { $id: 'User', additionalProperties: false }
+  { $id: 'Users', additionalProperties: false }
 )
-export type User = Static<typeof userSchema>
-export const userValidator = getValidator(userSchema, dataValidator)
-export const userResolver = resolve<User, HookContext<UserService>>({})
+export type Users = Static<typeof usersSchema>
+export const usersValidator = getValidator(usersSchema, dataValidator)
+export const usersResolver = resolve<UsersQuery, HookContext<UsersService>>({})
 
-export const userExternalResolver = resolve<User, HookContext<UserService>>({
-  // The password should never be visible externally
-  // password: async () => undefined
-})
+export const usersExternalResolver = resolve<Users, HookContext<UsersService>>({})
 
 // Schema for creating new entries
-export const userDataSchema = Type.Pick(userSchema, ['firebaseUid', 'firstName', 'lastName', 'email'], {
-  $id: 'UserData'
+export const usersDataSchema = Type.Pick(usersSchema, ['firebaseUid', 'firstName', 'lastName', 'email'], {
+  $id: 'UsersData'
 })
-export type UserData = Static<typeof userDataSchema>
-export const userDataValidator = getValidator(userDataSchema, dataValidator)
-export const userDataResolver = resolve<User, HookContext<UserService>>({
-  createdAt: async () => {
-    return Date.now()
-  },
-  updatedAt: async () => {
-    return Date.now()
-  }
-})
+export type UsersData = Static<typeof usersDataSchema>
+export const usersDataValidator = getValidator(usersDataSchema, dataValidator)
+export const usersDataResolver = resolve<UsersData, HookContext<UsersService>>({})
 
 // Schema for updating existing entries
-export const userPatchSchema = Type.Partial(userSchema, {
-  $id: 'UserPatch'
+export const usersPatchSchema = Type.Partial(usersSchema, {
+  $id: 'UsersPatch'
 })
-export type UserPatch = Static<typeof userPatchSchema>
-export const userPatchValidator = getValidator(userPatchSchema, dataValidator)
-export const userPatchResolver = resolve<UserPatch, HookContext<UserService>>({
-  updatedAt: async () => {
-    return Date.now()
-  }
-})
+export type UsersPatch = Static<typeof usersPatchSchema>
+export const usersPatchValidator = getValidator(usersPatchSchema, dataValidator)
+export const usersPatchResolver = resolve<UsersPatch, HookContext<UsersService>>({})
 
 // Schema for allowed query properties
-export const userQueryProperties = Type.Pick(userSchema, [
-  '_id',
-  'firebaseUid',
-  'firstName',
-  'lastName',
-  'email',
-  'createdAt',
-  'updatedAt'
-])
-export const userQuerySchema = Type.Intersect(
-  [querySyntax(userQueryProperties), Type.Object({}, { additionalProperties: false })],
+export const usersQueryProperties = Type.Pick(usersSchema, ['_id', 'firebaseUid', 'firstName', 'lastName', 'email'])
+export const usersQuerySchema = Type.Intersect(
+  [
+    querySyntax(usersQueryProperties),
+    // Add additional query properties here
+    Type.Object({}, { additionalProperties: false })
+  ],
   { additionalProperties: false }
 )
-export type UserQuery = Static<typeof userQuerySchema>
-export const userQueryValidator = getValidator(userQuerySchema, queryValidator)
-export const userQueryResolver = resolve<UserQuery, HookContext<UserService>>({})
+export type UsersQuery = Static<typeof usersQuerySchema>
+export const usersQueryValidator = getValidator(usersQuerySchema, queryValidator)
+export const usersQueryResolver = resolve<UsersQuery, HookContext<UsersService>>({})

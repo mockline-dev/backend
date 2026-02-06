@@ -33,7 +33,7 @@
       "passwordField": "password"
     }
   },
-  "r2": {
+  "aws": {
     "endpoint": "",
     "region": "eeur",
     "accessKeyId": "",
