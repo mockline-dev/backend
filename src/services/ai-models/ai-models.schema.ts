@@ -57,7 +57,7 @@ export const aiModelPatchSchema = Type.Partial(aiModelSchema, {
 })
 export type AIModelPatch = Static<typeof aiModelPatchSchema>
 export const aiModelPatchValidator = getValidator(aiModelPatchSchema, dataValidator)
-export const aiModelPatchResolver = resolve<AIModel, HookContext<AIModelsService>>({
+export const aiModelPatchResolver = resolve<AIModelPatch, HookContext<AIModelsService>>({
   updatedAt: async () => {
     return Date.now()
   }

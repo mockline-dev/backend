@@ -1,73 +1,44 @@
-// For more information about this file see https://dove.feathersjs.com/guides/cli/service.html
-import { authenticate } from '@feathersjs/authentication'
-
-import { hooks as schemaHooks } from '@feathersjs/schema'
-
+// Messages Service Configuration and Registration
+import { MessagesService, getOptions } from './messages.class'
 import {
-  messagesDataValidator,
-  messagesPatchValidator,
-  messagesQueryValidator,
-  messagesResolver,
-  messagesExternalResolver,
-  messagesDataResolver,
-  messagesPatchResolver,
-  messagesQueryResolver
+  messageDataResolver,
+  messageDataValidator,
+  messagePatchResolver,
+  messagePatchValidator,
+  messageQueryResolver,
+  messageQueryValidator
 } from './messages.schema'
 
+import { authenticate } from '@feathersjs/authentication'
+import { hooks as schemaHooks } from '@feathersjs/schema'
 import type { Application } from '../../declarations'
-import { MessagesService, getOptions } from './messages.class'
-import { messagesPath, messagesMethods } from './messages.shared'
 
-export * from './messages.class'
-export * from './messages.schema'
-
-// A configure function that registers the service and its hooks via `app.configure`
 export const messages = (app: Application) => {
-  // Register our service on the Feathers application
-  app.use(messagesPath, new MessagesService(getOptions(app)), {
-    // A list of all methods this service exposes externally
-    methods: messagesMethods,
-    // You can add additional custom events to be sent to clients here
-    events: []
-  })
-  // Initialize hooks
-  app.service(messagesPath).hooks({
+  app.use('messages', new MessagesService(getOptions(app)))
+
+  // Register hooks
+  app.service('messages').hooks({
     around: {
-      all: [
-        authenticate('jwt'),
-        schemaHooks.resolveExternal(messagesExternalResolver),
-        schemaHooks.resolveResult(messagesResolver)
-      ]
+      all: [authenticate('jwt')]
     },
     before: {
       all: [
-        schemaHooks.validateQuery(messagesQueryValidator),
-        schemaHooks.resolveQuery(messagesQueryResolver)
+        schemaHooks.validateQuery(messageQueryValidator),
+        schemaHooks.resolveQuery(messageQueryResolver)
       ],
       find: [],
       get: [],
       create: [
-        schemaHooks.validateData(messagesDataValidator),
-        schemaHooks.resolveData(messagesDataResolver)
+        schemaHooks.validateData(messageDataValidator),
+        schemaHooks.resolveData(messageDataResolver)
       ],
       patch: [
-        schemaHooks.validateData(messagesPatchValidator),
-        schemaHooks.resolveData(messagesPatchResolver)
+        schemaHooks.validateData(messagePatchValidator),
+        schemaHooks.resolveData(messagePatchResolver)
       ],
       remove: []
     },
-    after: {
-      all: []
-    },
-    error: {
-      all: []
-    }
+    after: {},
+    error: {}
   })
-}
-
-// Add this service to the service type index
-declare module '../../declarations' {
-  interface ServiceTypes {
-    [messagesPath]: MessagesService
-  }
 }

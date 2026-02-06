@@ -1,20 +1,20 @@
-// // For more information about this file see https://dove.feathersjs.com/guides/cli/service.schemas.html
+// Users Service Schema
 import { resolve } from '@feathersjs/schema'
 import type { Static } from '@feathersjs/typebox'
 import { ObjectIdSchema, Type, getValidator, querySyntax } from '@feathersjs/typebox'
 
 import type { HookContext } from '../../declarations'
 import { dataValidator, queryValidator } from '../../validators'
-import type { UserService } from './users.class'
+import { UserService } from './users.class'
 
 // Main data model schema
 export const userSchema = Type.Object(
   {
     _id: ObjectIdSchema(),
+    firebaseUid: Type.String(),
     firstName: Type.String(),
     lastName: Type.String(),
     email: Type.String(),
-    firebaseUid: Type.String(),
     createdAt: Type.Number(),
     updatedAt: Type.Number()
   },
@@ -30,18 +30,9 @@ export const userExternalResolver = resolve<User, HookContext<UserService>>({
 })
 
 // Schema for creating new entries
-export const userDataSchema = Type.Pick(
-  userSchema,
-  [
-    'firstName',
-    'lastName',
-    'email',
-    'firebaseUid',
-  ],
-  {
-    $id: 'UserData'
-  }
-)
+export const userDataSchema = Type.Pick(userSchema, ['firebaseUid', 'firstName', 'lastName', 'email'], {
+  $id: 'UserData'
+})
 export type UserData = Static<typeof userDataSchema>
 export const userDataValidator = getValidator(userDataSchema, dataValidator)
 export const userDataResolver = resolve<User, HookContext<UserService>>({
@@ -59,7 +50,7 @@ export const userPatchSchema = Type.Partial(userSchema, {
 })
 export type UserPatch = Static<typeof userPatchSchema>
 export const userPatchValidator = getValidator(userPatchSchema, dataValidator)
-export const userPatchResolver = resolve<User, HookContext<UserService>>({
+export const userPatchResolver = resolve<UserPatch, HookContext<UserService>>({
   updatedAt: async () => {
     return Date.now()
   }
@@ -68,25 +59,17 @@ export const userPatchResolver = resolve<User, HookContext<UserService>>({
 // Schema for allowed query properties
 export const userQueryProperties = Type.Pick(userSchema, [
   '_id',
+  'firebaseUid',
   'firstName',
   'lastName',
   'email',
-  'firebaseUid',
   'createdAt',
+  'updatedAt'
 ])
 export const userQuerySchema = Type.Intersect(
-  [
-    querySyntax(userQueryProperties),
-    // Add additional query properties here
-    Type.Object({}, { additionalProperties: false })
-  ],
+  [querySyntax(userQueryProperties), Type.Object({}, { additionalProperties: false })],
   { additionalProperties: false }
 )
 export type UserQuery = Static<typeof userQuerySchema>
 export const userQueryValidator = getValidator(userQuerySchema, queryValidator)
-export const userQueryResolver = resolve<UserQuery, HookContext<UserService>>({
-  // If there is a user (e.g. with authentication), they are only allowed to see their own data
-  _id: async (value, user, context) => {  
-    return value
-  }
-})
+export const userQueryResolver = resolve<UserQuery, HookContext<UserService>>({})

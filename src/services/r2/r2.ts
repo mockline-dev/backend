@@ -1,4 +1,5 @@
 // R2 Service Configuration and Registration
+import { authenticate } from '@feathersjs/authentication'
 import type { Application, HookContext } from '../../declarations'
 import { getR2Service, R2Config, type R2Service } from './r2.class'
 import type { R2PresignedUrl, R2Upload } from './r2.schema'
@@ -81,7 +82,7 @@ export const r2 = (app: Application) => {
   // Register hooks
   app.service('r2').hooks({
     before: {
-      all: [
+      all: [authenticate('jwt'),
         async (context: HookContext) => {
           // Ensure user is authenticated
           if (!context.params.user) {
