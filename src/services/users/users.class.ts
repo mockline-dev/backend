@@ -4,30 +4,27 @@ import type { MongoDBAdapterOptions, MongoDBAdapterParams } from '@feathersjs/mo
 import { MongoDBService } from '@feathersjs/mongodb'
 
 import type { Application } from '../../declarations'
-import type { User, UserData, UserPatch, UserQuery } from './users.schema'
+import type { Users, UsersData, UsersPatch, UsersQuery } from './users.schema'
 
-export type { User, UserData, UserPatch, UserQuery }
+export type { Users, UsersData, UsersPatch, UsersQuery }
 
-export interface UserParams extends MongoDBAdapterParams<UserQuery> {}
+export interface UsersParams extends MongoDBAdapterParams<UsersQuery> {}
 
 // By default calls the standard MongoDB adapter service methods but can be customized with your own functionality.
-export class UserService<ServiceParams extends Params = UserParams> extends MongoDBService<
-  User,
-  UserData,
-  UserParams,
-  UserPatch
+export class UsersService<ServiceParams extends Params = UsersParams> extends MongoDBService<
+  Users,
+  UsersData,
+  UsersParams,
+  UsersPatch
 > {}
 
 export const getOptions = (app: Application): MongoDBAdapterOptions => {
   return {
     paginate: app.get('paginate'),
-    Model: app
-      .get('mongodbClient')
-      .then(db => db.collection('users'))
-      .then(async collection => {
-        await collection.createIndex({ firebaseUid: 1 }, { unique: true })
+    Model: app.get('mongodbClient').then((db) => db.collection('users')).then(async collection => {
+      await collection.createIndex({ firebaseUid: 1 }, { unique: true })
 
-        return collection
-      })
+      return collection
+    })
   }
 }

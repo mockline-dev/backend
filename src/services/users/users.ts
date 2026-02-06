@@ -4,36 +4,35 @@ import { authenticate } from '@feathersjs/authentication'
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
 import {
-  userDataResolver,
-  userDataValidator,
-  userExternalResolver,
-  userPatchResolver,
-  userPatchValidator,
-  userQueryResolver,
-  userQueryValidator,
-  userResolver
+  usersDataResolver,
+  usersDataValidator,
+  usersPatchResolver,
+  usersPatchValidator,
+  usersQueryResolver,
+  usersQueryValidator
 } from './users.schema'
 
 import type { Application } from '../../declarations'
-import { UserService, getOptions } from './users.class'
-import { userMethods, userPath } from './users.shared'
+import { usersExternalResolver, usersResolver } from '../users/users.schema'
+import { UsersService, getOptions } from './users.class'
+import { usersMethods, usersPath } from './users.shared'
 
 export * from './users.class'
 export * from './users.schema'
 
 // A configure function that registers the service and its hooks via `app.configure`
-export const user = (app: Application) => {
+export const users = (app: Application) => {
   // Register our service on the Feathers application
-  app.use(userPath, new UserService(getOptions(app)), {
+  app.use(usersPath, new UsersService(getOptions(app)), {
     // A list of all methods this service exposes externally
-    methods: userMethods,
+    methods: usersMethods,
     // You can add additional custom events to be sent to clients here
     events: []
   })
   // Initialize hooks
-  app.service(userPath).hooks({
+  app.service(usersPath).hooks({
     around: {
-      all: [schemaHooks.resolveExternal(userExternalResolver), schemaHooks.resolveResult(userResolver)],
+      all: [schemaHooks.resolveExternal(usersExternalResolver), schemaHooks.resolveResult(usersResolver)],
       find: [authenticate('jwt')],
       get: [authenticate('jwt')],
       create: [],
@@ -42,21 +41,15 @@ export const user = (app: Application) => {
       remove: [authenticate('jwt')]
     },
     before: {
-      all: [schemaHooks.validateQuery(userQueryValidator), schemaHooks.resolveQuery(userQueryResolver)],
+      all: [schemaHooks.validateQuery(usersQueryValidator), schemaHooks.resolveQuery(usersQueryResolver)],
       find: [],
       get: [],
-      create: [
-        schemaHooks.validateData(userDataValidator),
-        schemaHooks.resolveData(userDataResolver)
-      ],
-      patch: [
-schemaHooks.validateData(userPatchValidator),schemaHooks.resolveData(userPatchResolver)],
+      create: [schemaHooks.validateData(usersDataValidator), schemaHooks.resolveData(usersDataResolver)],
+      patch: [schemaHooks.validateData(usersPatchValidator), schemaHooks.resolveData(usersPatchResolver)],
       remove: []
     },
     after: {
-      all: [],
-      create: [],
-      patch: []
+      all: []
     },
     error: {
       all: []
@@ -67,6 +60,6 @@ schemaHooks.validateData(userPatchValidator),schemaHooks.resolveData(userPatchRe
 // Add this service to the service type index
 declare module '../../declarations' {
   interface ServiceTypes {
-    [userPath]: UserService
+    [usersPath]: UsersService
   }
 }

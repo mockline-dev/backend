@@ -33,7 +33,7 @@
       "passwordField": "password"
     }
   },
-  "r2": {
+  "aws": {
     "endpoint": "https://9a222ebc447fea5517ed52c148c92f14.r2.cloudflarestorage.com",
     "region": "eeur",
     "accessKeyId": "9c5593de35606a43fc4a7172ff753f58",

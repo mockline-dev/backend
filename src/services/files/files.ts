@@ -4,12 +4,14 @@ import { authenticate } from '@feathersjs/authentication'
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
 import {
-  fileDataResolver,
-  fileDataValidator,
-  filePatchResolver,
-  filePatchValidator,
-  fileQueryResolver,
-  fileQueryValidator
+  filesDataResolver,
+  filesDataValidator,
+  filesExternalResolver,
+  filesPatchResolver,
+  filesPatchValidator,
+  filesQueryResolver,
+  filesQueryValidator,
+  filesResolver
 } from './files.schema'
 
 import type { Application, HookContext } from '../../declarations'
@@ -18,25 +20,6 @@ import { filesMethods, filesPath } from './files.shared'
 
 export * from './files.class'
 export * from './files.schema'
-
-// R2 upload hook
-const uploadToR2 = async (context: HookContext<FilesService>) => {
-  const data = context.data as any
-
-  if (data?.content && context.method === 'create') {
-    const r2Service = context.app.service('r2') as any
-    await r2Service.uploadFile({
-      key: data.r2Key,
-      content: data.content,
-      contentType: 'text/plain'
-    })
-
-    // Update size based on content length
-    data.size = data.content.length
-  }
-
-  return context
-}
 
 // A configure function that registers the service and its hooks via `app.configure`
 export const files = (app: Application) => {
@@ -50,24 +33,42 @@ export const files = (app: Application) => {
   // Initialize hooks
   app.service(filesPath).hooks({
     around: {
-        all: [authenticate('jwt')],
+      all: [
+        authenticate('jwt'),
+        schemaHooks.resolveExternal(filesExternalResolver),
+        schemaHooks.resolveResult(filesResolver)
+      ]
     },
     before: {
-      all: [schemaHooks.validateQuery(fileQueryValidator), schemaHooks.resolveQuery(fileQueryResolver)],
+      all: [schemaHooks.validateQuery(filesQueryValidator), schemaHooks.resolveQuery(filesQueryResolver)],
       find: [],
       get: [],
-      create: [
-        uploadToR2,
-        schemaHooks.validateData(fileDataValidator),
-        schemaHooks.resolveData(fileDataResolver)
-      ],
-      patch: [schemaHooks.validateData(filePatchValidator),schemaHooks.resolveData(filePatchResolver)],
-      remove: []
+      create: [schemaHooks.validateData(filesDataValidator), schemaHooks.resolveData(filesDataResolver)],
+      patch: [schemaHooks.validateData(filesPatchValidator), schemaHooks.resolveData(filesPatchResolver)],
+      remove: [
+        async (context: HookContext) => {
+          const app = context.app
+          const filesId = context.id
+
+          try {
+            if (!filesId) {
+              throw new Error('An ID is required to remove a files entry.')
+            }
+
+            const filesItem = await app.service(filesPath).get(filesId)
+
+            if (filesItem) {
+              await app.service('uploads').remove(null, { query: { key: filesItem.name } })
+            }
+          } catch (error) {
+            console.error('Failed to remove files', error)
+            throw new Error('Failed to remove files')
+          }
+        }
+      ]
     },
     after: {
-      all: [],
-      create: [],
-      patch: []
+      all: []
     },
     error: {
       all: []

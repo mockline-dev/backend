@@ -1,4 +1,4 @@
-// Files Service Schema
+// // For more information about this file see https://dove.feathersjs.com/guides/cli/service.schemas.html
 import { resolve } from '@feathersjs/schema'
 import type { Static } from '@feathersjs/typebox'
 import { ObjectIdSchema, Type, getValidator, querySyntax } from '@feathersjs/typebox'
@@ -8,45 +8,33 @@ import { dataValidator, queryValidator } from '../../validators'
 import type { FilesService } from './files.class'
 
 // Main data model schema
-export const fileSchema = Type.Object(
+export const filesSchema = Type.Object(
   {
     _id: ObjectIdSchema(),
     projectId: ObjectIdSchema(),
     messageId: Type.Optional(ObjectIdSchema()),
-    path: Type.String(),
-    r2Key: Type.String(),
-    language: Type.String(),
+    name: Type.String(),
+    fileType: Type.String(),
     size: Type.Number(),
-    currentVersion: Type.Number(),
+    currentVersion: Type.Number({default: 1}),
     createdAt: Type.Number(),
     updatedAt: Type.Number()
   },
-  { $id: 'File', additionalProperties: false }
+  { $id: 'Files', additionalProperties: false }
 )
-export type File = Static<typeof fileSchema>
-export const fileValidator = getValidator(fileSchema, dataValidator)
-export const fileResolver = resolve<File, HookContext<FilesService>>({
-  createdAt: async () => {
-    return Date.now()
-  },
-  updatedAt: async () => {
-    return Date.now()
-  }
-})
+export type Files = Static<typeof filesSchema>
+export const filesValidator = getValidator(filesSchema, dataValidator)
+export const filesResolver = resolve<FilesQuery, HookContext<FilesService>>({})
+
+export const filesExternalResolver = resolve<Files, HookContext<FilesService>>({})
 
 // Schema for creating new entries
-export const fileDataSchema = Type.Intersect([
-  Type.Pick(fileSchema, ['projectId', 'messageId', 'path', 'r2Key', 'language', 'size']),
-  Type.Object({
-    content: Type.Optional(Type.String())
-  })
-], { $id: 'FileData' })
-export type FileData = Static<typeof fileDataSchema>
-export const fileDataValidator = getValidator(fileDataSchema, dataValidator)
-export const fileDataResolver = resolve<File, HookContext<FilesService>>({
-  currentVersion: async () => {
-    return 1
-  },
+export const filesDataSchema = Type.Pick(filesSchema, ['projectId', 'messageId', 'name', 'fileType', 'size'], {
+  $id: 'FilesData'
+})
+export type FilesData = Static<typeof filesDataSchema>
+export const filesDataValidator = getValidator(filesDataSchema, dataValidator)
+export const filesDataResolver = resolve<Files, HookContext<FilesService>>({
   createdAt: async () => {
     return Date.now()
   },
@@ -56,33 +44,27 @@ export const fileDataResolver = resolve<File, HookContext<FilesService>>({
 })
 
 // Schema for updating existing entries
-export const filePatchSchema = Type.Partial(fileSchema, {
-  $id: 'FilePatch'
+export const filesPatchSchema = Type.Partial(filesSchema, {
+  $id: 'FilesPatch'
 })
-export type FilePatch = Static<typeof filePatchSchema>
-export const filePatchValidator = getValidator(filePatchSchema, dataValidator)
-export const filePatchResolver = resolve<FilePatch, HookContext<FilesService>>({
+export type FilesPatch = Static<typeof filesPatchSchema>
+export const filesPatchValidator = getValidator(filesPatchSchema, dataValidator)
+export const filesPatchResolver = resolve<FilesPatch, HookContext<FilesService>>({
   updatedAt: async () => {
     return Date.now()
   }
 })
 
 // Schema for allowed query properties
-export const fileQueryProperties = Type.Pick(fileSchema, [
-  '_id',
-  'projectId',
-  'messageId',
-  'path',
-  'r2Key',
-  'language',
-  'currentVersion',
-  'createdAt',
-  'updatedAt'
-])
-export const fileQuerySchema = Type.Intersect(
-  [querySyntax(fileQueryProperties), Type.Object({}, { additionalProperties: false })],
+export const filesQueryProperties = Type.Pick(filesSchema, ['_id', 'projectId', 'messageId', 'name', 'fileType', 'size', 'currentVersion', 'createdAt', 'updatedAt'])
+export const filesQuerySchema = Type.Intersect(
+  [
+    querySyntax(filesQueryProperties),
+    // Add additional query properties here
+    Type.Object({}, { additionalProperties: false })
+  ],
   { additionalProperties: false }
 )
-export type FileQuery = Static<typeof fileQuerySchema>
-export const fileQueryValidator = getValidator(fileQuerySchema, queryValidator)
-export const fileQueryResolver = resolve<FileQuery, HookContext<FilesService>>({})
+export type FilesQuery = Static<typeof filesQuerySchema>
+export const filesQueryValidator = getValidator(filesQuerySchema, queryValidator)
+export const filesQueryResolver = resolve<FilesQuery, HookContext<FilesService>>({})

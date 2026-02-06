@@ -9,7 +9,7 @@ export const configurationSchema = Type.Intersect([
     host: Type.String(),
     port: Type.Number(),
     public: Type.String(),
-    r2: Type.Object({
+    aws: Type.Object({
       endpoint: Type.String(),
       region: Type.String(),
       accessKeyId: Type.String(),
