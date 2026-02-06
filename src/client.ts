@@ -2,47 +2,19 @@
 import type { AuthenticationClientOptions } from '@feathersjs/authentication-client'
 
 import { r2Client } from './services/r2/r2.shared'
-export type { R2, R2Data, R2Query, R2Patch } from './services/r2/r2.shared'
+export type { AIModel, AIModelData, AIModelPatch, AIModelQuery } from './services/ai-models/ai-models.shared'
+export type { R2File, R2PresignedUrl, R2Query, R2Upload } from './services/r2/r2.shared'
 
 import { messagesClient } from './services/messages/messages.shared'
-export type {
-  Messages,
-  MessagesData,
-  MessagesQuery,
-  MessagesPatch
-} from './services/messages/messages.shared'
 
-import { conversationsClient } from './services/conversations/conversations.shared'
-export type {
-  Conversations,
-  ConversationsData,
-  ConversationsQuery,
-  ConversationsPatch
-} from './services/conversations/conversations.shared'
-
-import { filesClient } from './services/files/files.shared'
-export type { Files, FilesData, FilesQuery, FilesPatch } from './services/files/files.shared'
-
-import { endpointsClient } from './services/endpoints/endpoints.shared'
-export type {
-  Endpoints,
-  EndpointsData,
-  EndpointsQuery,
-  EndpointsPatch
-} from './services/endpoints/endpoints.shared'
-
-import { projectsClient } from './services/projects/projects.shared'
-export type {
-  Projects,
-  ProjectsData,
-  ProjectsQuery,
-  ProjectsPatch
-} from './services/projects/projects.shared'
+import { aiModelsClient } from './services/ai-models/ai-models.shared'
 
 import authenticationClient from '@feathersjs/authentication-client'
 import type { Application, TransportConnection } from '@feathersjs/feathers'
 import { feathers } from '@feathersjs/feathers'
 
+import { filesClient } from './services/files/files.shared'
+import { projectsClient } from './services/projects/projects.shared'
 import { userClient } from './services/users/users.shared'
 
 export interface Configuration {
@@ -73,10 +45,9 @@ export const createClient = <Configuration = any,>(
 
   client.configure(userClient)
   client.configure(projectsClient)
-  client.configure(endpointsClient)
   client.configure(filesClient)
-  client.configure(conversationsClient)
   client.configure(messagesClient)
+  client.configure(aiModelsClient)
   client.configure(r2Client)
   return client
 }

@@ -41,7 +41,7 @@
     "bucket": "mockline-projects"
   },
   "aiService": {
-    "url": "http://localhost:11434",
+    "url": "http://localhost:8000",
     "timeout": 300000
   }
 }

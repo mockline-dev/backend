@@ -1,4 +1,4 @@
-// // For more information about this file see https://dove.feathersjs.com/guides/cli/service.schemas.html
+// Messages Service Schema
 import { resolve } from '@feathersjs/schema'
 import type { Static } from '@feathersjs/typebox'
 import { ObjectIdSchema, Type, getValidator, querySyntax } from '@feathersjs/typebox'
@@ -8,76 +8,64 @@ import { dataValidator, queryValidator } from '../../validators'
 import type { MessagesService } from './messages.class'
 
 // Main data model schema
-export const messagesSchema = Type.Object(
+export const messageSchema = Type.Object(
   {
     _id: ObjectIdSchema(),
-    conversationId: ObjectIdSchema(),
-    role: Type.Union([Type.Literal('user'), Type.Literal('assistant'), Type.Literal('system')]),
+    projectId: ObjectIdSchema(),
+    role: Type.Union([Type.Literal('user'), Type.Literal('system'), Type.Literal('assistant')]),
     content: Type.String(),
     tokens: Type.Optional(Type.Number()),
+    status: Type.Optional(Type.String()),
     createdAt: Type.Number(),
-    metadata: Type.Optional(
-      Type.Object({
-        model: Type.Optional(Type.String()),
-        temperature: Type.Optional(Type.Number()),
-        files: Type.Optional(Type.Array(ObjectIdSchema()))
-      })
-    )
+    updatedAt: Type.Number()
   },
-  { $id: 'Messages', additionalProperties: false }
+  { $id: 'Message', additionalProperties: false }
 )
-export type Messages = Static<typeof messagesSchema>
-export const messagesValidator = getValidator(messagesSchema, dataValidator)
-export const messagesResolver = resolve<Messages, HookContext<MessagesService>>({
-  createdAt: async () => {
-    return Date.now()
-  }
-})
-
-export const messagesExternalResolver = resolve<Messages, HookContext<MessagesService>>({})
+export type Message = Static<typeof messageSchema>
+export const messageValidator = getValidator(messageSchema, dataValidator)
+export const messageResolver = resolve<Message, HookContext<MessagesService>>({})
 
 // Schema for creating new entries
-export const messagesDataSchema = Type.Pick(
-  messagesSchema,
-  ['conversationId', 'role', 'content', 'metadata', 'tokens', 'createdAt'],
-  {
-    $id: 'MessagesData'
-  }
-)
-export type MessagesData = Static<typeof messagesDataSchema>
-export const messagesDataValidator = getValidator(messagesDataSchema, dataValidator)
-export const messagesDataResolver = resolve<MessagesData, HookContext<MessagesService>>({
+export const messageDataSchema = Type.Pick(messageSchema, ['projectId', 'role', 'content', 'tokens', 'status'], {
+  $id: 'MessageData'
+})
+export type MessageData = Static<typeof messageDataSchema>
+export const messageDataValidator = getValidator(messageDataSchema, dataValidator)
+export const messageDataResolver = resolve<Message, HookContext<MessagesService>>({
   createdAt: async () => {
+    return Date.now()
+  },
+  updatedAt: async () => {
     return Date.now()
   }
 })
 
 // Schema for updating existing entries
-export const messagesPatchSchema = Type.Partial(messagesSchema, {
-  $id: 'MessagesPatch'
+export const messagePatchSchema = Type.Partial(messageSchema, {
+  $id: 'MessagePatch'
 })
-export type MessagesPatch = Static<typeof messagesPatchSchema>
-export const messagesPatchValidator = getValidator(messagesPatchSchema, dataValidator)
-export const messagesPatchResolver = resolve<MessagesPatch, HookContext<MessagesService>>({})
+export type MessagePatch = Static<typeof messagePatchSchema>
+export const messagePatchValidator = getValidator(messagePatchSchema, dataValidator)
+export const messagePatchResolver = resolve<MessagePatch, HookContext<MessagesService>>({
+  updatedAt: async () => {
+    return Date.now()
+  }
+})
 
 // Schema for allowed query properties
-export const messagesQueryProperties = Type.Pick(messagesSchema, [
+export const messageQueryProperties = Type.Pick(messageSchema, [
   '_id',
-  'conversationId',
+  'projectId',
   'role',
   'content',
-  'metadata',
   'tokens',
+  'status',
   'createdAt'
 ])
-export const messagesQuerySchema = Type.Intersect(
-  [
-    querySyntax(messagesQueryProperties),
-    // Add additional query properties here
-    Type.Object({}, { additionalProperties: false })
-  ],
+export const messageQuerySchema = Type.Intersect(
+  [querySyntax(messageQueryProperties), Type.Object({}, { additionalProperties: false })],
   { additionalProperties: false }
 )
-export type MessagesQuery = Static<typeof messagesQuerySchema>
-export const messagesQueryValidator = getValidator(messagesQuerySchema, queryValidator)
-export const messagesQueryResolver = resolve<MessagesQuery, HookContext<MessagesService>>({})
+export type MessageQuery = Static<typeof messageQuerySchema>
+export const messageQueryValidator = getValidator(messageQuerySchema, queryValidator)
+export const messageQueryResolver = resolve<MessageQuery, HookContext<MessagesService>>({})

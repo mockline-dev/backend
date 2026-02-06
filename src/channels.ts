@@ -1,15 +1,10 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/channels.html
-import type { RealTimeConnection, Params } from '@feathersjs/feathers'
 import type { AuthenticationResult } from '@feathersjs/authentication'
+import type { Params, RealTimeConnection } from '@feathersjs/feathers'
 import '@feathersjs/transport-commons'
 import type { Application, HookContext } from './declarations'
-import { logger } from './logger'
 
 export const channels = (app: Application) => {
-  logger.warn(
-    'Publishing all events to all authenticated users. See `channels.ts` and https://dove.feathersjs.com/api/channels.html for more information.'
-  )
-
   app.on('connection', (connection: RealTimeConnection) => {
     // On a new real-time connection, add it to the anonymous channel
     app.channel('anonymous').join(connection)
@@ -27,12 +22,25 @@ export const channels = (app: Application) => {
     }
   })
 
-  // eslint-disable-next-line no-unused-vars
-  app.publish((data: any, context: HookContext) => {
-    // Here you can add event publishers to channels set up in `channels.js`
-    // To publish only for a specific event use `app.publish(eventname, () => {})`
+  const getId = (value: any) => value?._id?.toString?.() ?? value?.id?.toString?.()
 
-    // e.g. to publish all service events to all authenticated users use
+  app.service('messages').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  app.service('projects').publish((data: any) => {
+    const projectId = getId(data)
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  app.service('files').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  // eslint-disable-next-line no-unused-vars
+  app.publish((_data: any, _context: HookContext) => {
     return app.channel('authenticated')
   })
 }

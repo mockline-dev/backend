@@ -1,11 +1,14 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.shared.html
 import type { Params } from '@feathersjs/feathers'
 import type { ClientApplication } from '../../client'
-import type { Files, FilesData, FilesPatch, FilesQuery, FilesService } from './files.class'
+import type { File, FileData, FilePatch, FileQuery, FilesService } from './files.class'
 
-export type { Files, FilesData, FilesPatch, FilesQuery }
+export type { File, FileData, FilePatch, FileQuery }
 
-export type FilesClientService = Pick<FilesService<Params<FilesQuery>>, (typeof filesMethods)[number]>
+export type FilesClientService = Pick<
+  FilesService<Params<FileQuery>>,
+  (typeof filesMethods)[number]
+>
 
 export const filesPath = 'files'
 
@@ -19,7 +22,7 @@ export const filesClient = (client: ClientApplication) => {
   })
 }
 
-// Add this service to the client service type index
+// Add this service to client service type index
 declare module '../../client' {
   interface ServiceTypes {
     [filesPath]: FilesClientService

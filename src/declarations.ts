@@ -3,10 +3,11 @@ import { HookContext as FeathersHookContext, NextFunction } from '@feathersjs/fe
 import { Application as FeathersApplication } from '@feathersjs/koa'
 import { ApplicationConfiguration } from './configuration'
 
-import { AIProjectsService } from './services/ai-projects/ai-projects.class'
-import { ConversationsService } from './services/conversations/conversations.class'
+import { AIModelsService } from './services/ai-models/ai-models.class'
+import { FilesService } from './services/files/files.class'
 import { MessagesService } from './services/messages/messages.class'
-import { User } from './services/users/users'
+import { ProjectsService } from './services/projects/projects.class'
+import { User, UserService } from './services/users/users'
 
 export type { NextFunction }
 
@@ -24,12 +25,11 @@ export interface ServiceTypes {
   redis: any
   'order-queue': any
   r2: any
-  conversations: ConversationsService
   messages: MessagesService
-  'ai-projects': AIProjectsService
-  'ai-files': any
-  'ai-file-versions': any
-  'ai-models': any
+  projects: ProjectsService
+  files: FilesService
+  'ai-models': AIModelsService
+  users: UserService
 }
 
 // The application instance type that will be used everywhere else
