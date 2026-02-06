@@ -26,9 +26,6 @@ export const projectsSchema = Type.Object(
 export type Projects = Static<typeof projectsSchema>
 export const projectsValidator = getValidator(projectsSchema, dataValidator)
 export const projectsResolver = resolve<ProjectsQuery, HookContext<ProjectsService>>({
-  userId: async (_value, _project, context) => {
-    return context.params.user?._id
-  },
   createdAt: async () => {
     return Date.now()
   },
@@ -40,12 +37,12 @@ export const projectsResolver = resolve<ProjectsQuery, HookContext<ProjectsServi
 export const projectsExternalResolver = resolve<Projects, HookContext<ProjectsService>>({})
 
 // Schema for creating new entries
-export const projectsDataSchema = Type.Pick(projectsSchema, ['userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'createdAt', 'updatedAt'], {
+export const projectsDataSchema = Type.Pick(projectsSchema, ['userId', 'name', 'description', 'framework', 'language', 'model', 'status'], {
   $id: 'ProjectsData'
 })
 export type ProjectsData = Static<typeof projectsDataSchema>
 export const projectsDataValidator = getValidator(projectsDataSchema, dataValidator)
-export const projectsDataResolver = resolve<ProjectsData, HookContext<ProjectsService>>({
+export const projectsDataResolver = resolve<Projects, HookContext<ProjectsService>>({
    createdAt: async () => {
     return Date.now()
   },

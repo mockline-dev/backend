@@ -40,8 +40,20 @@
     "secretAccessKey": "",
     "bucket": "mockline-projects"
   },
+  "r2PublicUrl": "",
+  "uploads": {
+    "chunkSize": 5242880,
+    "maxRetries": 3,
+    "retryDelay": 1000,
+    "maxConcurrentUploads": 5,
+    "timeout": 300000,
+    "enableCompression": true
+  },
   "aiService": {
     "url": "http://localhost:8000",
-    "timeout": 300000
+    "timeout": 300000,
+    "maxFileSize": 104857600,
+    "maxFilesPerGeneration": 50,
+    "enableUpload": true
   }
 }

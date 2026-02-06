@@ -13,6 +13,7 @@ export const messagesSchema = Type.Object(
     _id: ObjectIdSchema(),
     projectId: ObjectIdSchema(),
     role: Type.Union([Type.Literal('user'), Type.Literal('system'), Type.Literal('assistant')]),
+    type: Type.Union([Type.Literal('text'), Type.Literal('file')]),
     content: Type.String(),
     tokens: Type.Optional(Type.Number()),
     status: Type.Optional(Type.String()),
@@ -28,12 +29,12 @@ export const messagesResolver = resolve<MessagesQuery, HookContext<MessagesServi
 export const messagesExternalResolver = resolve<Messages, HookContext<MessagesService>>({})
 
 // Schema for creating new entries
-export const messagesDataSchema = Type.Pick(messagesSchema, ['projectId', 'role', 'content', 'tokens', 'status', 'createdAt', 'updatedAt'], {
+export const messagesDataSchema = Type.Pick(messagesSchema, ['projectId', 'role', 'content', 'tokens', 'status', 'type'], {
   $id: 'MessagesData'
 })
 export type MessagesData = Static<typeof messagesDataSchema>
 export const messagesDataValidator = getValidator(messagesDataSchema, dataValidator)
-export const messagesDataResolver = resolve<MessagesData, HookContext<MessagesService>>({
+export const messagesDataResolver = resolve<Messages, HookContext<MessagesService>>({
   createdAt: async () => {
     return Date.now()
   },

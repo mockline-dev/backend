@@ -16,6 +16,7 @@ export const configurationSchema = Type.Intersect([
       secretAccessKey: Type.String(),
       bucket: Type.String()
     }),
+    r2PublicUrl: Type.String(),
     aiService: Type.Object({
       url: Type.String(),
       timeout: Type.Optional(Type.Number())
