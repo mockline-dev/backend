@@ -33,18 +33,18 @@ interface AIResponse {
   error?: string
 }
 
-// New system prompt using markdown format - much more reliable than JSON
+// New system prompt using simple key-value format - more natural for AI to follow
 const FASTAPI_SYSTEM_PROMPT = `You are an expert Python FastAPI backend developer.
 Your task is to generate a complete, production-ready FastAPI application based on the user's requirements.
 
 ### OUTPUT FORMAT:
-You MUST respond with a markdown document in this EXACT structure:
+You MUST respond in this EXACT format (NO extra text before or after):
 
-## Explanation
-[Brief one-sentence summary of what was generated]
+PROJECT_NAME: [Related name for the project what was generated, it should be unique and related to the project]
 
-## Files
+PROJECT_EXPLANATION: [Brief summary of what was generated]
 
+PROJECT_FILES:
 ### File: [filename]
 \`\`\`[language]
 [Full file content]
@@ -65,14 +65,17 @@ Generate production-ready code with:
 - Standard project structure
 - No TODOs or placeholders
 
-IMPORTANT:
+CRITICAL INSTRUCTIONS:
+- Start with "PROJECT_NAME:" followed by the project name on the same line
+- Follow with "PROJECT_EXPLANATION:" followed by the explanation on the same line
+- Follow with "PROJECT_FILES:" on its own line
 - Each file MUST start with "### File: " followed by the filename
 - Use proper markdown code blocks with language identifiers
 - Include ALL necessary files (main.py, requirements.txt, .env.example, README.md, etc.)
 - Do NOT use JSON format
 - Do NOT escape special characters - use raw markdown
 
-Respond ONLY with the markdown document, no additional text.`
+Respond ONLY with the formatted content, no additional text.`
 
 export default function (app: any) {
   const initializeModel = async () => {
@@ -157,8 +160,14 @@ export default function (app: any) {
         // Parse markdown response
         const parsedResponse = this.parseMarkdownResponse(aiResponse)
         
+        console.log('Parsed name:', parsedResponse.name)
         console.log('Parsed explanation:', parsedResponse.explanation)
         console.log('Number of files parsed:', parsedResponse.files.length)
+        
+        await app.service('projects')._patch(projectId, {
+          name: parsedResponse.name,
+          description: parsedResponse.explanation
+        })
         
         // Process and upload files if requested
         let generatedFiles = []
@@ -172,7 +181,7 @@ export default function (app: any) {
 
         return {
           success: true,
-          response: parsedResponse.explanation || 'FastAPI backend generated successfully',
+          response: parsedResponse.name || 'FastAPI backend generated successfully',
           generatedFiles,
           usage: {
             promptTokens: response.prompt_eval_count,
@@ -245,12 +254,13 @@ export default function (app: any) {
       
       prompt += `Primary Requirements:\n${userPrompt}\n\n`
       
-      prompt += `CRITICAL: Your response MUST use MARKDOWN format with:
-1. Start with "## Explanation" section
-2. Follow with "## Files" section
-3. Each file must start with "### File: [filename]"
-4. Use markdown code blocks with proper language identifiers (e.g., \`\`\`python, \`\`\`bash, \`\`\`text)
-5. Include ALL necessary files:
+      prompt += `CRITICAL: Your response MUST use this EXACT format:
+1. Start with "PROJECT_NAME:" followed by the project name on the same line
+2. Follow with "PROJECT_EXPLANATION:" followed by the explanation on the same line
+3. Follow with "PROJECT_FILES:" on its own line
+4. Each file must start with "### File: [filename]"
+5. Use markdown code blocks with proper language identifiers (e.g., \`\`\`python, \`\`\`bash, \`\`\`text)
+6. Include ALL necessary files:
    - main.py (main application file)
    - requirements.txt (with pinned versions)
    - .env.example (configuration template)
@@ -264,34 +274,69 @@ Generate production-ready code with:
 - Security best practices (CORS, validation, etc.)
 - Modern FastAPI patterns (Pydantic v2, routers, dependencies)
 
-Respond ONLY with the markdown document, no additional text.`
+Respond ONLY with the formatted content, no additional text.`
       
       return prompt
     },
 
     /**
-     * Parse markdown response with file delimiters
-     * This is much simpler and more reliable than JSON parsing
+     * Parse key-value format response
+     * Simple and natural format that's easy for AI to follow
      */
-    parseMarkdownResponse(markdown: string): { explanation: string; files: Array<{ filename: string; content: string; type: string }> } {
-      console.log('Parsing markdown response...')
+    parseMarkdownResponse(markdown: string): { name: string; explanation: string; files: Array<{ filename: string; content: string; type: string }> } {
+      console.log('Parsing key-value format response...')
       
       const result = {
+        name: '',
         explanation: '',
         files: [] as Array<{ filename: string; content: string; type: string }>
       }
       
-      // Extract explanation section
-      const explanationMatch = markdown.match(/## Explanation\s*\n+(.*?)(?=\n##|\n### File:|$)/s)
+      // Extract name using PROJECT_NAME: pattern
+      const nameMatch = markdown.match(/PROJECT_NAME:\s*(.*?)(?=\n|$)/)
+      if (nameMatch) {
+        result.name = nameMatch[1].trim()
+      } else {
+        console.log('Warning: PROJECT_NAME not found, trying fallback...')
+        // Fallback: try to extract first header as name
+        const firstHeaderMatch = markdown.match(/^##\s+([^\n]+?)(?=\n##|$)/s)
+        if (firstHeaderMatch) {
+          const headerText = firstHeaderMatch[1].trim()
+          if (!headerText.match(/^(Explanation|Files)$/i)) {
+            result.name = headerText
+          }
+        }
+      }
+      
+      // Extract explanation using PROJECT_EXPLANATION: pattern
+      const explanationMatch = markdown.match(/PROJECT_EXPLANATION:\s*(.*?)(?=\nPROJECT_FILES:|\n### File:|$)/s)
       if (explanationMatch) {
         result.explanation = explanationMatch[1].trim()
+      } else {
+        console.log('Warning: PROJECT_EXPLANATION not found, trying fallback...')
+        // Fallback: try markdown header format
+        const fallbackExplanationMatch = markdown.match(/## Explanation\s*\n+(.*?)(?=\n##|\n### File:|$)/s)
+        if (fallbackExplanationMatch) {
+          result.explanation = fallbackExplanationMatch[1].trim()
+        }
+      }
+      
+      // Extract files section - everything after PROJECT_FILES:
+      let filesContent = ''
+      const filesMatch = markdown.match(/PROJECT_FILES:\s*([\s\S]*)/)
+      if (filesMatch) {
+        filesContent = filesMatch[1]
+      } else {
+        console.log('Warning: PROJECT_FILES not found, using entire content for file extraction...')
+        // Fallback: use entire markdown for file extraction
+        filesContent = markdown
       }
       
       // Extract all files using the "### File: " pattern
       const filePattern = /### File:\s*([^\n]+)\s*\n+```(\w*)\n([\s\S]*?)```/g
       let match
       
-      while ((match = filePattern.exec(markdown)) !== null) {
+      while ((match = filePattern.exec(filesContent)) !== null) {
         const filename = match[1].trim()
         const language = match[2] || 'text'
         const content = match[3]
@@ -311,7 +356,7 @@ Respond ONLY with the markdown document, no additional text.`
         
         // Try pattern without explicit language
         const altPattern = /### File:\s*([^\n]+)\s*\n+```\n([\s\S]*?)```/g
-        while ((match = altPattern.exec(markdown)) !== null) {
+        while ((match = altPattern.exec(filesContent)) !== null) {
           const filename = match[1].trim()
           const content = match[2]
           
@@ -333,7 +378,7 @@ Respond ONLY with the markdown document, no additional text.`
         const commonFiles = ['main.py', 'requirements.txt', '.env.example', 'README.md']
         let fileIndex = 0
         
-        while ((match = codeBlockPattern.exec(markdown)) !== null) {
+        while ((match = codeBlockPattern.exec(filesContent)) !== null) {
           const language = match[1] || 'text'
           const content = match[2]
           
@@ -358,7 +403,7 @@ Respond ONLY with the markdown document, no additional text.`
         }
       }
       
-      console.log(`Markdown parsing complete. Found ${result.files.length} files`)
+      console.log(`Parsing complete. Name: "${result.name}", Explanation: "${result.explanation.substring(0, 50)}...", Files: ${result.files.length}`)
       return result
     },
 
