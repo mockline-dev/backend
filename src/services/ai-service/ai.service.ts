@@ -64,6 +64,8 @@ Generate production-ready code with:
 - CORS middleware, environment configuration
 - Standard project structure
 - No TODOs or placeholders
+- Only single source of truth for the project, no other files or code should be included
+- DONT INCLUDE UPDATED or CONTINUED versions, files should be single source of truth with working code
 
 CRITICAL INSTRUCTIONS:
 - Start with "PROJECT_NAME:" followed by the project name on the same line
@@ -74,6 +76,8 @@ CRITICAL INSTRUCTIONS:
 - Include ALL necessary files (main.py, requirements.txt, .env.example, README.md, etc.)
 - Do NOT use JSON format
 - Do NOT escape special characters - use raw markdown
+- Be carefull with the requirements.txt file, do not include python==x.x.x
+- Use only exisiting versions of the packages, libraries, do not hellusinate the versions
 
 Respond ONLY with the formatted content, no additional text.`
 
@@ -273,6 +277,8 @@ Generate production-ready code with:
 - Type hints and documentation
 - Security best practices (CORS, validation, etc.)
 - Modern FastAPI patterns (Pydantic v2, routers, dependencies)
+- Be carefull with the requirements.txt file, do not include python==x.x.x
+- Use only exisiting versions of the files, do not hellusinate the versions
 
 Respond ONLY with the formatted content, no additional text.`
       
