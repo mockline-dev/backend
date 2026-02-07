@@ -41,7 +41,8 @@ export const files = (app: Application) => {
     },
     before: {
       all: [schemaHooks.validateQuery(filesQueryValidator), schemaHooks.resolveQuery(filesQueryResolver)],
-      find: [],
+      find: [
+      ],
       get: [],
       create: [schemaHooks.validateData(filesDataValidator), schemaHooks.resolveData(filesDataResolver)],
       patch: [schemaHooks.validateData(filesPatchValidator), schemaHooks.resolveData(filesPatchResolver)],
@@ -68,7 +69,13 @@ export const files = (app: Application) => {
       ]
     },
     after: {
-      all: []
+      all: [],
+      create: [
+        async (context: HookContext) => {
+          const result = context.result
+          console.log(result)
+        }
+      ]
     },
     error: {
       all: []
