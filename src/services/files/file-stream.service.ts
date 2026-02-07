@@ -15,8 +15,12 @@ export default function (app: any) {
   })
 
   app.use('/file-stream', {
-    async get(params: any) {
-      const { key } = params
+    async get(id: any, params: any) {
+      // Support both calling conventions:
+      // 1. service.get(key) - key is passed as id
+      // 2. service.get(null, { key }) - key is passed in params
+      const key = id || params?.key
+
       try {
         if (!key || typeof key !== 'string') {
           throw new Error('Invalid file key')
