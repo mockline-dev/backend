@@ -20,6 +20,14 @@ export const configurationSchema = Type.Intersect([
     aiService: Type.Object({
       url: Type.String(),
       timeout: Type.Optional(Type.Number())
+    }),
+    ollama: Type.Object({
+      model: Type.String(),
+      numPredict: Type.Number(),
+      numCtx: Type.Number(),
+      temperature: Type.Number(),
+      topP: Type.Number(),
+      repeatPenalty: Type.Number()
     })
   })
 ])

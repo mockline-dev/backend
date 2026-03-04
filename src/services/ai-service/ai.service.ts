@@ -33,66 +33,65 @@ interface AIResponse {
   error?: string
 }
 
-// New system prompt using simple key-value format - more natural for AI to follow
+// System prompt for Qwen2.5-Coder - more concise for better instruction following
 const FASTAPI_SYSTEM_PROMPT = `You are an expert Python FastAPI backend developer.
-Your task is to generate a complete, production-ready FastAPI application based on the user's requirements.
+Generate a complete, production-ready FastAPI application based on requirements.
 
-### OUTPUT FORMAT:
-You MUST respond in this EXACT format (NO extra text before or after):
-
-PROJECT_NAME: [Related name for the project what was generated, it should be unique and related to the project]
-
-PROJECT_EXPLANATION: [Brief summary of what was generated]
-
+### OUTPUT FORMAT (strict):
+PROJECT_NAME: [unique project name]
+PROJECT_EXPLANATION: [brief summary]
 PROJECT_FILES:
 ### File: [filename]
 \`\`\`[language]
-[Full file content]
+[complete file content]
 \`\`\`
 
-### File: [another-filename]
-\`\`\`[language]
-[Full file content]
-\`\`\`
-
-### TECHNICAL REQUIREMENTS:
-Generate production-ready code with:
-- Modern FastAPI best practices (Pydantic v2, routers, dependencies)
+### REQUIREMENTS:
+- Modern FastAPI (Pydantic v2, routers, dependencies)
 - Complete error handling and validation
 - Type hints and docstrings
-- Security best practices
-- CORS middleware, environment configuration
-- Standard project structure
-- No TODOs or placeholders
-- Only single source of truth for the project, no other files or code should be included
-- DONT INCLUDE UPDATED or CONTINUED versions, files should be single source of truth with working code
+- Security best practices, CORS
+- Include: main.py, requirements.txt, .env.example, README.md
+- No TODOs, placeholders, or partial files
+- Use existing package versions (don't hallucinate)
+- Single source of truth per file
 
-CRITICAL INSTRUCTIONS:
-- Start with "PROJECT_NAME:" followed by the project name on the same line
-- Follow with "PROJECT_EXPLANATION:" followed by the explanation on the same line
-- Follow with "PROJECT_FILES:" on its own line
-- Each file MUST start with "### File: " followed by the filename
-- Use proper markdown code blocks with language identifiers
-- Include ALL necessary files (main.py, requirements.txt, .env.example, README.md, etc.)
-- Do NOT use JSON format
-- Do NOT escape special characters - use raw markdown
-- Be carefull with the requirements.txt file, do not include python==x.x.x
-- Use only exisiting versions of the packages, libraries, do not hellusinate the versions
+Respond ONLY with the formatted content.`
 
-Respond ONLY with the formatted content, no additional text.`
+// Mocky Assistant Prompt for AI chat/editing mode
+const MOCKY_ASSISTANT_PROMPT = `You are Mocky, an expert backend developer assistant for the Mockline platform.
+Your role is to help users improve, debug, and extend their AI-generated FastAPI backends.
+
+When suggesting file changes, use this EXACT format:
+
+FILE_UPDATE: [filename]
+ACTION: [create|modify|delete]
+DESCRIPTION: [brief description of change]
+\`\`\`[language]
+[complete new file content]
+\`\`\`
+
+Rules:
+- Always provide complete file contents (no partial updates or diffs)
+- One FILE_UPDATE block per file
+- Explain your changes before showing them
+- Consider the existing project structure
+- Follow FastAPI best practices (Pydantic v2, dependency injection, proper error handling)`
 
 export default function (app: any) {
   const initializeModel = async () => {
+    const ollamaConfig = app.get('ollama')
+    const modelName = ollamaConfig.model // 'qwen2.5-coder:7b'
+
     try {
       const models = await ollama.list()
-      const hasModel = models.models.some((m: any) => m.name.includes('llama3.2:3b'))
-      
+      const hasModel = models.models.some((m: any) => m.name.includes(modelName))
+
       if (!hasModel) {
-        console.log('Initializing Llama 3.2:3b for FastAPI generation...')
-        await ollama.pull({ model: 'llama3.2:3b', stream: false })
-        console.log('Model ready for FastAPI generation')
+        console.log(`Pulling ${modelName} for code generation...`)
+        await ollama.pull({ model: modelName, stream: false })
+        console.log(`${modelName} ready`)
       }
-      
       return true
     } catch (error) {
       console.error('Failed to initialize model:', error)
@@ -138,18 +137,23 @@ export default function (app: any) {
         
         // Construct prompt specifically for FastAPI generation
         const fastapiPrompt = this.constructFastAPIPrompt(prompt, context)
-        
+
+        // Get Ollama config from application configuration
+        const ollamaConfig = app.get('ollama')
+
         // Generate response from model with optimized parameters
         const response = await ollama.generate({
-          model: 'llama3.2:3b',
+          model: ollamaConfig.model,
           prompt: fastapiPrompt,
           system: FASTAPI_SYSTEM_PROMPT,
           options: {
             temperature: Math.max(0.1, Math.min(temperature, 0.7)), // Clamp temperature
-            num_predict: Math.min(maxTokens, 8000), // Limit max tokens
-            top_p: 0.9,
-            repeat_penalty: 1.1,
-            stop: ['<|eot_id|>', '<|end_of_text|>']
+            num_predict: ollamaConfig.numPredict,
+            num_ctx: ollamaConfig.numCtx,
+            top_p: ollamaConfig.topP,
+            repeat_penalty: ollamaConfig.repeatPenalty
+            // Removed: stop: ['<|eot_id|>', '<|end_of_text|>'] - Llama-specific tokens
+            // Qwen uses <｜end▁of▁sentence｜> and <|im_end|> natively, Ollama handles this
           },
           stream: false
         })
@@ -207,8 +211,9 @@ export default function (app: any) {
     async find(params: any) {
       try {
         const models = await ollama.list()
-        const modelInfo = models.models.find((m: any) => m.name.includes('llama3.2:3b'))
-        
+        const modelName = app.get('ollama').model
+        const modelInfo = models.models.find((m: any) => m.name.includes(modelName))
+
         return {
           service: 'ai-fastapi-generator',
           status: 'running',
@@ -235,7 +240,7 @@ export default function (app: any) {
             'Background tasks',
             'Testing setup'
           ],
-          maxTokens: 8000,
+          maxTokens: 16384,
           defaultTemperature: 0.3,
           maxFileSize: 10 * 1024 * 1024 // 10MB
         }

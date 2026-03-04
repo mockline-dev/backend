@@ -20,6 +20,7 @@ export interface ServiceTypes {
   'file-stream': any
   uploads: any,
   'ai-service': any
+  'ai-stream': any
 }
 
 // The application instance type that will be used everywhere else
