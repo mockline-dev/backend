@@ -67,10 +67,62 @@ export const projects = (app: Application) => {
       create: [
         async (context: HookContext) => {
           const result = context.result
-          const aiResponse = await app.service('ai-service').create({
-            projectId: result._id,
-            prompt: result.name
-          })
+          const projectId = result._id
+
+          // Don't await — run AI generation in background so the create response returns immediately
+          ;(async () => {
+            try {
+              // Transition: initializing → generating
+              await app.service('projects')._patch(projectId, {
+                status: 'generating'
+              })
+
+              const aiResponse = await app.service('ai-service').create({
+                projectId,
+                prompt: result.description || result.name
+              })
+
+              if (aiResponse.success) {
+                // Transition: generating → ready
+                await app.service('projects')._patch(projectId, {
+                  status: 'ready'
+                })
+
+                // Auto-snapshot: capture initial generated state
+                try {
+                  await app.service('snapshots').create({
+                    projectId,
+                    label: 'Initial generation',
+                    trigger: 'auto-generation',
+                    files: [],
+                    version: 1,
+                    totalSize: 0,
+                    fileCount: 0,
+                    createdAt: Date.now()
+                  })
+                } catch (snapErr: any) {
+                  console.error(`Failed to create initial snapshot for project ${projectId}:`, snapErr.message)
+                }
+              } else {
+                // Transition: generating → error
+                await app.service('projects')._patch(projectId, {
+                  status: 'error',
+                  errorMessage: aiResponse.error || 'AI generation failed'
+                })
+              }
+            } catch (error: any) {
+              console.error(`Project ${projectId} generation failed:`, error)
+              try {
+                await app.service('projects')._patch(projectId, {
+                  status: 'error',
+                  errorMessage: error.message || 'Unexpected error during generation'
+                })
+              } catch (patchError) {
+                console.error(`Failed to update project ${projectId} error status:`, patchError)
+              }
+            }
+          })()
+
           return context
         }
       ]

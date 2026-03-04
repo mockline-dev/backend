@@ -8,6 +8,26 @@ export const channels = (app: Application) => {
   app.on('connection', (connection: RealTimeConnection) => {
     // On a new real-time connection, add it to the anonymous channel
     app.channel('anonymous').join(connection)
+
+    // Client can emit 'join-project' / 'leave-project' over Socket.IO to manage project subscriptions
+    const socket = (connection as any)?.socket
+    if (socket?.on) {
+      socket.on('join-project', (projectId?: string) => {
+        const targetId = projectId?.toString().trim()
+        if (!targetId) {
+          return
+        }
+        app.channel(`projects/${targetId}`).join(connection)
+      })
+
+      socket.on('leave-project', (projectId?: string) => {
+        const targetId = projectId?.toString().trim()
+        if (!targetId) {
+          return
+        }
+        app.channel(`projects/${targetId}`).leave(connection)
+      })
+    }
   })
 
   app.on('login', (authResult: AuthenticationResult, { connection }: Params) => {
@@ -37,6 +57,16 @@ export const channels = (app: Application) => {
   app.service('files').publish((data: any) => {
     const projectId = data?.projectId?.toString?.()
     return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  app.service('snapshots').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  // Publish ai-stream events to project-scoped channels
+  app.service('ai-stream').publish((data: any) => {
+    return app.channel(`projects/${data.projectId}`)
   })
 
   // eslint-disable-next-line no-unused-vars

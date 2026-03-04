@@ -18,6 +18,7 @@ export const projectsSchema = Type.Object(
     language: Type.Union([Type.Literal('python'), Type.Literal('typescript')]),
     model: Type.String(),
     status: Type.Union([Type.Literal('initializing'), Type.Literal('generating'), Type.Literal('ready'), Type.Literal('error')]),
+    errorMessage: Type.Optional(Type.String()),
     createdAt: Type.Number(),
     updatedAt: Type.Number()
   },
@@ -37,7 +38,7 @@ export const projectsResolver = resolve<ProjectsQuery, HookContext<ProjectsServi
 export const projectsExternalResolver = resolve<Projects, HookContext<ProjectsService>>({})
 
 // Schema for creating new entries
-export const projectsDataSchema = Type.Pick(projectsSchema, ['userId', 'name', 'description', 'framework', 'language', 'model', 'status'], {
+export const projectsDataSchema = Type.Pick(projectsSchema, ['userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'errorMessage'], {
   $id: 'ProjectsData'
 })
 export type ProjectsData = Static<typeof projectsDataSchema>
@@ -64,7 +65,7 @@ export const projectsPatchResolver = resolve<ProjectsPatch, HookContext<Projects
 })
 
 // Schema for allowed query properties
-export const projectsQueryProperties = Type.Pick(projectsSchema, ['_id', 'userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'createdAt', 'updatedAt'])
+export const projectsQueryProperties = Type.Pick(projectsSchema, ['_id', 'userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'errorMessage', 'createdAt', 'updatedAt'])
 export const projectsQuerySchema = Type.Intersect(
   [
     querySyntax(projectsQueryProperties),

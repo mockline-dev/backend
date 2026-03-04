@@ -55,5 +55,13 @@
     "maxFileSize": 104857600,
     "maxFilesPerGeneration": 50,
     "enableUpload": true
+  },
+  "ollama": {
+    "model": "qwen2.5-coder:7b",
+    "numPredict": 16384,
+    "numCtx": 32768,
+    "temperature": 0.3,
+    "topP": 0.9,
+    "repeatPenalty": 1.1
   }
 }
