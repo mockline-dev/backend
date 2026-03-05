@@ -21,6 +21,8 @@ export interface ServiceTypes {
   uploads: any,
   'ai-service': any
   'ai-stream': any
+  'validate-prompt': any
+  'server-monitor': any
 }
 
 // The application instance type that will be used everywhere else

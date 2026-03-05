@@ -17,10 +17,15 @@ export const projectsSchema = Type.Object(
     framework: Type.Union([Type.Literal('fast-api'), Type.Literal('feathers')]),
     language: Type.Union([Type.Literal('python'), Type.Literal('typescript')]),
     model: Type.String(),
-    status: Type.Union([Type.Literal('initializing'), Type.Literal('generating'), Type.Literal('ready'), Type.Literal('error')]),
+    status: Type.Union([Type.Literal('initializing'), Type.Literal('generating'), Type.Literal('validating'), Type.Literal('ready'), Type.Literal('error')]),
     errorMessage: Type.Optional(Type.String()),
     createdAt: Type.Number(),
-    updatedAt: Type.Number()
+    updatedAt: Type.Number(),
+    // Progress tracking fields
+    filesGenerated: Type.Optional(Type.Number()),
+    totalFiles: Type.Optional(Type.Number()),
+    generationProgress: Type.Optional(Type.Number()),
+    currentStage: Type.Optional(Type.String())
   },
   { $id: 'Projects', additionalProperties: false }
 )
@@ -65,7 +70,7 @@ export const projectsPatchResolver = resolve<ProjectsPatch, HookContext<Projects
 })
 
 // Schema for allowed query properties
-export const projectsQueryProperties = Type.Pick(projectsSchema, ['_id', 'userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'errorMessage', 'createdAt', 'updatedAt'])
+export const projectsQueryProperties = Type.Pick(projectsSchema, ['_id', 'userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'errorMessage', 'createdAt', 'updatedAt', 'filesGenerated', 'totalFiles', 'generationProgress', 'currentStage'])
 export const projectsQuerySchema = Type.Intersect(
   [
     querySyntax(projectsQueryProperties),
