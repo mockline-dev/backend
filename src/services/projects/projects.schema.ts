@@ -43,7 +43,7 @@ export const projectsResolver = resolve<ProjectsQuery, HookContext<ProjectsServi
 export const projectsExternalResolver = resolve<Projects, HookContext<ProjectsService>>({})
 
 // Schema for creating new entries
-export const projectsDataSchema = Type.Pick(projectsSchema, ['userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'errorMessage'], {
+export const projectsDataSchema = Type.Pick(projectsSchema, ['userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'filesGenerated', 'totalFiles', 'generationProgress', 'currentStage'], {
   $id: 'ProjectsData'
 })
 export type ProjectsData = Static<typeof projectsDataSchema>

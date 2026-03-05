@@ -189,7 +189,31 @@ export const projects = (app: Application) => {
       ]
     },
     error: {
-      all: []
+      all: [
+        async (context: HookContext) => {
+          const { error, method, params } = context
+          
+          // Log validation errors with details
+          if (error?.name === 'BadRequest' || error?.name === 'ValidationError') {
+            console.error(`[Projects Service] Validation error on ${method}:`, {
+              error: error.message,
+              data: context.data,
+              params: params,
+              validationErrors: error.data || error.errors
+            })
+          } else {
+            // Log other errors
+            console.error(`[Projects Service] Error on ${method}:`, {
+              error: error?.message || error,
+              stack: error?.stack,
+              data: context.data,
+              params: params
+            })
+          }
+          
+          return context
+        }
+      ]
     }
   })
 }
