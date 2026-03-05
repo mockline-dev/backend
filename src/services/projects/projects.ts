@@ -28,7 +28,7 @@ export const projects = (app: Application) => {
     // A list of all methods this service exposes externally
     methods: projectsMethods,
     // You can add additional custom events to be sent to clients here
-    events: []
+    events: ['progress']
   })
   // Initialize hooks
   app.service(projectsPath).hooks({
@@ -51,6 +51,11 @@ export const projects = (app: Application) => {
         const {user} = context.params
         context.data.userId = user._id
         context.data.status = 'initializing'
+        // Initialize progress tracking fields
+        context.data.filesGenerated = 0
+        context.data.totalFiles = 0
+        context.data.generationProgress = 0
+        context.data.currentStage = 'initializing'
         return context
       },
         schemaHooks.validateData(projectsDataValidator),
@@ -64,6 +69,34 @@ export const projects = (app: Application) => {
     },
     after: {
       all: [],
+      patch: [
+        async (context: HookContext) => {
+          // Broadcast progress updates to all clients when progress fields change
+          const { data, result } = context
+          const projectId = context.id || result._id
+
+          if (projectId && (
+            data.status ||
+            data.generationProgress !== undefined ||
+            data.filesGenerated !== undefined ||
+            data.totalFiles !== undefined ||
+            data.currentStage
+          )) {
+            const projectsService = app.service('projects')
+            projectsService.emit('progress', {
+              projectId,
+              status: result.status,
+              progress: result.generationProgress,
+              filesGenerated: result.filesGenerated,
+              totalFiles: result.totalFiles,
+              currentStage: result.currentStage,
+              errorMessage: result.errorMessage
+            })
+          }
+
+          return context
+        }
+      ],
       create: [
         async (context: HookContext) => {
           const result = context.result
@@ -74,7 +107,17 @@ export const projects = (app: Application) => {
             try {
               // Transition: initializing → generating
               await app.service('projects')._patch(projectId, {
-                status: 'generating'
+                status: 'generating',
+                generationProgress: 10,
+                currentStage: 'analyzing_requirements'
+              })
+
+              // Estimate total files based on framework
+              const estimatedFiles = result.framework === 'feathers' ? 10 : 8
+              await app.service('projects')._patch(projectId, {
+                totalFiles: estimatedFiles,
+                generationProgress: 20,
+                currentStage: 'generating_code'
               })
 
               const aiResponse = await app.service('ai-service').create({
@@ -83,9 +126,23 @@ export const projects = (app: Application) => {
               })
 
               if (aiResponse.success) {
-                // Transition: generating → ready
+                // Update progress based on generated files
+                const filesGenerated = aiResponse.generatedFiles?.filter((f: any) => f.uploadSuccess).length || 0
                 await app.service('projects')._patch(projectId, {
-                  status: 'ready'
+                  status: 'validating',
+                  filesGenerated,
+                  generationProgress: 85,
+                  currentStage: 'validating_files'
+                })
+
+                // Simulate validation delay
+                await new Promise(resolve => setTimeout(resolve, 1000))
+
+                // Transition: validating → ready
+                await app.service('projects')._patch(projectId, {
+                  status: 'ready',
+                  generationProgress: 100,
+                  currentStage: 'complete'
                 })
 
                 // Auto-snapshot: capture initial generated state
@@ -107,7 +164,9 @@ export const projects = (app: Application) => {
                 // Transition: generating → error
                 await app.service('projects')._patch(projectId, {
                   status: 'error',
-                  errorMessage: aiResponse.error || 'AI generation failed'
+                  errorMessage: aiResponse.error || 'AI generation failed',
+                  generationProgress: 0,
+                  currentStage: 'error'
                 })
               }
             } catch (error: any) {
@@ -115,7 +174,9 @@ export const projects = (app: Application) => {
               try {
                 await app.service('projects')._patch(projectId, {
                   status: 'error',
-                  errorMessage: error.message || 'Unexpected error during generation'
+                  errorMessage: error.message || 'Unexpected error during generation',
+                  generationProgress: 0,
+                  currentStage: 'error'
                 })
               } catch (patchError) {
                 console.error(`Failed to update project ${projectId} error status:`, patchError)

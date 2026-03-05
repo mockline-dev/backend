@@ -8,7 +8,9 @@ import { users } from './users/users'
 import type { Application } from '../declarations'
 import aiStreamService from './ai-service/ai-stream.service'
 import aiService from './ai-service/ai.service'
+import validatePromptService from './ai-service/validate-prompt.service'
 import fileStream from './files/file-stream.service'
+import serverMonitorService from './server-monitor/server-monitor.service'
 
 export const services = (app: Application) => {
   app.configure(snapshots)
@@ -20,6 +22,8 @@ export const services = (app: Application) => {
   app.configure(aiService)
   app.configure(aiStreamService)
   app.configure(fileStream)
+  app.configure(validatePromptService)
+  app.configure(serverMonitorService)
 
   // All services will be registered here
 }
