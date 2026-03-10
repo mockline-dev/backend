@@ -8,8 +8,12 @@ import { authentication } from './authentication'
 import { channels } from './channels'
 import { configurationValidator } from './configuration'
 import type { Application } from './declarations'
+import { logError } from './hooks/log-error'
 import { mongodb } from './mongodb'
 import { services } from './services/index'
+
+// Import generation worker to start it
+import './queues/workers/generation.worker'
 
 const app: Application = koa(feathers())
 
@@ -48,17 +52,12 @@ app.hooks({
   },
   before: {},
   after: {},
-  error: {}
+  error: [logError]
 })
 // Register application setup and teardown hooks here
 app.hooks({
-  setup: [
-   
-  ],
-  teardown: [
-   
-  ]
+  setup: [],
+  teardown: []
 })
-
 
 export { app }

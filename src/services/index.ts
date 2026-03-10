@@ -8,6 +8,7 @@ import { users } from './users/users'
 import type { Application } from '../declarations'
 import aiStreamService from './ai-service/ai-stream.service'
 import aiService from './ai-service/ai.service'
+import enhancePromptService from './ai-service/enhance-prompt.service'
 import validatePromptService from './ai-service/validate-prompt.service'
 import fileStream from './files/file-stream.service'
 import serverMonitorService from './server-monitor/server-monitor.service'
@@ -22,6 +23,7 @@ export const services = (app: Application) => {
   app.configure(aiService)
   app.configure(aiStreamService)
   app.configure(fileStream)
+  app.configure(enhancePromptService)
   app.configure(validatePromptService)
   app.configure(serverMonitorService)
 

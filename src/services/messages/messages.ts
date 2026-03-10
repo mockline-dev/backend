@@ -47,6 +47,12 @@ export const messages = (app: Application) => {
       find: [],
       get: [],
       create: [
+        async (context: any) => {
+          if (!context.data?.type) {
+            context.data.type = 'text'
+          }
+          return context
+        },
         schemaHooks.validateData(messagesDataValidator),
         schemaHooks.resolveData(messagesDataResolver)
       ],
@@ -60,7 +66,22 @@ export const messages = (app: Application) => {
       all: []
     },
     error: {
-      all: []
+      all: [
+        async (context: any) => {
+          const { error, method, params } = context
+
+          if (error?.name === 'BadRequest' || error?.name === 'ValidationError') {
+            console.error(`[Messages Service] Validation error on ${method}:`, {
+              error: error.message,
+              data: context.data,
+              params,
+              validationErrors: error.data || error.errors
+            })
+          }
+
+          return context
+        }
+      ]
     }
   })
 }

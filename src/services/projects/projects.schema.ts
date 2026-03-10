@@ -17,15 +17,33 @@ export const projectsSchema = Type.Object(
     framework: Type.Union([Type.Literal('fast-api'), Type.Literal('feathers')]),
     language: Type.Union([Type.Literal('python'), Type.Literal('typescript')]),
     model: Type.String(),
-    status: Type.Union([Type.Literal('initializing'), Type.Literal('generating'), Type.Literal('validating'), Type.Literal('ready'), Type.Literal('error')]),
+    status: Type.Union([
+      Type.Literal('initializing'),
+      Type.Literal('generating'),
+      Type.Literal('validating'),
+      Type.Literal('ready'),
+      Type.Literal('error')
+    ]),
     errorMessage: Type.Optional(Type.String()),
     createdAt: Type.Number(),
     updatedAt: Type.Number(),
-    // Progress tracking fields
-    filesGenerated: Type.Optional(Type.Number()),
-    totalFiles: Type.Optional(Type.Number()),
-    generationProgress: Type.Optional(Type.Number()),
-    currentStage: Type.Optional(Type.String())
+    // BullMQ job tracking
+    jobId: Type.Optional(Type.String()),
+    // Soft delete
+    deletedAt: Type.Optional(Type.Number()),
+    // Nested progress object
+    generationProgress: Type.Optional(
+      Type.Object({
+        percentage: Type.Number({ minimum: 0, maximum: 100, default: 0 }),
+        currentStage: Type.String({ default: '' }),
+        currentFile: Type.Optional(Type.String()),
+        filesGenerated: Type.Number({ default: 0 }),
+        totalFiles: Type.Number({ default: 0 }),
+        startedAt: Type.Optional(Type.Number()),
+        completedAt: Type.Optional(Type.Number()),
+        errorMessage: Type.Optional(Type.String())
+      })
+    )
   },
   { $id: 'Projects', additionalProperties: false }
 )
@@ -43,13 +61,27 @@ export const projectsResolver = resolve<ProjectsQuery, HookContext<ProjectsServi
 export const projectsExternalResolver = resolve<Projects, HookContext<ProjectsService>>({})
 
 // Schema for creating new entries
-export const projectsDataSchema = Type.Pick(projectsSchema, ['userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'filesGenerated', 'totalFiles', 'generationProgress', 'currentStage'], {
-  $id: 'ProjectsData'
-})
+export const projectsDataSchema = Type.Pick(
+  projectsSchema,
+  [
+    'userId',
+    'name',
+    'description',
+    'framework',
+    'language',
+    'model',
+    'status',
+    'jobId',
+    'generationProgress'
+  ],
+  {
+    $id: 'ProjectsData'
+  }
+)
 export type ProjectsData = Static<typeof projectsDataSchema>
 export const projectsDataValidator = getValidator(projectsDataSchema, dataValidator)
 export const projectsDataResolver = resolve<Projects, HookContext<ProjectsService>>({
-   createdAt: async () => {
+  createdAt: async () => {
     return Date.now()
   },
   updatedAt: async () => {
@@ -58,9 +90,31 @@ export const projectsDataResolver = resolve<Projects, HookContext<ProjectsServic
 })
 
 // Schema for updating existing entries
-export const projectsPatchSchema = Type.Partial(projectsSchema, {
-  $id: 'ProjectsPatch'
-})
+const generationProgressPatchSchema = Type.Partial(
+  Type.Object({
+    percentage: Type.Number({ minimum: 0, maximum: 100, default: 0 }),
+    currentStage: Type.String({ default: '' }),
+    currentFile: Type.Optional(Type.String()),
+    filesGenerated: Type.Number({ default: 0 }),
+    totalFiles: Type.Number({ default: 0 }),
+    startedAt: Type.Optional(Type.Number()),
+    completedAt: Type.Optional(Type.Number()),
+    errorMessage: Type.Optional(Type.String())
+  })
+)
+
+export const projectsPatchSchema = Type.Intersect(
+  [
+    Type.Partial(Type.Omit(projectsSchema, ['generationProgress'])),
+    Type.Object({
+      generationProgress: Type.Optional(generationProgressPatchSchema)
+    })
+  ],
+  {
+    $id: 'ProjectsPatch',
+    additionalProperties: false
+  }
+)
 export type ProjectsPatch = Static<typeof projectsPatchSchema>
 export const projectsPatchValidator = getValidator(projectsPatchSchema, dataValidator)
 export const projectsPatchResolver = resolve<ProjectsPatch, HookContext<ProjectsService>>({
@@ -70,7 +124,21 @@ export const projectsPatchResolver = resolve<ProjectsPatch, HookContext<Projects
 })
 
 // Schema for allowed query properties
-export const projectsQueryProperties = Type.Pick(projectsSchema, ['_id', 'userId', 'name', 'description', 'framework', 'language', 'model', 'status', 'errorMessage', 'createdAt', 'updatedAt', 'filesGenerated', 'totalFiles', 'generationProgress', 'currentStage'])
+export const projectsQueryProperties = Type.Pick(projectsSchema, [
+  '_id',
+  'userId',
+  'name',
+  'description',
+  'framework',
+  'language',
+  'model',
+  'status',
+  'errorMessage',
+  'createdAt',
+  'updatedAt',
+  'jobId',
+  'deletedAt'
+])
 export const projectsQuerySchema = Type.Intersect(
   [
     querySyntax(projectsQueryProperties),

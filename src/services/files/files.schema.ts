@@ -17,7 +17,7 @@ export const filesSchema = Type.Object(
     key: Type.String(),
     fileType: Type.String(),
     size: Type.Number(),
-    currentVersion: Type.Number({default: 1}),
+    currentVersion: Type.Number({ default: 1 }),
     createdAt: Type.Number(),
     updatedAt: Type.Number()
   },
@@ -30,9 +30,13 @@ export const filesResolver = resolve<FilesQuery, HookContext<FilesService>>({})
 export const filesExternalResolver = resolve<Files, HookContext<FilesService>>({})
 
 // Schema for creating new entries
-export const filesDataSchema = Type.Pick(filesSchema, ['projectId', 'messageId', 'name', 'key', 'fileType', 'size'], {
-  $id: 'FilesData'
-})
+export const filesDataSchema = Type.Pick(
+  filesSchema,
+  ['projectId', 'messageId', 'name', 'key', 'fileType', 'size'],
+  {
+    $id: 'FilesData'
+  }
+)
 export type FilesData = Static<typeof filesDataSchema>
 export const filesDataValidator = getValidator(filesDataSchema, dataValidator)
 export const filesDataResolver = resolve<Files, HookContext<FilesService>>({
@@ -57,7 +61,18 @@ export const filesPatchResolver = resolve<FilesPatch, HookContext<FilesService>>
 })
 
 // Schema for allowed query properties
-export const filesQueryProperties = Type.Pick(filesSchema, ['_id', 'projectId', 'messageId', 'name', 'fileType', 'size', 'currentVersion', 'createdAt', 'updatedAt'])
+export const filesQueryProperties = Type.Pick(filesSchema, [
+  '_id',
+  'projectId',
+  'messageId',
+  'name',
+  'fileType',
+  'size',
+  'key',
+  'currentVersion',
+  'createdAt',
+  'updatedAt'
+])
 export const filesQuerySchema = Type.Intersect(
   [
     querySyntax(filesQueryProperties),

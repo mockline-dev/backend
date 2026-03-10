@@ -21,10 +21,14 @@ export class FilesService<ServiceParams extends Params = FilesParams> extends Mo
 export const getOptions = (app: Application): MongoDBAdapterOptions => {
   return {
     paginate: app.get('paginate'),
-    Model: app.get('mongodbClient').then((db) => db.collection('files')).then(async collection => {
+    Model: app
+      .get('mongodbClient')
+      .then(db => db.collection('files'))
+      .then(async collection => {
         await collection.createIndex({ projectId: 1 })
         await collection.createIndex({ messageId: 1 })
         await collection.createIndex({ createdAt: -1 })
+        await collection.createIndex({ path: 1 })
 
         return collection
       })

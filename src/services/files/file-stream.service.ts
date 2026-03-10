@@ -19,7 +19,9 @@ export default function (app: any) {
       // Support both calling conventions:
       // 1. service.get(key) - key is passed as id
       // 2. service.get(null, { key }) - key is passed in params
-      const key = id || params?.key
+      // 3. service.get(any, { query: { key } }) - key is passed in query
+      const rawKey = id || params?.key || params?.query?.key
+      const key = typeof rawKey === 'string' ? decodeURIComponent(rawKey) : rawKey
 
       try {
         if (!key || typeof key !== 'string') {

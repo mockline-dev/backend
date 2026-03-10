@@ -10,16 +10,16 @@ import type { SnapshotsService } from './snapshots.class'
 // Main data model schema
 export const snapshotsSchema = Type.Object(
   {
-   _id: ObjectIdSchema(),
+    _id: ObjectIdSchema(),
     projectId: ObjectIdSchema(),
     version: Type.Number(),
     label: Type.String(),
-    description: Type.Optional(Type.String()),
     trigger: Type.Union([
       Type.Literal('auto-generation'),
       Type.Literal('auto-ai-edit'),
       Type.Literal('manual')
     ]),
+    r2Prefix: Type.String(),
     files: Type.Array(
       Type.Object({
         fileId: ObjectIdSchema(),
@@ -38,17 +38,29 @@ export const snapshotsSchema = Type.Object(
 )
 export type Snapshots = Static<typeof snapshotsSchema>
 export const snapshotsValidator = getValidator(snapshotsSchema, dataValidator)
-export const snapshotsResolver = resolve<SnapshotsQuery, HookContext<SnapshotsService>>({})
+export const snapshotsResolver = resolve<SnapshotsQuery, HookContext<SnapshotsService>>({
+  createdAt: async () => {
+    return Date.now()
+  }
+})
 
 export const snapshotsExternalResolver = resolve<Snapshots, HookContext<SnapshotsService>>({})
 
 // Schema for creating new entries
-export const snapshotsDataSchema = Type.Pick(snapshotsSchema, ['projectId', 'version', 'label', 'description', 'trigger', 'files', 'totalSize', 'fileCount', 'createdAt'], {
-  $id: 'SnapshotsData'
-})
+export const snapshotsDataSchema = Type.Pick(
+  snapshotsSchema,
+  ['projectId', 'version', 'label', 'trigger', 'r2Prefix', 'files', 'totalSize', 'fileCount', 'createdAt'],
+  {
+    $id: 'SnapshotsData'
+  }
+)
 export type SnapshotsData = Static<typeof snapshotsDataSchema>
 export const snapshotsDataValidator = getValidator(snapshotsDataSchema, dataValidator)
-export const snapshotsDataResolver = resolve<SnapshotsData, HookContext<SnapshotsService>>({})
+export const snapshotsDataResolver = resolve<SnapshotsData, HookContext<SnapshotsService>>({
+  createdAt: async () => {
+    return Date.now()
+  }
+})
 
 // Schema for updating existing entries
 export const snapshotsPatchSchema = Type.Partial(snapshotsSchema, {
@@ -59,7 +71,8 @@ export const snapshotsPatchValidator = getValidator(snapshotsPatchSchema, dataVa
 export const snapshotsPatchResolver = resolve<SnapshotsPatch, HookContext<SnapshotsService>>({})
 
 // Schema for allowed query properties
-export const snapshotsQueryProperties = Type.Pick(snapshotsSchema, [ '_id',
+export const snapshotsQueryProperties = Type.Pick(snapshotsSchema, [
+  '_id',
   'projectId',
   'version',
   'label',
