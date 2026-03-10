@@ -1,4 +1,5 @@
 import { authenticate } from '@feathersjs/authentication'
+import { BadRequest, Forbidden, NotFound } from '@feathersjs/errors'
 import ollama from 'ollama'
 
 const MOCKY_ASSISTANT_PROMPT = `You are Mocky, an expert backend developer assistant for the Mockline platform.
@@ -21,84 +22,118 @@ Rules:
 - Follow FastAPI best practices (Pydantic v2, dependency injection, proper error handling)`
 
 export default function (app: any) {
-  app.use('/ai-stream', {
-    async create(data: {
-      projectId: string
-      message: string
-      conversationHistory?: Array<{ role: string; content: string }>
-      context?: { files: string[]; selectedFile?: string; selectedContent?: string }
-    }) {
-      const { projectId, message, conversationHistory = [], context } = data
+  app.use(
+    '/ai-stream',
+    {
+      async create(
+        data: {
+          projectId: string
+          message: string
+          conversationHistory?: Array<{ role: string; content: string }>
+          context?: { files: string[]; selectedFile?: string; selectedContent?: string }
+        },
+        params: any
+      ) {
+        const { projectId, message, conversationHistory = [], context } = data
 
-      // Build messages array for Ollama chat
-      const messages = [
-        { role: 'system', content: buildSystemPrompt(context) },
-        ...conversationHistory,
-        { role: 'user', content: message }
-      ]
-
-      // Get Socket.IO connection for this project
-      const channel = app.channel(`projects/${projectId}`)
-
-      let fullContent = ''
-
-      // Stream using ollama.chat
-      const stream = await ollama.chat({
-        model: app.get('ollama').model,
-        messages,
-        stream: true,
-        options: {
-          temperature: 0.4,
-          num_predict: 8192,
-          num_ctx: 32768
+        if (!projectId) {
+          throw new BadRequest('projectId is required')
         }
-      })
 
-      for await (const chunk of stream) {
-        fullContent += chunk.message.content
+        if (!message?.trim()) {
+          throw new BadRequest('message is required')
+        }
 
-        // Emit each chunk via Socket.IO
-        channel.send({
-          type: 'ai-stream::chunk',
-          projectId,
-          content: chunk.message.content,
-          fullContent,
-          done: chunk.done
-        })
-      }
-
-      // Save the complete assistant message
-      const assistantMessage = await app.service('messages').create({
-        projectId,
-        role: 'assistant',
-        type: 'text',
-        content: fullContent
-      })
-
-      // Parse for file updates and handle them
-      const fileUpdates = parseFileUpdates(fullContent)
-      if (fileUpdates.length > 0) {
-        // Auto-snapshot before applying AI-suggested changes
+        const userId = params.user?._id?.toString?.()
+        let project: any
         try {
-          await app.service('snapshots').create({
-            projectId,
-            label: `Before AI edit: ${message.substring(0, 50)}`,
-            trigger: 'auto-ai-edit'
-          })
-        } catch (snapErr: any) {
-          console.error('Failed to create pre-edit snapshot:', snapErr.message)
+          project = await app.service('projects').get(projectId)
+        } catch {
+          throw new NotFound('Project not found')
         }
 
-        channel.send({
-          type: 'ai-stream::file-updates',
-          projectId,
-          updates: fileUpdates
-        })
-      }
+        if (project.userId?.toString?.() !== userId) {
+          throw new Forbidden('Not your project')
+        }
 
-      return { success: true, messageId: assistantMessage._id }
+        const sanitizedHistory = (conversationHistory || [])
+          .filter(
+            item =>
+              item && typeof item.content === 'string' && ['system', 'user', 'assistant'].includes(item.role)
+          )
+          .slice(-30)
+
+        // Build messages array for Ollama chat
+        const messages = [
+          { role: 'system', content: buildSystemPrompt(context) },
+          ...sanitizedHistory,
+          { role: 'user', content: message }
+        ]
+
+        const aiStreamService = app.service('ai-stream')
+
+        let fullContent = ''
+
+        // Stream using ollama.chat
+        const stream = await ollama.chat({
+          model: app.get('ollama').model,
+          messages,
+          stream: true,
+          options: {
+            temperature: 0.4,
+            num_predict: 8192,
+            num_ctx: 32768
+          }
+        })
+
+        for await (const chunk of stream) {
+          fullContent += chunk.message.content
+
+          // Emit streaming chunk as a custom service event.
+          aiStreamService.emit('chunk', {
+            projectId,
+            content: chunk.message.content,
+            fullContent,
+            done: chunk.done
+          })
+        }
+
+        // Save the complete assistant message
+        const assistantMessage = await app.service('messages').create({
+          projectId,
+          role: 'assistant',
+          type: 'text',
+          content: fullContent
+        })
+
+        // Parse for file updates and handle them
+        const fileUpdates = parseFileUpdates(fullContent)
+        if (fileUpdates.length > 0) {
+          // Auto-snapshot before applying AI-suggested changes
+          try {
+            await app.service('snapshots').create({
+              projectId,
+              label: `Before AI edit: ${message.substring(0, 50)}`,
+              trigger: 'auto-ai-edit'
+            })
+          } catch (snapErr: any) {
+            console.error('Failed to create pre-edit snapshot:', snapErr.message)
+          }
+
+          aiStreamService.emit('file-updates', {
+            projectId,
+            updates: fileUpdates
+          })
+        }
+
+        return { success: true, messageId: assistantMessage._id }
+      }
+    },
+    {
+      methods: ['create'],
+      events: ['chunk', 'file-updates']
     }
-  })
+  )
 
   app.service('ai-stream').hooks({
     before: {
@@ -126,7 +161,8 @@ function parseFileUpdates(content: string): Array<{
   language: string
 }> {
   const updates: any[] = []
-  const pattern = /FILE_UPDATE:\s*([^\n]+)\nACTION:\s*(create|modify|delete)\nDESCRIPTION:\s*([^\n]+)\n```(\w*)\n([\s\S]*?)```/g
+  const pattern =
+    /FILE_UPDATE:\s*([^\n]+)\nACTION:\s*(create|modify|delete)\nDESCRIPTION:\s*([^\n]+)\n```(\w*)\n([\s\S]*?)```/g
   let match
   while ((match = pattern.exec(content)) !== null) {
     updates.push({

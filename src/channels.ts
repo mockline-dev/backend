@@ -69,6 +69,14 @@ export const channels = (app: Application) => {
     return app.channel(`projects/${data.projectId}`)
   })
 
+  app.service('ai-stream').publish('chunk', (data: any) => {
+    return app.channel(`projects/${data.projectId}`)
+  })
+
+  app.service('ai-stream').publish('file-updates', (data: any) => {
+    return app.channel(`projects/${data.projectId}`)
+  })
+
   // eslint-disable-next-line no-unused-vars
   app.publish((_data: any, _context: HookContext) => {
     return app.channel('authenticated')

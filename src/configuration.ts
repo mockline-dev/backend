@@ -27,7 +27,12 @@ export const configurationSchema = Type.Intersect([
       numCtx: Type.Number(),
       temperature: Type.Number(),
       topP: Type.Number(),
-      repeatPenalty: Type.Number()
+      repeatPenalty: Type.Number(),
+      timeout: Type.Number(),
+      baseUrl: Type.Optional(Type.String())
+    }),
+    redis: Type.Object({
+      url: Type.String()
     })
   })
 ])

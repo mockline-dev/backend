@@ -34,3 +34,6 @@ declare module '../../client' {
     [snapshotsPath]: SnapshotsClientService
   }
 }
+
+// Export helper functions for snapshot operations
+export type { createSnapshotWithR2, pruneSnapshots, restoreSnapshot } from './snapshots.class'
