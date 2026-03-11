@@ -12,6 +12,66 @@ function parseJson(text: string): any {
   return JSON.parse((match?.[1] || text).trim())
 }
 
+function parseJsonOrThrow(text: string, context: string): any {
+  try {
+    return parseJson(text)
+  } catch (error) {
+    const snippet = text.slice(0, 600)
+    logger.error('Failed to parse %s JSON. Raw response snippet: %s', context, snippet)
+    throw new Error(
+      `Failed to parse ${context} JSON: ${error instanceof Error ? error.message : 'unknown error'}`
+    )
+  }
+}
+
+function normalizeFilePlan(input: unknown): { path: string; description: string }[] {
+  if (!Array.isArray(input)) {
+    throw new Error('File plan is not an array')
+  }
+
+  const normalized = input
+    .filter(item => typeof item === 'object' && item !== null)
+    .map(item => {
+      const itemRecord = item as Record<string, unknown>
+      const path: string = typeof itemRecord.path === 'string' ? itemRecord.path : ''
+      const description: string =
+        typeof itemRecord.description === 'string' ? itemRecord.description : 'Generated project file'
+
+      return {
+        path: path.trim(),
+        description: description.trim()
+      }
+    })
+    .filter(item => item.path.length > 0)
+
+  if (normalized.length === 0) {
+    throw new Error('File plan is empty')
+  }
+
+  return normalized
+}
+
+function ensureRequiredFiles(
+  filePlan: { path: string; description: string }[]
+): { path: string; description: string }[] {
+  const requiredFiles: { path: string; description: string }[] = [
+    { path: 'requirements.txt', description: 'Python dependencies for the generated backend' },
+    { path: 'main.py', description: 'FastAPI app entrypoint' }
+  ]
+
+  const existing = new Set(filePlan.map(file => file.path))
+  const nextPlan = [...filePlan]
+
+  for (const required of requiredFiles) {
+    if (!existing.has(required.path)) {
+      logger.warn('Required file missing from generated plan. Injecting: %s', required.path)
+      nextPlan.unshift(required)
+    }
+  }
+
+  return nextPlan
+}
+
 function stripFences(text: string): string {
   return text
     .replace(/^```[\w]*\n/, '')
@@ -55,7 +115,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       )) {
         schemaText += chunk.message.content
       }
-      const schema = parseJson(schemaText)
+      const schema = parseJsonOrThrow(schemaText, 'schema')
 
       await updateProgress('Planning files', 15)
 
@@ -68,7 +128,8 @@ export const generationWorker = new Worker<GenerationJobData>(
       )) {
         planText += chunk.message.content
       }
-      const filePlan: { path: string; description: string }[] = parseJson(planText)
+      const rawFilePlan = parseJsonOrThrow(planText, 'file plan')
+      const filePlan = ensureRequiredFiles(normalizeFilePlan(rawFilePlan))
 
       await app.service('projects').patch(projectId, {
         generationProgress: {
@@ -88,22 +149,48 @@ export const generationWorker = new Worker<GenerationJobData>(
         await updateProgress('Generating files', percentage, file.path)
 
         const contextFiles = generatedFiles.slice(-3)
-        let fileContent = ''
+        let clean = ''
 
-        for await (const chunk of ollamaClient.chatStream(
-          [
-            {
-              role: 'user',
-              content: buildGenerationPrompts.generateFile(prompt, schema, file, contextFiles)
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            let fileContent = ''
+            for await (const chunk of ollamaClient.chatStream(
+              [
+                {
+                  role: 'user',
+                  content: buildGenerationPrompts.generateFile(prompt, schema, file, contextFiles)
+                }
+              ],
+              undefined,
+              { temperature: 0.1 }
+            )) {
+              fileContent += chunk.message.content
             }
-          ],
-          undefined,
-          { temperature: 0.1 }
-        )) {
-          fileContent += chunk.message.content
+
+            clean = stripFences(fileContent)
+
+            if (!clean) {
+              throw new Error('Generated file content is empty')
+            }
+
+            break
+          } catch (error) {
+            logger.warn(
+              'Failed generating file %s for project %s (attempt %s/2): %s',
+              file.path,
+              projectId,
+              attempt,
+              error instanceof Error ? error.message : 'unknown error'
+            )
+
+            if (attempt === 2) {
+              throw new Error(
+                `Failed generating file ${file.path}: ${error instanceof Error ? error.message : 'unknown error'}`
+              )
+            }
+          }
         }
 
-        const clean = stripFences(fileContent)
         generatedFiles.push({ path: file.path, content: clean })
 
         await r2Client.putObject(`projects/${projectId}/${file.path}`, clean)

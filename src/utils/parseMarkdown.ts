@@ -14,6 +14,11 @@ interface ParsedEnhancePromptResponse {
   enhancedPrompt: string
 }
 
+interface ParsedInferProjectMetaResponse {
+  name: string
+  description: string
+}
+
 export const parseProjectResponse = (markdown: string): ParsedProjectResponse => {
   console.log('Parsing key-value format response...')
 
@@ -202,6 +207,26 @@ export const parseEnhancePromptResponse = (jsonString: string): ParsedEnhancePro
     result.enhancedPrompt = parsed.enhancedPrompt || ''
   } catch (error) {
     console.error('Failed to parse JSON enhance-prompt response:', error)
+  }
+
+  return result
+}
+
+export const parseInferProjectMetaResponse = (jsonString: string): ParsedInferProjectMetaResponse => {
+  const result: ParsedInferProjectMetaResponse = {
+    name: '',
+    description: ''
+  }
+
+  try {
+    const fenceMatch: RegExpMatchArray | null = jsonString.match(/```(?:json)?\s*([\s\S]*?)```/)
+    const clean: string = fenceMatch ? fenceMatch[1].trim() : jsonString.trim()
+    const parsed = JSON.parse(clean)
+
+    result.name = typeof parsed.name === 'string' ? parsed.name.trim().slice(0, 60) : ''
+    result.description = typeof parsed.description === 'string' ? parsed.description.trim() : ''
+  } catch (error) {
+    console.error('Failed to parse JSON infer-project-meta response:', error)
   }
 
   return result
