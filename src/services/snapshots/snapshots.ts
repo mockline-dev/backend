@@ -1,5 +1,6 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.html
 import { authenticate } from '@feathersjs/authentication'
+import { BadRequest } from '@feathersjs/errors'
 
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
@@ -118,6 +119,8 @@ export const snapshots = (app: Application) => {
           context.data.files = snapshotFiles
           context.data.totalSize = snapshotFiles.reduce((sum, f) => sum + (f.size ?? 0), 0)
           context.data.fileCount = snapshotFiles.length
+          context.data.r2Prefix = `snapshots/${projectId}/v${nextVersion}/`
+          context.data.createdAt = Date.now()
 
           logger.info('Snapshot prepared', {
             projectId,
@@ -201,6 +204,9 @@ export const snapshots = (app: Application) => {
           }
 
           // 3. Copy snapshot files back to original paths and recreate file records
+          const restoreErrors: Array<{ file: string; error: string }> = []
+          let restoredCount = 0
+
           for (const snapshotFile of snapshot.files) {
             try {
               await s3Client.send(
@@ -210,14 +216,19 @@ export const snapshots = (app: Application) => {
                   Key: snapshotFile.key
                 })
               )
-              await context.app.service('files')._create({
+              await context.app.service('files').create({
                 projectId,
                 name: snapshotFile.name,
                 key: snapshotFile.key,
                 fileType: snapshotFile.fileType,
                 size: snapshotFile.size
               })
+              restoredCount += 1
             } catch (err: any) {
+              restoreErrors.push({
+                file: snapshotFile.name,
+                error: err.message
+              })
               logger.error('Failed to restore file during rollback', {
                 file: snapshotFile.name,
                 error: err.message
@@ -225,12 +236,23 @@ export const snapshots = (app: Application) => {
             }
           }
 
+          if (restoredCount === 0 || restoreErrors.length > 0) {
+            throw new BadRequest(
+              `Rollback failed: restored ${restoredCount}/${snapshot.files.length} files.`,
+              {
+                restoredCount,
+                expectedCount: snapshot.files.length,
+                restoreErrors
+              }
+            )
+          }
+
           // Short-circuit the patch — return rollback result directly
           context.result = {
             success: true,
             restoredVersion: snapshot.version,
             projectId,
-            fileCount: snapshot.files.length
+            fileCount: restoredCount
           }
 
           return context

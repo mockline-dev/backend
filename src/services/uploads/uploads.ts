@@ -4,6 +4,7 @@ import {
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  PutObjectCommand,
   S3Client,
   UploadPartCommand
 } from '@aws-sdk/client-s3'
@@ -25,13 +26,40 @@ export const uploads = (app: Application) => {
 
   app.use(uploadsPath, {
     async create(data: any) {
-      const { key, contentType } = data
+      const { key, contentType, content } = data
 
       if (!key) {
         throw new Error('Key is required')
       }
       if (!contentType) {
         throw new Error('ContentType is required')
+      }
+
+      // Save flow sends full text content in one request; use a direct put to avoid orphaned multipart uploads.
+      if (content !== undefined && content !== null) {
+        let body = content
+        if (typeof content === 'string' && content.startsWith('data:')) {
+          const base64Data = content.split(',')[1]
+          body = Buffer.from(base64Data, 'base64')
+        }
+
+        const putCommand = new PutObjectCommand({
+          Bucket: awsConfig.bucket,
+          Key: key,
+          ContentType: contentType,
+          Body: body,
+          ACL: 'public-read',
+          ...(typeof content === 'string' && !content.startsWith('data:')
+            ? { ContentLength: Buffer.byteLength(content) }
+            : {})
+        })
+
+        await s3Client.send(putCommand)
+
+        return {
+          key,
+          success: true
+        }
       }
 
       const command = new CreateMultipartUploadCommand({
