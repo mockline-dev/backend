@@ -11,15 +11,28 @@ FILE_UPDATE: [filename]
 ACTION: [create|modify|delete]
 DESCRIPTION: [brief description of change]
 \`\`\`[language]
-[complete new file content]
+[updated code content]
 \`\`\`
 
 Rules:
-- Always provide complete file contents (no partial updates or diffs)
+- For ACTION: modify, ALWAYS use targeted SEARCH/REPLACE blocks. Do not return full-file content for modify.
+- Use this block format for targeted modifications:
+  <<<<<<< SEARCH
+  [exact existing code snippet]
+  =======
+  [new replacement snippet]
+  >>>>>>> REPLACE
+- You can include multiple SEARCH/REPLACE blocks in one modify update.
+- For dependency files (such as requirements.txt), preserve existing lines and only change the specific dependency lines requested.
+- Only return full-file content for ACTION: create.
 - One FILE_UPDATE block per file
-- Explain your changes before showing them
+- Keep explanations brief and put file update blocks exactly as specified
+- Do not wrap FILE_UPDATE/ACTION/DESCRIPTION labels in markdown formatting
 - Consider the existing project structure
-- Follow FastAPI best practices (Pydantic v2, dependency injection, proper error handling)`
+- Prioritize the user's exact prompt intent and avoid unrelated refactors or formatting-only rewrites.
+- Keep edits minimal, safe, and scoped to only what the user requested.
+- If the user provides logs/errors, diagnose the concrete root cause from those logs first and propose targeted fixes; do not reply with generic clarification prompts.
+- Follow FastAPI best practices (Pydantic v2, dependency injection, proper error handling, and minimal safe changes that satisfy the request)`
 
 export default function (app: any) {
   app.use(
@@ -126,7 +139,10 @@ export default function (app: any) {
           })
         }
 
-        return { success: true, messageId: assistantMessage._id }
+        return {
+          success: true,
+          messageId: assistantMessage?._id?.toString?.() ?? assistantMessage?._id
+        }
       }
     },
     {
@@ -161,17 +177,41 @@ function parseFileUpdates(content: string): Array<{
   language: string
 }> {
   const updates: any[] = []
+  const normalized = content.replace(/\r\n/g, '\n')
+
+  // Accept slightly noisy markdown output while still requiring structured fields.
   const pattern =
-    /FILE_UPDATE:\s*([^\n]+)\nACTION:\s*(create|modify|delete)\nDESCRIPTION:\s*([^\n]+)\n```(\w*)\n([\s\S]*?)```/g
+    /(?:^|\n)\s*\*{0,2}\s*FILE_UPDATE\s*:\s*(.+?)\s*\*{0,2}\s*\n\s*\*{0,2}\s*ACTION\s*:\s*(create|modify|delete)\s*\*{0,2}\s*\n\s*\*{0,2}\s*DESCRIPTION\s*:\s*(.+?)\s*\*{0,2}\s*\n```([\w+-]*)\n([\s\S]*?)```/gi
+
+  const clean = (value: string) =>
+    value
+      .trim()
+      .replace(/^\*+|\*+$/g, '')
+      .replace(/^`+|`+$/g, '')
+      .trim()
+
   let match
-  while ((match = pattern.exec(content)) !== null) {
+  while ((match = pattern.exec(normalized)) !== null) {
+    const rawFilename = clean(match[1])
+    const filename = rawFilename
+      .replace(/^\[\s*/, '')
+      .replace(/\s*\]$/, '')
+      .trim()
+    const action = clean(match[2]).toLowerCase() as 'create' | 'modify' | 'delete'
+    const description = clean(match[3])
+    const language = clean(match[4]) || 'text'
+    const fileContent = match[5] ?? ''
+
+    if (!filename) continue
+
     updates.push({
-      filename: match[1].trim(),
-      action: match[2].trim(),
-      description: match[3].trim(),
-      language: match[4] || 'text',
-      content: match[5]
+      filename,
+      action,
+      description,
+      language,
+      content: fileContent
     })
   }
+
   return updates
 }

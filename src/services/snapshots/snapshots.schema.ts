@@ -62,10 +62,20 @@ export const snapshotsDataResolver = resolve<SnapshotsData, HookContext<Snapshot
   }
 })
 
-// Schema for updating existing entries
-export const snapshotsPatchSchema = Type.Partial(snapshotsSchema, {
-  $id: 'SnapshotsPatch'
-})
+// Schema for updating existing entries.
+// `action: 'rollback'` is used by the rollback flow and must pass validation.
+export const snapshotsPatchSchema = Type.Intersect(
+  [
+    Type.Partial(snapshotsSchema),
+    Type.Object({
+      action: Type.Optional(Type.Literal('rollback'))
+    })
+  ],
+  {
+    $id: 'SnapshotsPatch',
+    additionalProperties: false
+  }
+)
 export type SnapshotsPatch = Static<typeof snapshotsPatchSchema>
 export const snapshotsPatchValidator = getValidator(snapshotsPatchSchema, dataValidator)
 export const snapshotsPatchResolver = resolve<SnapshotsPatch, HookContext<SnapshotsService>>({})
