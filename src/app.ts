@@ -12,9 +12,8 @@ import { logError } from './hooks/log-error'
 import { mongodb } from './mongodb'
 import { services } from './services/index'
 
-// Import generation worker to start it
-import './queues/workers/generation.worker'
-import './queues/workers/validation.worker'
+import { gracefulShutdown } from './hooks/graceful-shutdown'
+import { startWorkerService } from './services/redis'
 
 const app: Application = koa(feathers())
 
@@ -74,16 +73,27 @@ app.configure(channels)
 // Register hooks that run on all service methods
 app.hooks({
   around: {
-    all: []
+    all: [logError]
   },
   before: {},
   after: {},
-  error: [logError]
+  error: []
 })
 // Register application setup and teardown hooks here
 app.hooks({
-  setup: [],
-  teardown: []
+  setup: [
+    async () => {
+      await startWorkerService(app)
+    }
+  ],
+  teardown: [
+    async () => {
+      await gracefulShutdown()
+    }
+  ]
 })
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 
 export { app }

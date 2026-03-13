@@ -23,6 +23,20 @@ This project uses [Feathers](http://feathersjs.com). An open source framework fo
     npm start
     ```
 
+## Redis (Docker)
+
+Run Redis only (for local backend development):
+
+```bash
+docker compose up -d redis
+```
+
+Stop Redis:
+
+```bash
+docker compose stop redis
+```
+
 ## Testing
 
 Run `npm test` and all your tests in the `test/` directory will be run.

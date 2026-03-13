@@ -120,29 +120,59 @@ export const projects = (app: Application) => {
 
           // Don't await — run AI generation in background so the create response returns immediately
           ;(async () => {
-            try {
-              await app.service('ai-service').create(
-                {
-                  projectId,
-                  prompt: result.description || result.name
-                },
-                { user }
-              )
-            } catch (error: any) {
-              console.error(`Project ${projectId} generation failed:`, error)
+            const maxRetries = 2
+            let attempt = 0
+            let lastError: any = null
+
+            while (attempt < maxRetries) {
               try {
-                await app.service('projects')._patch(projectId, {
-                  status: 'error',
-                  errorMessage: error.message || 'Unexpected error during generation',
-                  generationProgress: {
-                    percentage: 0,
-                    currentStage: 'error',
-                    filesGenerated: 0,
-                    totalFiles: 0
+                await app.service('ai-service').create(
+                  {
+                    projectId,
+                    prompt: result.description || result.name
+                  },
+                  { user }
+                )
+                // Success - break out of retry loop
+                break
+              } catch (error: any) {
+                lastError = error
+                attempt++
+
+                // Check if error is retryable
+                const isRetryable = error.message?.includes('timeout') ||
+                                   error.message?.includes('network') ||
+                                   error.message?.includes('ECONN') ||
+                                   error.code === 'ECONNRESET' ||
+                                   error.code === 'ETIMEDOUT'
+
+                if (!isRetryable || attempt >= maxRetries) {
+                  // Non-retryable error or max retries reached
+                  console.error(`Project ${projectId} generation failed (attempt ${attempt}):`, error.message)
+                  try {
+                    await app.service('projects')._patch(projectId, {
+                      status: 'error',
+                      errorMessage: error.message || 'Unexpected error during generation',
+                      errorType: isRetryable ? 'retryable_error' : 'permanent_error',
+                      retryAttempts: attempt,
+                      generationProgress: {
+                        percentage: 0,
+                        currentStage: 'error',
+                        filesGenerated: 0,
+                        totalFiles: 0,
+                        failedAt: Date.now()
+                      }
+                    })
+                  } catch (patchError) {
+                    console.error(`Failed to update project ${projectId} error status:`, patchError)
                   }
-                })
-              } catch (patchError) {
-                console.error(`Failed to update project ${projectId} error status:`, patchError)
+                  break
+                }
+
+                // Retry with exponential backoff
+                const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000)
+                console.warn(`Project ${projectId} generation failed, retrying in ${backoffDelay}ms (attempt ${attempt}/${maxRetries})`)
+                await new Promise(resolve => setTimeout(resolve, backoffDelay))
               }
             }
           })()

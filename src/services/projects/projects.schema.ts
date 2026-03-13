@@ -25,6 +25,8 @@ export const projectsSchema = Type.Object(
       Type.Literal('error')
     ]),
     errorMessage: Type.Optional(Type.String()),
+    errorType: Type.Optional(Type.String()),
+    retryAttempts: Type.Optional(Type.Number()),
     createdAt: Type.Number(),
     updatedAt: Type.Number(),
     // BullMQ job tracking
@@ -41,7 +43,18 @@ export const projectsSchema = Type.Object(
         totalFiles: Type.Number({ default: 0 }),
         startedAt: Type.Optional(Type.Number()),
         completedAt: Type.Optional(Type.Number()),
-        errorMessage: Type.Optional(Type.String())
+        failedAt: Type.Optional(Type.Number()),
+        errorMessage: Type.Optional(Type.String()),
+        warnings: Type.Optional(Type.Array(Type.String())),
+        errorType: Type.Optional(Type.String()),
+        retryAttempts: Type.Optional(Type.Number()),
+        validationResults: Type.Optional(
+          Type.Object({
+            passCount: Type.Number(),
+            failCount: Type.Number(),
+            failedFiles: Type.Array(Type.String())
+          })
+        )
       })
     )
   },
@@ -99,7 +112,18 @@ const generationProgressPatchSchema = Type.Partial(
     totalFiles: Type.Number({ default: 0 }),
     startedAt: Type.Optional(Type.Number()),
     completedAt: Type.Optional(Type.Number()),
-    errorMessage: Type.Optional(Type.String())
+    failedAt: Type.Optional(Type.Number()),
+    errorMessage: Type.Optional(Type.String()),
+    warnings: Type.Optional(Type.Array(Type.String())),
+    errorType: Type.Optional(Type.String()),
+    retryAttempts: Type.Optional(Type.Number()),
+    validationResults: Type.Optional(
+      Type.Object({
+        passCount: Type.Number(),
+        failCount: Type.Number(),
+        failedFiles: Type.Array(Type.String())
+      })
+    )
   })
 )
 

@@ -1,25 +1,28 @@
+import type { Application } from '@feathersjs/feathers'
 import admin from 'firebase-admin'
 import fs from 'fs'
 
-// Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-  try {
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './mockline-1a0e0-firebase-adminsdk-fbsvc-3f81f63b5b.json'
-    
-    if (!fs.existsSync(serviceAccountPath)) {
-      throw new Error(`Firebase service account file not found: ${serviceAccountPath}`)
-    }
-    
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'))
-    
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id
-    })
-  } catch (error) {
-    console.error('Failed to initialize Firebase Admin SDK:', error)
-    throw new Error('Firebase configuration error')
+let firebaseAdmin: admin.app.App | null = null
+
+export const initializeFirebase = (app: Application) => {
+  if (firebaseAdmin) {
+    return firebaseAdmin
   }
+
+  const config = app.get('firebase')
+  const serviceAccount = JSON.parse(fs.readFileSync(config.serviceAccountPath, 'utf8'))
+
+  firebaseAdmin = admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  })
+
+  return firebaseAdmin
 }
 
+export const getFirebaseAdmin = () => {
+  if (!firebaseAdmin) {
+    throw new Error('Firebase admin not initialized. Call initializeFirebase first.')
+  }
+  return firebaseAdmin
+}
 export default admin

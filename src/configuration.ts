@@ -31,8 +31,26 @@ export const configurationSchema = Type.Intersect([
       timeout: Type.Number(),
       baseUrl: Type.Optional(Type.String())
     }),
-    redis: Type.Object({
-      url: Type.String()
+    redisConfig: Type.Object({
+      host: Type.String(),
+      port: Type.Number(),
+      username: Type.Union([Type.String(), Type.Null()]),
+      password: Type.String(),
+      db: Type.Number()
+    }),
+    jobs: Type.Record(
+      Type.String(),
+      Type.Object({
+        enabled: Type.Boolean(),
+        delay: Type.Number()
+      })
+    ),
+    bullBoard: Type.Object({
+      username: Type.String(),
+      password: Type.String()
+    }),
+    firebase: Type.Object({
+      serviceAccountPath: Type.String()
     })
   })
 ])
