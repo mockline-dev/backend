@@ -7,7 +7,7 @@ export interface ILLMProvider {
   chatStream(
     messages: OllamaMessage[],
     tools?: object[],
-    options?: { temperature?: number; num_ctx?: number; top_p?: number }
+    options?: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number }
   ): AsyncGenerator<OllamaStreamChunk>
 
   /**

@@ -8,7 +8,7 @@ export class OllamaProvider implements ILLMProvider {
   async *chatStream(
     messages: OllamaMessage[],
     tools?: object[],
-    options: { temperature?: number; num_ctx?: number; top_p?: number } = {}
+    options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
   ): AsyncGenerator<OllamaStreamChunk> {
     yield* ollamaClient.chatStream(messages, tools, options)
   }

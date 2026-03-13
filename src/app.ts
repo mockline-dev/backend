@@ -8,17 +8,18 @@ import { authentication } from './authentication'
 import { channels } from './channels'
 import { configurationValidator } from './configuration'
 import type { Application } from './declarations'
+import { initializeFirebase } from './firebase'
 import { logError } from './hooks/log-error'
 import { mongodb } from './mongodb'
 import { services } from './services/index'
-
-import { gracefulShutdown } from './hooks/graceful-shutdown'
 import { startWorkerService } from './services/redis'
 
 const app: Application = koa(feathers())
 
 // Load our app configuration (see config/ folder)
 app.configure(configuration(configurationValidator))
+
+initializeFirebase(app)
 
 // Set up Koa middleware
 app.use(cors())
@@ -73,27 +74,21 @@ app.configure(channels)
 // Register hooks that run on all service methods
 app.hooks({
   around: {
-    all: [logError]
+    all: []
   },
   before: {},
   after: {},
-  error: []
+  error: [logError]
 })
 // Register application setup and teardown hooks here
 app.hooks({
   setup: [
-    async () => {
-      await startWorkerService(app)
-    }
-  ],
-  teardown: [
-    async () => {
-      await gracefulShutdown()
-    }
+    // async () => {
+    //   await startWorkerService(app)
+    // }
   ]
 })
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT'))
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+startWorkerService(app)
 
 export { app }

@@ -3,6 +3,22 @@ import 'reflect-metadata'
 import { closeRedisClient, getRedisClient } from '../client'
 
 const QUEUE_NAMES = ['code-generation', 'code-validation']
+const CLEAN_BATCH_SIZE = 10_000
+
+async function cleanByType(queue: Queue, type: 'completed' | 'failed' | 'active' | 'waiting' | 'delayed') {
+  let totalCleaned = 0
+
+  while (true) {
+    const cleaned = await queue.clean(0, CLEAN_BATCH_SIZE, type)
+    totalCleaned += cleaned.length
+
+    if (cleaned.length < CLEAN_BATCH_SIZE) {
+      break
+    }
+  }
+
+  return totalCleaned
+}
 
 async function cleanupQueue() {
   console.log('🧹 Starting queue cleanup...')
@@ -12,6 +28,9 @@ async function cleanupQueue() {
     for (const queueName of QUEUE_NAMES) {
       const queue = new Queue(queueName, { connection: connection as any })
       console.log(`📊 Checking current queue status: ${queueName}`)
+
+      await queue.pause()
+      console.log(`⏸️  Paused queue ${queueName}`)
 
       const waiting = await queue.getWaiting()
       const active = await queue.getActive()
@@ -37,23 +56,32 @@ async function cleanupQueue() {
 
       console.log(`🧹 Cleaning all jobs for ${queueName}...`)
 
-      const cleanCompleted = await queue.clean(0, 'completed' as any)
-      console.log(`✅ Cleaned ${cleanCompleted.length} completed jobs`)
+      const cleanCompleted = await cleanByType(queue, 'completed')
+      console.log(`✅ Cleaned ${cleanCompleted} completed jobs`)
 
-      const cleanFailed = await queue.clean(0, 'failed' as any)
-      console.log(`✅ Cleaned ${cleanFailed.length} failed jobs`)
+      const cleanFailed = await cleanByType(queue, 'failed')
+      console.log(`✅ Cleaned ${cleanFailed} failed jobs`)
 
-      const cleanActive = await queue.clean(0, 'active' as any)
-      console.log(`✅ Cleaned ${cleanActive.length} active jobs`)
+      const cleanActive = await cleanByType(queue, 'active')
+      console.log(`✅ Cleaned ${cleanActive} active jobs`)
 
-      const cleanWaiting = await queue.clean(0, 'waiting' as any)
-      console.log(`✅ Cleaned ${cleanWaiting.length} waiting jobs`)
+      const cleanWaiting = await cleanByType(queue, 'waiting')
+      console.log(`✅ Cleaned ${cleanWaiting} waiting jobs`)
 
-      const cleanDelayed = await queue.clean(0, 'delayed' as any)
-      console.log(`✅ Cleaned ${cleanDelayed.length} delayed jobs`)
+      const cleanDelayed = await cleanByType(queue, 'delayed')
+      console.log(`✅ Cleaned ${cleanDelayed} delayed jobs`)
 
-      const drainedJobs = await queue.drain()
-      console.log(`✅ Drained ${drainedJobs} jobs from queue`)
+      await queue.drain(true)
+      console.log('✅ Drained waiting and delayed jobs from queue')
+
+      // Final hard reset to ensure no stuck/active jobs remain.
+      // force=true is required when jobs are active or locked.
+      try {
+        await queue.obliterate({ force: true, count: CLEAN_BATCH_SIZE })
+        console.log(`✅ Obliterated queue ${queueName}`)
+      } catch (err: any) {
+        console.log(`⚠️  Obliterate skipped for ${queueName}: ${err.message}`)
+      }
 
       console.log(`🔍 Verifying cleanup for ${queueName}...`)
       const finalWaiting = await queue.getWaiting()
@@ -83,6 +111,8 @@ async function cleanupQueue() {
       } else {
         console.log(`⚠️  Queue ${queueName} still has remaining jobs`)
       }
+
+      await queue.resume()
 
       await queue.close()
     }

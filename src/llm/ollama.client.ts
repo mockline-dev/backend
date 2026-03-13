@@ -40,10 +40,23 @@ export class OllamaClient {
   async *chatStream(
     messages: OllamaMessage[],
     tools?: object[],
-    options: { temperature?: number; num_ctx?: number; top_p?: number } = {}
+    options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
   ): AsyncGenerator<OllamaStreamChunk> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeout)
+    const idleTimeout = this.timeout
+    let timer: NodeJS.Timeout | undefined
+
+    const refreshIdleTimer = () => {
+      if (!idleTimeout || idleTimeout <= 0) {
+        return
+      }
+      if (timer) {
+        clearTimeout(timer)
+      }
+      timer = setTimeout(() => controller.abort(), idleTimeout)
+    }
+
+    refreshIdleTimer()
 
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
@@ -58,6 +71,7 @@ export class OllamaClient {
           options: {
             temperature: options.temperature ?? 0.15,
             num_ctx: options.num_ctx ?? 8192,
+            num_predict: options.num_predict,
             top_p: options.top_p ?? 0.9,
             repeat_penalty: 1.1,
             stop: ['```\n\n```']
@@ -76,6 +90,7 @@ export class OllamaClient {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+        refreshIdleTimer()
         const text = decoder.decode(value, { stream: true })
         for (const line of text.split('\n').filter(l => l.trim())) {
           try {
@@ -85,8 +100,17 @@ export class OllamaClient {
           }
         }
       }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        throw new Error(
+          `Ollama request aborted after ${idleTimeout}ms of inactivity. Increase ollama.timeout or use a faster model.`
+        )
+      }
+      throw err
     } finally {
-      clearTimeout(timer)
+      if (timer) {
+        clearTimeout(timer)
+      }
     }
   }
 

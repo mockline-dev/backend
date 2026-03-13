@@ -232,7 +232,21 @@ Return:
   { "path": "README.md", "description": "Project documentation" }
 ]`,
 
-  generateFile: (
+  generateFileSystemPrompt: (filePath: string): string => `
+You are a senior backend engineer generating production-ready files.
+
+Strict requirements:
+- Return only raw file content for ${'${filePath}'}.
+- No markdown fences, no explanations.
+- Preserve architectural consistency with provided schema and relationships.
+- Include complete imports and deterministic, executable code.
+- For Python: use Pydantic v2 and FastAPI best practices.
+- Add robust error handling, clear exceptions, and practical logging.
+- Keep code concise but complete; avoid placeholders or TODOs.
+- If context files are provided, integrate with them and avoid duplicate/conflicting definitions.
+`,
+
+  generateFileUserPrompt: (
     prompt: string,
     schema: any,
     file: { path: string; description: string },
@@ -241,312 +255,35 @@ Return:
     memoryBlock?: string,
     relationships?: any[]
   ): string => `
-Generate the complete content of: ${file.path}
+Generate the complete content for file: ${file.path}
 Purpose: ${file.description}
 
-Project context: "${prompt}"
-Schema: ${JSON.stringify(schema, null, 2)}
-${memoryBlock ? `\n${memoryBlock}\n` : ''}
-${
-  relationships && relationships.length > 0
-    ? `Relationships (use these for proper foreign key implementation):\n${JSON.stringify(relationships, null, 2)}\n\n`
-    : ''
-}
+Project prompt:
+${prompt}
+
+Schema JSON:
+${JSON.stringify(schema)}
+
+${memoryBlock ? `Memory context:\n${memoryBlock}\n` : ''}
+${relationships && relationships.length > 0 ? `Relationships JSON:\n${JSON.stringify(relationships)}\n` : ''}
 ${
   existingFiles && existingFiles.length > 0
-    ? `Existing project files (already in the codebase — do NOT duplicate, only extend/modify):\n${existingFiles.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}`
+    ? `Existing files:\n${existingFiles.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}\n`
     : ''
 }
-
 ${
   context.length > 0
-    ? `Previously generated files (this session):\n${context.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}`
+    ? `Previously generated files:\n${context.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}\n`
     : ''
 }
 
-=== COMPREHENSIVE GENERATION RULES ===
+Quality checklist:
+- Keep architecture consistent with schema and relationships.
+- Use complete imports and executable code.
+- Preserve compatibility with existing files.
+- Add practical validation, error handling, and logging.
+- For API/service/model files, provide production-ready implementations.
+- For docs/config/tests, keep concise and accurate.
 
-GENERAL RULES:
-- Output ONLY the raw file content
-- NO markdown code fences
-- NO explanation text before or after the code
-- Write complete, production-ready code
-- Include all imports
-- Add docstrings to all functions and classes
-- If existing files are provided, ensure this file integrates with them correctly
-
-=== ERROR HANDLING GUIDELINES ===
-- Always wrap database operations in try-except blocks
-- Use specific exception types (SQLAlchemyError, IntegrityError, etc.)
-- Raise HTTPException with appropriate status codes:
-   * 400: Bad Request (validation errors, invalid input)
-   * 401: Unauthorized (authentication required)
-   * 403: Forbidden (insufficient permissions)
-   * 404: Not Found (resource doesn't exist)
-   * 409: Conflict (duplicate entries, constraint violations)
-   * 422: Unprocessable Entity (validation errors)
-   * 500: Internal Server Error (unexpected errors)
-- Log errors with appropriate severity (ERROR, WARNING, INFO)
-- Never expose sensitive information in error messages (passwords, tokens, etc.)
-- Provide clear, actionable error messages to clients
-
-=== LOGGING IMPLEMENTATION ===
-- Import logging module: import logging
-- Create logger: logger = logging.getLogger(__name__)
-- Use appropriate log levels:
-   * DEBUG: Detailed diagnostic information
-   * INFO: General informational messages
-   * WARNING: Something unexpected but not an error
-   * ERROR: Serious problem occurred
-   * CRITICAL: Critical condition
-- Log important operations (database queries, API calls, errors)
-- Include context in log messages (user IDs, request IDs)
-- Use structured logging when possible
-
-=== PYDANTIC VALIDATION ===
-- Use Pydantic v2 (from pydantic import BaseModel, Field, EmailStr, validator)
-- Define separate schemas for:
-   * Create operations (input without id, created_at, etc.)
-   * Update operations (all fields optional)
-   * Response operations (include all fields)
-   * List operations (minimal fields for performance)
-- Use Field() for constraints:
-   * Field(..., min_length=1, max_length=100)
-   * Field(..., ge=0, le=100)  # greater/equal, less/equal
-   * Field(..., pattern=r'^[a-z]+$')
-- Use EmailStr for email fields (requires email-validator package)
-- Use field_validator for custom validation (Pydantic v2)
-- Add example values to fields for API documentation
-
-=== EXCEPTION HANDLING ===
-- Import HTTPException from fastapi
-- Create custom exception classes for domain-specific errors
-- Use dependency injection for common error handling
-- Implement exception handlers in main.py:
-   * @app.exception_handler(IntegrityError)
-   * @app.exception_handler(HTTPException)
-- Return consistent error response format:
-   { "detail": "Error message", "error_code": "VALIDATION_ERROR", "field": "email" }
-
-=== PAGINATION IMPLEMENTATION ===
-- Create pagination utility with:
-   * page: int = 1 (default to 1)
-   * page_size: int = 10 (default to 10, max 100)
-   * Calculate offset: offset = (page - 1) * page_size
-- Use SQLAlchemy's limit() and offset() methods
-- Return paginated response with metadata:
-   {
-     "items": [...],
-     "total": 150,
-     "page": 1,
-     "page_size": 10,
-     "pages": 15,
-     "has_next": true,
-     "has_prev": false
-   }
-- Add pagination to list endpoints
-- Validate page and page_size parameters
-
-=== SEARCH AND FILTERING ===
-- Implement search using SQLAlchemy's ilike() for case-insensitive search
-- Support multiple search fields with OR logic
-- Implement filtering using exact matches or ranges:
-   * Filter by field: ?field=value
-   * Filter by range: ?min_price=10&max_price=100
-   * Filter by date: ?start_date=2024-01-01&end_date=2024-12-31
-- Support sorting: ?sort_by=created_at&order=desc
-- Use dynamic filtering with **kwargs
-- Validate filter parameters
-
-=== RELATIONSHIPS IMPLEMENTATION ===
-- IMPORTANT: Use the relationships to properly implement foreign keys and relationships:
-   * For many-to-one: Add foreign key field (e.g., user_id, project_id)
-   * For one-to-many: Add relationship field (e.g., SQLAlchemy relationship)
-   * For one-to-one: Add foreign key with unique constraint
-   * For many-to-many: Add association table
-- Ensure all foreign key fields referenced in relationships exist in the model
-- Use SQLAlchemy relationships with lazy loading options:
-   * lazy="select" (default, load when accessed)
-   * lazy="joined" (load via JOIN)
-   * lazy="subquery" (load via subquery)
-- Use back_populates for bidirectional relationships
-- Handle cascade operations (cascade="all, delete-orphan")
-- Use foreign key constraints with proper indexes
-
-=== AUTHENTICATION AND AUTHORIZATION ===
-- If authType is "jwt", implement JWT authentication:
-   * Create security.py with password hashing (bcrypt)
-   * Create token creation and verification functions
-   * Create OAuth2PasswordBearer for token extraction
-   * Create get_current_user dependency
-   * Create get_current_active_user dependency
-- Protect endpoints with @Depends(get_current_user)
-- Implement role-based access control if needed
-- Use password hashing with passlib and bcrypt
-- Store only password_hash, never plain passwords
-- Implement password validation (length, complexity)
-- Use Pydantic EmailStr for email validation
-
-=== CRUD OPERATIONS ===
-- Use proper HTTP methods:
-   * GET: Retrieve resources (list, get by id)
-   * POST: Create new resources
-   * PUT: Update entire resource (all fields required)
-   * PATCH: Partial update (fields optional)
-   * DELETE: Remove resources
-- Implement idempotent operations where possible
-- Return appropriate status codes:
-   * 200: OK (GET, PUT, PATCH, DELETE)
-   * 201: Created (POST)
-   * 204: No Content (DELETE)
-- Use async/await for database operations
-- Use database sessions with proper context management
-
-=== RESPONSE SCHEMAS ===
-- Create separate Pydantic models for:
-   * Request bodies (CreateSchema, UpdateSchema)
-   * Response bodies (ResponseSchema, ListResponseSchema)
-   * Include all necessary fields in responses
-   * Exclude sensitive fields (password_hash, tokens)
-- Use nested schemas for relationships
-- Add computed fields with @computed_field (Pydantic v2)
-- Add example values for API documentation
-- Use Config class for model configuration
-
-=== DATABASE TRANSACTIONS ===
-- Use database sessions with proper transaction management
-- Implement commit/rollback patterns:
-   try:
-       # database operations
-       db.commit()
-   except Exception as e:
-       db.rollback()
-       raise
-- Use context managers for sessions
-- Implement optimistic locking for concurrent updates
-- Use database constraints for data integrity
-
-=== INDEXING ===
-- Add indexes to frequently queried fields
-- Add indexes to foreign key fields
-- Add indexes to fields used in WHERE, JOIN, ORDER BY clauses
-- Add unique indexes for fields that must be unique
-- Consider composite indexes for multi-field queries
-- Add indexes to fields used in search and filtering
-
-=== CACHING ===
-- Consider caching for frequently accessed, rarely changed data
-- Use Redis or in-memory caching
-- Implement cache invalidation strategies
-- Cache expensive database queries
-- Cache API responses with appropriate TTL
-- Use cache keys that include query parameters
-
-=== RATE LIMITING ===
-- Implement rate limiting to prevent abuse
-- Use token bucket or sliding window algorithm
-- Set appropriate limits per endpoint:
-   * Public endpoints: 100 requests/minute
-   * Authenticated endpoints: 1000 requests/minute
-   * Write operations: Lower limits
-- Return rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining)
-- Use Redis for distributed rate limiting
-
-=== CORS IMPLEMENTATION ===
-- Configure CORS middleware in main.py:
-   from fastapi.middleware.cors import CORSMiddleware
-   app.add_middleware(
-       CORSMiddleware,
-       allow_origins=["http://localhost:3000"],  # Frontend URL
-       allow_credentials=True,
-       allow_methods=["*"],
-       allow_headers=["*"],
-   )
-- Use specific origins in production, not "*"
-- Allow only necessary methods and headers
-
-=== API DOCUMENTATION ===
-- FastAPI automatically generates OpenAPI/Swagger docs
-- Add detailed docstrings to endpoints
-- Add descriptions to parameters and request bodies
-- Add example values to Pydantic models
-- Add tags to endpoints for grouping
-- Add summary and description to route decorators
-- Use @app.post(..., summary="Create user", description="Creates a new user account")
-- Add response models to route decorators
-- Add status code descriptions
-
-=== HEALTH CHECK ENDPOINTS ===
-- Implement health check endpoint at /health
-- Check database connectivity
-- Check external service dependencies
-- Return JSON response with status:
-   {
-     "status": "healthy",
-     "database": "connected",
-     "timestamp": "2024-01-01T00:00:00Z"
-   }
-- Use appropriate HTTP status codes (200 for healthy, 503 for unhealthy)
-
-=== ENVIRONMENT VARIABLE HANDLING ===
-- Use Pydantic Settings for configuration:
-   from pydantic_settings import BaseSettings
-   class Settings(BaseSettings):
-       DATABASE_URL: str
-       SECRET_KEY: str
-       class Config:
-           env_file = ".env"
-- Load environment variables from .env file
-- Provide .env.example with all required variables
-- Never commit .env file to version control
-- Use sensible defaults for non-sensitive settings
-- Validate required environment variables at startup
-
-=== LOGGING LEVELS ===
-- Set appropriate logging level based on environment:
-   * Development: DEBUG
-   * Production: INFO or WARNING
-- Configure logging format with timestamps
-- Log to console in development
-- Log to file in production
-- Use structured logging (JSON format) in production
-- Include request ID in logs for tracing
-
-=== ERROR RESPONSES ===
-- Return consistent error response format:
-   {
-     "detail": "Error message",
-     "error_code": "VALIDATION_ERROR",
-     "field": "email",
-     "timestamp": "2024-01-01T00:00:00Z"
-   }
-- Use appropriate HTTP status codes
-- Include error codes for programmatic handling
-- Provide helpful error messages for debugging
-- Log full error details server-side
-- Sanitize error messages before sending to clients
-
-=== EMAIL VALIDATION ===
-- CRITICAL: If email fields exist, use EmailStr from pydantic
-- Ensure email-validator is in requirements.txt
-- Example: email: EmailStr = Field(..., description="User email address")
-- EmailStr automatically validates email format
-
-=== SOFT DELETE ===
-- If "soft-delete" in features, implement soft delete:
-   * Add deleted_at field (datetime, nullable)
-   * Add index on deleted_at field
-   * Filter out soft-deleted records in queries
-   * Provide restore endpoint if needed
-   * Use cascade soft delete for related records
-
-=== AUDIT TRAIL ===
-- If "audit-trail" in features, implement audit trail:
-   * Add created_at and updated_at fields
-   * Add created_by and updated_by fields (foreign keys to User)
-   * Automatically set timestamps on create/update
-   * Track who made changes
-   * Consider audit log table for full history
-
-Output the complete content of ${file.path} now:`
+Return only the final file content.`
 }

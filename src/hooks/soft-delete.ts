@@ -2,9 +2,13 @@ import type { HookContext } from '../declarations'
 
 export const softDelete = async (context: HookContext) => {
   if (context.method === 'remove') {
-    context.result = await context.service.patch(context.id!, {
-      deletedAt: new Date().toISOString()
-    })
+    context.result = await context.service.patch(
+      context.id!,
+      {
+        deletedAt: Date.now()
+      },
+      context.params
+    )
     return context
   }
 }
