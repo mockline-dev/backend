@@ -1,5 +1,7 @@
 import type { Application } from '../declarations'
-import { ollamaClient, OllamaMessage } from '../llm/ollama.client'
+import { getProvider } from '../llm/providers/registry'
+import type { OllamaMessage } from '../llm/ollama.client'
+import { ContextRetriever } from './rag/retriever'
 import { AGENT_TOOLS } from './tools/definitions'
 import { executeToolCall, ToolResult } from './tools/executor'
 
@@ -29,8 +31,16 @@ export class AgentEngine {
   async run(options: AgentRunOptions): Promise<void> {
     const { projectId, systemPrompt, userMessage, history = [], maxIterations = 15, onEvent } = options
 
+    // Augment the system prompt with relevant file context from RAG
+    const retriever = new ContextRetriever(this.app)
+    const relevantFiles = await retriever.getRelevantFiles(projectId, userMessage, 5)
+    const contextBlock =
+      relevantFiles.length > 0
+        ? `\n\nRelevant project files for this task:\n${relevantFiles.map(f => `=== ${f.path} ===\n${f.content}`).join('\n\n')}`
+        : ''
+
     const messages: OllamaMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: systemPrompt + contextBlock },
       ...history,
       { role: 'user', content: userMessage }
     ]
@@ -40,7 +50,7 @@ export class AgentEngine {
       let pendingToolCalls: any[] = []
 
       try {
-        for await (const chunk of ollamaClient.chatStream(messages, AGENT_TOOLS, {
+        for await (const chunk of getProvider().chatStream(messages, AGENT_TOOLS, {
           temperature: 0.1
         })) {
           if (chunk.message.content) {

@@ -68,5 +68,13 @@
   },
   "redis": {
     "url": "redis://localhost:6379"
+  },
+  "llm": {
+    "provider": "ollama"
+  },
+  "openai": {
+    "apiKey": "",
+    "model": "gpt-4o-mini",
+    "embedModel": "text-embedding-3-small"
   }
 }

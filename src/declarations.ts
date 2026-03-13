@@ -3,7 +3,6 @@ import { HookContext as FeathersHookContext, NextFunction } from '@feathersjs/fe
 import { Application as FeathersApplication } from '@feathersjs/koa'
 import { ApplicationConfiguration } from './configuration'
 
-
 import { Users } from './services/users/users'
 
 export type { NextFunction }
@@ -18,11 +17,12 @@ export interface Configuration extends ApplicationConfiguration {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ServiceTypes {
   'file-stream': any
-  uploads: any,
+  uploads: any
   'ai-service': any
   'ai-stream': any
   'validate-prompt': any
   'server-monitor': any
+  models: any
 }
 
 // The application instance type that will be used everywhere else

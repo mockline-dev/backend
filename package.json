@@ -87,6 +87,7 @@
     "node-cron": "^4.1.0",
     "nodemailer": "^7.0.4",
     "ollama": "^0.6.3",
+    "openai": "^6.27.0",
     "reflect-metadata": "^0.2.2",
     "s3-blob-store": "^4.1.1",
     "winston": "^3.17.0"

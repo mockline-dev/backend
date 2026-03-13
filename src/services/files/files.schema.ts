@@ -2,6 +2,7 @@
 import { resolve } from '@feathersjs/schema'
 import type { Static } from '@feathersjs/typebox'
 import { ObjectIdSchema, Type, getValidator, querySyntax } from '@feathersjs/typebox'
+import { ObjectId as MongoObjectId } from 'mongodb'
 
 import type { HookContext } from '../../declarations'
 import { dataValidator, queryValidator } from '../../validators'
@@ -34,12 +35,42 @@ export const filesDataSchema = Type.Pick(
   filesSchema,
   ['projectId', 'messageId', 'name', 'key', 'fileType', 'size'],
   {
-    $id: 'FilesData'
+    $id: 'FilesData',
+    additionalProperties: false
   }
 )
 export type FilesData = Static<typeof filesDataSchema>
 export const filesDataValidator = getValidator(filesDataSchema, dataValidator)
 export const filesDataResolver = resolve<Files, HookContext<FilesService>>({
+  projectId: async value => {
+    if (value instanceof MongoObjectId) {
+      return value
+    }
+
+    if (typeof value === 'string' && MongoObjectId.isValid(value)) {
+      return new MongoObjectId(value)
+    }
+
+    return value
+  },
+  messageId: async value => {
+    if (value == null) {
+      return undefined
+    }
+
+    if (value instanceof MongoObjectId) {
+      return value
+    }
+
+    if (typeof value === 'string' && MongoObjectId.isValid(value)) {
+      return new MongoObjectId(value)
+    }
+
+    return value
+  },
+  currentVersion: async () => {
+    return 1
+  },
   createdAt: async () => {
     return Date.now()
   },

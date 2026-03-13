@@ -38,11 +38,7 @@ export const snapshotsSchema = Type.Object(
 )
 export type Snapshots = Static<typeof snapshotsSchema>
 export const snapshotsValidator = getValidator(snapshotsSchema, dataValidator)
-export const snapshotsResolver = resolve<SnapshotsQuery, HookContext<SnapshotsService>>({
-  createdAt: async () => {
-    return Date.now()
-  }
-})
+export const snapshotsResolver = resolve<SnapshotsQuery, HookContext<SnapshotsService>>({})
 
 export const snapshotsExternalResolver = resolve<Snapshots, HookContext<SnapshotsService>>({})
 

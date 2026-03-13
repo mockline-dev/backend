@@ -20,14 +20,15 @@ export const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'write_file',
-      description: 'Create or replace a file with new content. Use for all code generation and editing.',
+      description:
+        'Create or replace a file with new content. Preserve existing behavior and avoid unrelated rewrites.',
       parameters: {
         type: 'object',
         properties: {
           path: { type: 'string', description: 'File path relative to project root' },
           content: {
             type: 'string',
-            description: 'Complete file content. Never partial — always write the full file.'
+            description: 'Updated file content with only the requested changes applied.'
           }
         },
         required: ['path', 'content']
@@ -56,7 +57,7 @@ export const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'delete_file',
-      description: 'Delete a file from the project',
+      description: 'Delete a file from the project only when the user explicitly requested deletion',
       parameters: {
         type: 'object',
         properties: {

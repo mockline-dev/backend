@@ -1,6 +1,6 @@
 import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
-import ollama from 'ollama'
+import { getProvider } from '../../llm/providers/registry'
 import { parseInferProjectMetaResponse } from '../../utils/parseMarkdown'
 
 const INFER_PROJECT_META_SYSTEM = `You are an expert product strategist for AI code generation systems.
@@ -32,21 +32,13 @@ export default function (app: any) {
 
       try {
         const ollamaConfig = app.get('ollama')
-        const response = await ollama.generate({
-          model: ollamaConfig.model,
-          prompt: enhancedPrompt,
-          system: INFER_PROJECT_META_SYSTEM,
-          options: {
-            temperature: 0.7,
-            num_predict: ollamaConfig.numPredict,
-            num_ctx: ollamaConfig.numCtx,
-            top_p: ollamaConfig.topP,
-            repeat_penalty: ollamaConfig.repeatPenalty
-          },
-          stream: false
+        const provider = getProvider()
+        const aiResponse = await provider.generate(INFER_PROJECT_META_SYSTEM, enhancedPrompt, {
+          temperature: 0.7,
+          num_predict: ollamaConfig.numPredict,
+          num_ctx: ollamaConfig.numCtx,
+          top_p: ollamaConfig.topP
         })
-
-        const aiResponse = response.response.trim()
         const parsed = parseInferProjectMetaResponse(aiResponse)
 
         if (!parsed.name || !parsed.description) {

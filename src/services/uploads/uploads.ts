@@ -139,7 +139,7 @@ export const uploads = (app: Application) => {
         size: fileSize,
         fileType: fileType,
         projectId: new ObjectId(projectId),
-        messageId: messageId ? new ObjectId(messageId) : undefined
+        ...(messageId ? { messageId: new ObjectId(messageId) } : {})
       }
       try {
         const media = await app.service('files').create(payload)

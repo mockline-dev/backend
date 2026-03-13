@@ -46,17 +46,25 @@ Return:
     prompt: string,
     schema: any,
     file: { path: string; description: string },
-    context: { path: string; content: string }[]
+    context: { path: string; content: string }[],
+    existingFiles?: { path: string; content: string }[],
+    memoryBlock?: string
   ): string => `
 Generate the complete content of: ${file.path}
 Purpose: ${file.description}
 
 Project context: "${prompt}"
 Schema: ${JSON.stringify(schema, null, 2)}
+${memoryBlock ? `\n${memoryBlock}\n` : ''}
+${
+  existingFiles && existingFiles.length > 0
+    ? `Existing project files (already in the codebase — do NOT duplicate, only extend/modify):\n${existingFiles.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}`
+    : ''
+}
 
 ${
   context.length > 0
-    ? `Previously generated files:\n${context.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}`
+    ? `Previously generated files (this session):\n${context.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}`
     : ''
 }
 
@@ -68,6 +76,7 @@ RULES:
 - Include all imports
 - Add docstrings to all functions and classes
 - Handle errors properly with HTTP exceptions where applicable
+- If existing files are provided, ensure this file integrates with them correctly
 
 Output the complete content of ${file.path} now:`
 }
