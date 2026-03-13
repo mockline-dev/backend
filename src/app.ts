@@ -14,6 +14,7 @@ import { services } from './services/index'
 
 // Import generation worker to start it
 import './queues/workers/generation.worker'
+import './queues/workers/validation.worker'
 
 const app: Application = koa(feathers())
 

@@ -1,5 +1,7 @@
+import { architecture } from './architecture/architecture'
 import { files } from './files/files'
 import { messages } from './messages/messages'
+import { models } from './models/models'
 import { projects } from './projects/projects'
 import { snapshots } from './snapshots/snapshots'
 import { uploads } from './uploads/uploads'
@@ -15,9 +17,11 @@ import fileStream from './files/file-stream.service'
 import serverMonitorService from './server-monitor/server-monitor.service'
 
 export const services = (app: Application) => {
+  app.configure(architecture)
   app.configure(snapshots)
   app.configure(files)
   app.configure(messages)
+  app.configure(models)
   app.configure(projects)
   app.configure(users)
   app.configure(uploads)

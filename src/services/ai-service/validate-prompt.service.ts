@@ -1,6 +1,6 @@
 import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
-import ollama from 'ollama'
+import { getProvider } from '../../llm/providers/registry'
 
 interface ValidatePromptRequest {
   prompt: string
@@ -52,8 +52,19 @@ export default function (app: any) {
         // Check for backend/API keywords
         const promptLower = prompt.toLowerCase()
         const backendKeywords = [
-          'api', 'backend', 'server', 'endpoint', 'database', 'fastapi',
-          'rest', 'crud', 'auth', 'user', 'model', 'service', 'controller'
+          'api',
+          'backend',
+          'server',
+          'endpoint',
+          'database',
+          'fastapi',
+          'rest',
+          'crud',
+          'auth',
+          'user',
+          'model',
+          'service',
+          'controller'
         ]
         const hasBackendKeywords = backendKeywords.some(keyword => promptLower.includes(keyword))
 
@@ -62,7 +73,8 @@ export default function (app: any) {
             isValid: true,
             confidence: 0.6,
             category: 'general',
-            reason: 'Prompt lacks specific backend/API keywords. The AI will generate a general FastAPI template.',
+            reason:
+              'Prompt lacks specific backend/API keywords. The AI will generate a general FastAPI template.',
             suggestions: [
               'Add specific API endpoints you need (e.g., "create user API", "product management")',
               'Specify authentication requirements (e.g., "JWT auth", "OAuth")',
@@ -91,17 +103,11 @@ Respond in this exact JSON format:
 
 Keep the response concise and focused on backend development feasibility.`
 
-          const response = await ollama.generate({
-            model: ollamaConfig.model,
-            prompt: validationPrompt,
-            options: {
-              temperature: 0.2,
-              num_predict: 500
-            },
-            stream: false
+          const provider = getProvider()
+          const aiResponseText = await provider.generate('', validationPrompt, {
+            temperature: 0.2,
+            num_predict: 500
           })
-
-          const aiResponseText = response.response.trim()
 
           // Try to parse JSON response
           try {
@@ -129,7 +135,6 @@ Keep the response concise and focused on backend development feasibility.`
             reason: 'AI validation available, using basic validation',
             suggestions: this.generateSuggestions(promptLower)
           }
-
         } catch (aiError) {
           console.warn('AI validation unavailable, using basic validation:', aiError)
           return {
@@ -140,7 +145,6 @@ Keep the response concise and focused on backend development feasibility.`
             suggestions: this.generateSuggestions(promptLower)
           }
         }
-
       } catch (error) {
         console.error('Error validating prompt:', error)
         return {

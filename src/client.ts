@@ -1,15 +1,15 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/client.html
 import type { AuthenticationClientOptions } from '@feathersjs/authentication-client'
 
-import { snapshotsClient } from './services/snapshots/snapshots.shared'
+import { architectureClient } from './services/architecture/architecture.shared'
 export type {
-  Snapshots,
-  SnapshotsData,
-  SnapshotsQuery,
-  SnapshotsPatch
-} from './services/snapshots/snapshots.shared'
+  Architecture,
+  ArchitectureData,
+  ArchitectureQuery,
+  ArchitecturePatch
+} from './services/architecture/architecture.shared'
 
-import { filesClient } from './services/files/files.shared'
+import { snapshotsClient } from './services/snapshots/snapshots.shared'
 export type { Files, FilesData, FilesPatch, FilesQuery } from './services/files/files.shared'
 export type {
   Messages,
@@ -23,7 +23,15 @@ export type {
   ProjectsPatch,
   ProjectsQuery
 } from './services/projects/projects.shared'
+export type {
+  Snapshots,
+  SnapshotsData,
+  SnapshotsPatch,
+  SnapshotsQuery
+} from './services/snapshots/snapshots.shared'
 export type { Users, UsersData, UsersPatch, UsersQuery } from './services/users/users.shared'
+
+import { filesClient } from './services/files/files.shared'
 
 import { messagesClient } from './services/messages/messages.shared'
 
@@ -68,5 +76,6 @@ export const createClient = <Configuration = any,>(
   client.configure(filesClient)
   client.configure(uploadsClient)
   client.configure(snapshotsClient)
+  client.configure(architectureClient)
   return client
 }
