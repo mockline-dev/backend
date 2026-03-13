@@ -2,7 +2,7 @@ import { BadRequest, Forbidden, NotFound } from '@feathersjs/errors'
 import { rateLimit } from '../../hooks/rate-limit'
 import { ollamaClient } from '../../llm/ollama.client'
 import { logger } from '../../logger'
-import { generationQueue } from '../../queues/generation.queue'
+import { generationQueue } from '../redis/queues/queues'
 
 export default function (app: any) {
   /**

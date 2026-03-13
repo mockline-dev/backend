@@ -12,6 +12,12 @@ export interface IntentSchema {
   }>
   features: string[]
   authType: 'jwt' | 'none' | 'oauth2'
+  relationships?: Array<{
+    from: string
+    to: string
+    type: 'one-to-many' | 'many-to-one' | 'one-to-one' | 'many-to-many'
+    foreignKey?: string
+  }>
 }
 
 export class IntentAnalyzer {

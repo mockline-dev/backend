@@ -76,5 +76,29 @@
     "apiKey": "",
     "model": "gpt-4o-mini",
     "embedModel": "text-embedding-3-small"
-  }
+  },
+  "redisConfig": {
+        "host": "127.0.0.1",
+        "port": 6379,
+        "username": "default",
+        "password": "",
+        "db": 0
+    },
+    "jobs": {
+        "generate": {
+            "delay": 0,
+            "enabled": true
+        },
+        "validate": {
+            "delay": 0,
+            "enabled": true
+        }
+    },
+    "firebase": {
+        "serviceAccountPath": "./config/firebase/mockline-1a0e0-firebase-adminsdk-fbsvc-3f81f63b5b.json"
+    },
+    "bullBoard": {
+        "username": "admin",
+        "password": "admin"
+    }
 }

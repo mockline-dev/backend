@@ -4,6 +4,7 @@ import { logger } from '../../logger'
 import type { ContextRetriever } from '../rag/retriever'
 import type { IntentSchema } from './intent-analyzer'
 import type { TaskPlan } from './task-planner'
+import type { Relationship } from './schema-validator'
 
 export interface GeneratedFile {
   path: string
@@ -20,6 +21,8 @@ export interface FileGeneratorOptions {
   retriever?: ContextRetriever
   /** Optional project memory block injected into every generation prompt. */
   memoryBlock?: string
+  /** Validated relationships between entities for proper foreign key implementation */
+  relationships?: Relationship[]
 }
 
 export class FileGenerator {
@@ -62,7 +65,8 @@ export class FileGenerator {
         task,
         generated.slice(-3),
         existingFiles,
-        options.memoryBlock
+        options.memoryBlock,
+        options.relationships
       )
       generated.push({ path: task.path, content })
     }
@@ -76,11 +80,14 @@ export class FileGenerator {
     task: TaskPlan,
     context: GeneratedFile[],
     existingFiles: { path: string; content: string }[] = [],
-    memoryBlock?: string
+    memoryBlock?: string,
+    relationships?: Relationship[]
   ): Promise<string> {
     const provider = getProvider()
+    const maxAttempts = 4
+    const retryDelays = [1000, 2000, 4000] // Progressive delay: 1s, 2s, 4s
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         let raw = ''
         for await (const chunk of provider.chatStream(
@@ -93,7 +100,8 @@ export class FileGenerator {
                 task,
                 context,
                 existingFiles,
-                memoryBlock
+                memoryBlock,
+                relationships
               )
             }
           ],
@@ -108,9 +116,15 @@ export class FileGenerator {
         return clean
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        logger.warn('FileGenerator: attempt %d/2 failed for %s: %s', attempt, task.path, msg)
-        if (attempt === 2) {
-          throw new Error(`FileGenerator: failed to generate ${task.path}: ${msg}`)
+        logger.warn('FileGenerator: attempt %d/%d failed for %s: %s', attempt, maxAttempts, task.path, msg)
+        
+        if (attempt < maxAttempts) {
+          // Add progressive delay before retry
+          const delay = retryDelays[attempt - 1] || 1000
+          logger.debug('FileGenerator: waiting %dms before retry', delay)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        } else {
+          throw new Error(`FileGenerator: failed to generate ${task.path} after ${maxAttempts} attempts: ${msg}`)
         }
       }
     }

@@ -32,6 +32,5 @@ export const services = (app: Application) => {
   app.configure(inferProjectMetaService)
   app.configure(validatePromptService)
   app.configure(serverMonitorService)
-
   // All services will be registered here
 }

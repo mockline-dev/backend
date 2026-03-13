@@ -1,12 +1,9 @@
 import { TooManyRequests } from '@feathersjs/errors'
-import IORedis from 'ioredis'
 import type { HookContext } from '../declarations'
+import { getRedisClient } from '../services/redis/client'
 
-const redis = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-  lazyConnect: true
-})
+// Get Redis client singleton
+let redis: Awaited<ReturnType<typeof getRedisClient>> | null = null
 
 interface RateLimitOptions {
   windowSeconds: number
@@ -17,6 +14,11 @@ interface RateLimitOptions {
 export const rateLimit = (options: RateLimitOptions) => async (context: HookContext) => {
   const userId = context.params?.user?._id?.toString()
   if (!userId) return context
+
+  // Initialize Redis client on first use
+  if (!redis) {
+    redis = await getRedisClient()
+  }
 
   const key = `rate:${options.keyPrefix}:${userId}`
   const current = await redis.incr(key)
