@@ -40,7 +40,7 @@ export class OpenAIProvider implements ILLMProvider {
   async *chatStream(
     messages: OllamaMessage[],
     _tools?: object[],
-    options: { temperature?: number; num_ctx?: number; top_p?: number } = {}
+    options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
   ): AsyncGenerator<OllamaStreamChunk> {
     const openaiMessages = messages.map(m => ({
       role: m.role as 'system' | 'user' | 'assistant',
@@ -52,7 +52,8 @@ export class OpenAIProvider implements ILLMProvider {
       messages: openaiMessages,
       stream: true,
       temperature: options.temperature ?? 0.3,
-      top_p: options.top_p
+      top_p: options.top_p,
+      max_tokens: options.num_predict
     })
 
     for await (const chunk of stream) {

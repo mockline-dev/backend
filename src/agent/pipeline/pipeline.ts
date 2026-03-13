@@ -43,6 +43,7 @@ export class GenerationPipeline {
 
   async run(options: PipelineOptions): Promise<PipelineResult> {
     const { projectId, prompt, onProgress, jobId } = options
+    const pipelineStartedAt = Date.now()
 
     // Stage 0 — Load project info, initialize memory, index existing files
     let project: any
@@ -61,19 +62,39 @@ export class GenerationPipeline {
     const memoryBlock = this.memory.buildContextBlock(memoryData)
 
     // Index any pre-existing project files into the RAG store so generators have context
-    try {
-      await this.retriever.indexProject(projectId)
-    } catch (err: any) {
-      logger.warn('Pipeline: RAG indexing failed (non-fatal): %s', err.message)
-    }
+    const ragIndexStartedAt = Date.now()
+    void this.retriever
+      .indexProject(projectId)
+      .then(() => {
+        logger.info(
+          'Pipeline: RAG indexing completed in %dms for project %s',
+          Date.now() - ragIndexStartedAt,
+          projectId
+        )
+      })
+      .catch((err: any) => {
+        logger.warn('Pipeline: RAG indexing failed (non-fatal): %s', err.message)
+      })
 
     // Stage 1 — Intent analysis (schema extraction)
     await onProgress('Analyzing prompt', 5)
+    const intentStartedAt = Date.now()
     const schema = await this.intentAnalyzer.analyze(prompt)
+    logger.info(
+      'Pipeline: intent analysis completed in %dms for project %s',
+      Date.now() - intentStartedAt,
+      projectId
+    )
 
     // Stage 1.5 — Schema validation (relationship extraction and validation)
     await onProgress('Validating schema', 10)
+    const schemaValidationStartedAt = Date.now()
     const validationResult = this.schemaValidator.validate(schema)
+    logger.info(
+      'Pipeline: schema validation completed in %dms for project %s',
+      Date.now() - schemaValidationStartedAt,
+      projectId
+    )
 
     // Collect all warnings for later reporting
     const allWarnings: string[] = []
@@ -117,7 +138,13 @@ export class GenerationPipeline {
 
     // Stage 2 — Task planning (file structure)
     await onProgress('Planning files', 15)
+    const planningStartedAt = Date.now()
     const plan = await this.taskPlanner.plan(prompt, schema)
+    logger.info(
+      'Pipeline: task planning completed in %dms for project %s',
+      Date.now() - planningStartedAt,
+      projectId
+    )
 
     await this.app.service('projects').patch(projectId, {
       generationProgress: {
@@ -129,6 +156,7 @@ export class GenerationPipeline {
     } as any)
 
     // Stage 3 — File generation
+    const generationStartedAt = Date.now()
     const generatedFiles = await this.fileGenerator.generateAll(
       prompt,
       schema,
@@ -145,13 +173,25 @@ export class GenerationPipeline {
       },
       { projectId, retriever: this.retriever, memoryBlock, relationships: validationResult.relationships }
     )
+    logger.info(
+      'Pipeline: file generation completed in %dms for project %s (%d files)',
+      Date.now() - generationStartedAt,
+      projectId,
+      generatedFiles.length
+    )
 
     // Stage 3.5 — Cross-file validation
     await onProgress('Validating cross-file dependencies', 80)
+    const crossFileValidationStartedAt = Date.now()
     const crossFileValidation = this.crossFileValidator.validate(
       generatedFiles,
       schema,
       validationResult.relationships
+    )
+    logger.info(
+      'Pipeline: cross-file validation completed in %dms for project %s',
+      Date.now() - crossFileValidationStartedAt,
+      projectId
     )
 
     // Log warnings if any
@@ -191,11 +231,23 @@ export class GenerationPipeline {
 
     // Stage 4 — Persist files to R2 + MongoDB
     await onProgress('Saving files', 82)
+    const persistenceStartedAt = Date.now()
     const persistedFiles = await this.persistFiles(projectId, generatedFiles, jobId)
+    logger.info(
+      'Pipeline: persistence completed in %dms for project %s',
+      Date.now() - persistenceStartedAt,
+      projectId
+    )
 
     // Stage 5 — Validate generated files
     await onProgress('Validating', 90)
+    const fileValidationStartedAt = Date.now()
     const validationResults = await validateGeneratedFiles(generatedFiles, projectId, this.app, onProgress)
+    logger.info(
+      'Pipeline: file validation completed in %dms for project %s',
+      Date.now() - fileValidationStartedAt,
+      projectId
+    )
     if (validationResults.failCount > 0) {
       logger.warn(
         'Pipeline: %d/%d files failed validation for project %s',
@@ -210,6 +262,7 @@ export class GenerationPipeline {
     // Stage 6 — Extract architecture metadata
     try {
       await onProgress('Building architecture graph', 95)
+      const architectureStartedAt = Date.now()
       const extractor = new ArchitectureExtractor()
       const architectureData = extractor.extract(schema, generatedFiles, validationResult.relationships)
       await this.app.service('architecture').create({
@@ -217,6 +270,11 @@ export class GenerationPipeline {
         ...architectureData,
         updatedAt: Date.now()
       } as any)
+      logger.info(
+        'Pipeline: architecture extraction completed in %dms for project %s',
+        Date.now() - architectureStartedAt,
+        projectId
+      )
 
       // Persist architecture decisions into project memory
       const decisions: string[] = [
@@ -247,6 +305,14 @@ export class GenerationPipeline {
     if (allWarnings.length > 0) {
       ;(result as any).warnings = allWarnings
     }
+
+    logger.info(
+      'Pipeline: completed in %dms for project %s (files=%d, warnings=%d)',
+      Date.now() - pipelineStartedAt,
+      projectId,
+      result.fileCount,
+      allWarnings.length
+    )
 
     return result
   }

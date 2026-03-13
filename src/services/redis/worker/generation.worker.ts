@@ -12,15 +12,44 @@ export const generationWorker = new Worker<GenerationJobData>(
   async (job: Job<GenerationJobData>) => {
     const { projectId, prompt } = job.data
     const jobId = job.id || 'unknown'
+    const maxAttempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1
+    const currentAttempt = job.attemptsMade + 1
+    const isFinalAttempt = currentAttempt >= maxAttempts
 
     // Register job with tracker (30 minute timeout)
     jobTracker.registerJob(jobId, projectId, 30 * 60 * 1000)
+
+    const PROGRESS_PATCH_DEBOUNCE_MS = 400
+    let pendingProgress: Record<string, unknown> | null = null
+    let progressTimer: NodeJS.Timeout | null = null
+
+    const flushProgressPatch = async () => {
+      if (!pendingProgress) {
+        return
+      }
+      const progress = pendingProgress
+      pendingProgress = null
+      await app.service('projects').patch(projectId, { generationProgress: progress } as any)
+    }
+
+    const scheduleProgressPatch = () => {
+      if (progressTimer) {
+        return
+      }
+      progressTimer = setTimeout(() => {
+        progressTimer = null
+        flushProgressPatch().catch((flushErr: any) => {
+          logger.warn('Generation job %s progress flush failed: %s', jobId, flushErr.message)
+        })
+      }, PROGRESS_PATCH_DEBOUNCE_MS)
+    }
 
     const updateProgress = async (stage: string, percentage: number, currentFile?: string) => {
       const generationProgress: Record<string, unknown> = { currentStage: stage, percentage }
       if (currentFile) generationProgress.currentFile = currentFile
 
-      await app.service('projects').patch(projectId, { generationProgress } as any)
+      pendingProgress = generationProgress
+      scheduleProgressPatch()
       app.channel(`projects/${projectId}`).send({
         type: 'generation:progress',
         payload: { stage, percentage, currentFile }
@@ -59,6 +88,8 @@ export const generationWorker = new Worker<GenerationJobData>(
       const status = warnings.length > 0 ? 'ready' : 'ready'
       const currentStage = warnings.length > 0 ? 'complete_with_warnings' : 'complete'
 
+      await flushProgressPatch()
+
       await app.service('projects').patch(projectId, {
         status,
         generationProgress: {
@@ -93,6 +124,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       // If it's a validation warning, treat as partial success
       if (isWarning) {
         logger.warn('Generation job %s completed with warnings: %s', jobId, err.message)
+        await flushProgressPatch()
         await app.service('projects').patch(projectId, {
           status: 'ready',
           generationProgress: {
@@ -108,7 +140,28 @@ export const generationWorker = new Worker<GenerationJobData>(
         return // Don't throw - treat as success with warnings
       }
 
+      if (!isFinalAttempt) {
+        logger.warn(
+          'Generation job %s failed on attempt %d/%d, retrying: %s',
+          jobId,
+          currentAttempt,
+          maxAttempts,
+          err.message
+        )
+
+        await app.service('projects').patch(projectId, {
+          generationProgress: {
+            currentStage: 'retrying_generation',
+            errorMessage: err.message,
+            retryAttempts: currentAttempt
+          }
+        } as any)
+
+        throw err
+      }
+
       // For actual errors, mark as error and cleanup
+      await flushProgressPatch()
       await app.service('projects').patch(projectId, {
         status: 'error',
         generationProgress: {
@@ -126,20 +179,36 @@ export const generationWorker = new Worker<GenerationJobData>(
       await jobTracker.cancelJob(jobId)
 
       throw err
+    } finally {
+      if (progressTimer) {
+        clearTimeout(progressTimer)
+        progressTimer = null
+      }
     }
   },
-  { connection: redisConnection as any, concurrency: 3 }
+  { connection: redisConnection as any, concurrency: 1 }
 )
 
 generationWorker.on('failed', (job, err) => {
   const jobId = job?.id || 'unknown'
-  logger.error('Generation job %s permanently failed: %s', jobId, err.message)
+  const maxAttempts = typeof job?.opts?.attempts === 'number' ? job.opts.attempts : 1
+  const attemptsMade = job?.attemptsMade ?? 0
+  const isFinalFailure = attemptsMade >= maxAttempts
+
+  if (!isFinalFailure) {
+    logger.warn('Generation job %s failed attempt %d/%d: %s', jobId, attemptsMade, maxAttempts, err.message)
+    return
+  }
+
+  logger.error('Generation job %s permanently failed after %d attempts: %s', jobId, attemptsMade, err.message)
 
   // Ensure cleanup happens even if the job handler didn't complete
   if (job?.data?.projectId) {
-    jobTracker.cancelJob(jobId).catch(cleanupErr => {
-      logger.error('Failed to cleanup job %s: %s', jobId, cleanupErr.message)
-    })
+    if (jobTracker.getJob(jobId)) {
+      jobTracker.cancelJob(jobId).catch(cleanupErr => {
+        logger.error('Failed to cleanup job %s: %s', jobId, cleanupErr.message)
+      })
+    }
   }
 })
 

@@ -36,17 +36,19 @@ export class ContextRetriever {
       paths = (result.data ?? result).map((f: any) => f.name)
     }
 
-    const contexts: FileContext[] = []
-    for (const path of paths) {
-      try {
-        const content = await r2Client.getObject(`projects/${projectId}/${path}`)
-        contexts.push({ path, content })
-      } catch (err: any) {
-        logger.warn('ContextRetriever: could not fetch %s/%s: %s', projectId, path, err.message)
-      }
-    }
+    const contextResults = await Promise.all(
+      paths.map(async path => {
+        try {
+          const content = await r2Client.getObject(`projects/${projectId}/${path}`)
+          return { path, content } as FileContext
+        } catch (err: any) {
+          logger.warn('ContextRetriever: could not fetch %s/%s: %s', projectId, path, err.message)
+          return null
+        }
+      })
+    )
 
-    return contexts
+    return contextResults.filter((context): context is FileContext => context !== null)
   }
 
   /**
