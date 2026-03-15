@@ -25,6 +25,8 @@ export async function startWorkerService(app: any) {
     logger.info('Worker service started successfully')
   } catch (err) {
     logger.error('Failed to start worker service', err)
+    await stopWorkerService()
+    throw err
   }
 }
 

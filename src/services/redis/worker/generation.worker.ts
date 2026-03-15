@@ -142,22 +142,13 @@ export const generationWorker = new Worker<GenerationJobData>(
 
       if (!isFinalAttempt) {
         logger.warn(
-          'Generation job %s failed on attempt %d/%d, retrying: %s',
+          'Generation job %s failed on attempt %d/%d, retry disabled — marking as error: %s',
           jobId,
           currentAttempt,
           maxAttempts,
           err.message
         )
-
-        await app.service('projects').patch(projectId, {
-          generationProgress: {
-            currentStage: 'retrying_generation',
-            errorMessage: err.message,
-            retryAttempts: currentAttempt
-          }
-        } as any)
-
-        throw err
+        job.discard()
       }
 
       // For actual errors, mark as error and cleanup

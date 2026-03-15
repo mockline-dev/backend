@@ -22,11 +22,13 @@ export interface PythonValidationResult {
 
 /**
  * Validates Python source code using ruff (fast linter/syntax checker).
- * ruff must be available in PATH. Falls back to a no-op if not installed.
+ * Falls back to `python3 -m py_compile` when ruff is unavailable.
  */
 export async function validatePython(path: string, content: string): Promise<PythonValidationResult> {
   const tmpDir = join(tmpdir(), 'mockline-validation')
   const tmpFile = join(tmpDir, path.replace(/\//g, '__'))
+  let ruffUnavailable = false
+  let result: PythonValidationResult | null = null
 
   try {
     await mkdir(tmpDir, { recursive: true })
@@ -40,7 +42,7 @@ export async function validatePython(path: string, content: string): Promise<Pyt
       logger.debug('PythonValidator: ruff stderr for %s: %s', path, stderr.slice(0, 200))
     }
 
-    return { path, valid: true, errors: [] }
+    result = { path, valid: true, errors: [] }
   } catch (err: any) {
     // ruff exits with code 1 when there are lint errors; stdout contains JSON
     if (err.stdout) {
@@ -52,22 +54,49 @@ export async function validatePython(path: string, content: string): Promise<Pyt
           code: r.code,
           message: r.message
         }))
-        return { path, valid: errors.length === 0, errors }
+        result = { path, valid: errors.length === 0, errors }
       } catch {
-        // ruff may not be installed — treat as valid to avoid blocking generation
-        logger.warn('PythonValidator: could not parse ruff output for %s (ruff may not be installed)', path)
-        return { path, valid: true, errors: [] }
+        logger.warn('PythonValidator: could not parse ruff output for %s, falling back to py_compile', path)
+        ruffUnavailable = true
       }
     }
 
-    // ruff not found or other execution error — non-fatal, skip silently
+    // ruff not found or other execution error — fallback to Python syntax compile check
     logger.debug('PythonValidator: ruff unavailable for %s: %s', path, err.message)
-    return { path, valid: true, errors: [] }
-  } finally {
+    ruffUnavailable = true
+  }
+
+  if (!result && ruffUnavailable) {
     try {
-      await unlink(tmpFile)
-    } catch {
-      // ignore cleanup errors
+      await execAsync(`python3 -m py_compile "${tmpFile}"`, { timeout: 10_000 })
+      result = { path, valid: true, errors: [] }
+    } catch (compileErr: any) {
+      const compileOutput = `${compileErr.stderr ?? ''}${compileErr.stdout ?? ''}`.trim()
+      result = {
+        path,
+        valid: false,
+        errors: [
+          {
+            message: compileOutput || `Python syntax validation failed for ${path}`
+          }
+        ]
+      }
     }
+  }
+
+  try {
+    await unlink(tmpFile)
+  } catch {
+    // ignore cleanup errors
+  }
+
+  if (result) {
+    return result
+  }
+
+  return {
+    path,
+    valid: false,
+    errors: [{ message: `Python validation could not determine result for ${path}` }]
   }
 }

@@ -95,6 +95,12 @@ export class FileGenerator {
           }
 
           const compactExistingFiles = compactExternalContext(existingFiles)
+          const generatedSoFar = [...generatedByIndex.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([, file]) => file)
+          const compactStableContext = compactGeneratedContext(
+            selectTaskRelevantContext(task.path, generatedSoFar)
+          )
 
           const content = await this.generateOne(
             prompt,
@@ -103,7 +109,8 @@ export class FileGenerator {
             compactStableContext,
             compactExistingFiles,
             compactMemoryBlock(options.memoryBlock),
-            options.relationships
+            options.relationships,
+            plan.map(item => item.path)
           )
 
           generatedByIndex.set(index, { path: task.path, content })
@@ -132,7 +139,8 @@ export class FileGenerator {
     context: GeneratedFile[],
     existingFiles: { path: string; content: string }[] = [],
     memoryBlock?: string,
-    relationships?: Relationship[]
+    relationships?: Relationship[],
+    plannedFilePaths: string[] = []
   ): Promise<string> {
     const provider = getProvider()
     const maxAttempts = 4
@@ -157,7 +165,8 @@ export class FileGenerator {
                 context,
                 existingFiles,
                 memoryBlock,
-                relationships
+                relationships,
+                plannedFilePaths
               )
             }
           ],
@@ -251,13 +260,56 @@ function classifyTaskStage(path: string): number {
 }
 
 function compactGeneratedContext(files: GeneratedFile[]): GeneratedFile[] {
-  const MAX_FILES = 2
+  const MAX_FILES = 6
   const MAX_CHARS_PER_FILE = 2500
 
   return files.slice(-MAX_FILES).map(file => ({
     path: file.path,
     content: truncateForContext(file.content, MAX_CHARS_PER_FILE)
   }))
+}
+
+function selectTaskRelevantContext(taskPath: string, generatedFiles: GeneratedFile[]): GeneratedFile[] {
+  const normalizedTaskPath = taskPath.toLowerCase()
+  const basename = normalizedTaskPath.split('/').pop() || ''
+  const entityToken = basename.replace(/\.(py|ts|tsx|js|jsx|md|txt)$/i, '')
+
+  const scored = generatedFiles.map((file, index) => {
+    const normalizedFilePath = file.path.toLowerCase()
+    let score = index
+
+    if (normalizedFilePath.includes('/core/')) {
+      score += 40
+    }
+
+    if (entityToken && normalizedFilePath.includes(`/${entityToken}.`)) {
+      score += 120
+    }
+
+    if (normalizedTaskPath.startsWith('app/api/')) {
+      if (normalizedFilePath.startsWith('app/services/')) score += 90
+      if (normalizedFilePath.startsWith('app/schemas/')) score += 80
+      if (normalizedFilePath.startsWith('app/models/')) score += 70
+    }
+
+    if (normalizedTaskPath.startsWith('app/services/')) {
+      if (normalizedFilePath.startsWith('app/schemas/')) score += 80
+      if (normalizedFilePath.startsWith('app/models/')) score += 70
+      if (normalizedFilePath.startsWith('app/core/')) score += 60
+    }
+
+    if (normalizedTaskPath === 'main.py') {
+      if (normalizedFilePath.startsWith('app/api/')) score += 90
+      if (normalizedFilePath.startsWith('app/core/')) score += 70
+    }
+
+    return { file, score }
+  })
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map(item => item.file)
 }
 
 function compactMemoryBlock(memoryBlock?: string): string | undefined {

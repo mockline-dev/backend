@@ -45,6 +45,8 @@ export class OllamaClient {
     const controller = new AbortController()
     const idleTimeout = this.timeout
     let timer: NodeJS.Timeout | undefined
+    let lastChunkAt = Date.now()
+    let chunksReceived = 0
 
     const refreshIdleTimer = () => {
       if (!idleTimeout || idleTimeout <= 0) {
@@ -53,6 +55,7 @@ export class OllamaClient {
       if (timer) {
         clearTimeout(timer)
       }
+      lastChunkAt = Date.now()
       timer = setTimeout(() => controller.abort(), idleTimeout)
     }
 
@@ -91,6 +94,7 @@ export class OllamaClient {
         const { done, value } = await reader.read()
         if (done) break
         refreshIdleTimer()
+        chunksReceived += 1
         const text = decoder.decode(value, { stream: true })
         for (const line of text.split('\n').filter(l => l.trim())) {
           try {
@@ -102,8 +106,9 @@ export class OllamaClient {
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') {
+        const idleDuration = Date.now() - lastChunkAt
         throw new Error(
-          `Ollama request aborted after ${idleTimeout}ms of inactivity. Increase ollama.timeout or use a faster model.`
+          `Ollama request aborted after ${idleTimeout}ms inactivity (chunks=${chunksReceived}, idle=${idleDuration}ms). Increase ollama.timeout or use a faster model.`
         )
       }
       throw err

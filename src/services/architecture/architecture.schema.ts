@@ -52,6 +52,7 @@ export const architectureSchema = Type.Object(
         type: Type.Union([
           Type.Literal('one-to-many'),
           Type.Literal('many-to-many'),
+          Type.Literal('many-to-one'),
           Type.Literal('one-to-one')
         ])
       })

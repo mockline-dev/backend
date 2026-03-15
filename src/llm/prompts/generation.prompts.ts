@@ -253,7 +253,8 @@ Strict requirements:
     context: { path: string; content: string }[],
     existingFiles?: { path: string; content: string }[],
     memoryBlock?: string,
-    relationships?: any[]
+    relationships?: any[],
+    plannedFilePaths?: string[]
   ): string => `
 Generate the complete content for file: ${file.path}
 Purpose: ${file.description}
@@ -266,6 +267,11 @@ ${JSON.stringify(schema)}
 
 ${memoryBlock ? `Memory context:\n${memoryBlock}\n` : ''}
 ${relationships && relationships.length > 0 ? `Relationships JSON:\n${JSON.stringify(relationships)}\n` : ''}
+${
+  plannedFilePaths && plannedFilePaths.length > 0
+    ? `Planned file paths (strict contract):\n${plannedFilePaths.join('\n')}\n`
+    : ''
+}
 ${
   existingFiles && existingFiles.length > 0
     ? `Existing files:\n${existingFiles.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}\n`
@@ -284,6 +290,18 @@ Quality checklist:
 - Add practical validation, error handling, and logging.
 - For API/service/model files, provide production-ready implementations.
 - For docs/config/tests, keep concise and accurate.
+- Import ONLY from:
+   1) Python stdlib or third-party packages,
+   2) modules that map to planned file paths above,
+   3) modules visible in provided context/existing files.
+- Do NOT invent module paths outside planned files.
+- Canonical FastAPI project modules:
+   - config: app.core.config
+   - database/session/get_db: app.core.database
+   - security/auth utils: app.core.security
+   - Do NOT use app.config, app.db, app.db.session.
+- If a file imports symbols from another local module, ensure those symbols already exist there
+   (or update the current file to use existing symbols only).
 
 Return only the final file content.`
 }

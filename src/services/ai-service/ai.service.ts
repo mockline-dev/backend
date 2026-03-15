@@ -44,8 +44,7 @@ export default function (app: any) {
           'generate',
           { projectId, prompt, userId, model: ollamaConfig.model },
           {
-            attempts: 2,
-            backoff: { type: 'exponential', delay: 5000 },
+            attempts: 1,
             removeOnComplete: false,
             removeOnFail: false
           }
