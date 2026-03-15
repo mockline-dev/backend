@@ -3,6 +3,7 @@ import { logger } from '../../logger'
 import { r2Client } from '../../storage/r2.client'
 import { ProjectMemory } from '../memory/project-memory'
 import { ContextRetriever } from '../rag/retriever'
+import { getWeaviateRetriever, type RetrievedContext } from '../rag/weaviate'
 import { validateGeneratedFiles } from '../validation/validator'
 import { ArchitectureExtractor } from './architecture-extractor'
 import { CriticalFilesValidator } from './critical-files-validator'
@@ -30,16 +31,28 @@ export class GenerationPipeline {
   private criticalFilesValidator = new CriticalFilesValidator()
   private memory: ProjectMemory
   private retriever: ContextRetriever
+  private weaviateEnabled: boolean = false
   private allWarnings: string[] = []
 
   constructor(app: Application) {
     this.app = app
     this.memory = new ProjectMemory(app)
     this.retriever = new ContextRetriever(app)
+
+    // Check if Weaviate is enabled
+    try {
+      const config = (app as any).get('weaviate')
+      this.weaviateEnabled = config?.enabled ?? false
+      if (this.weaviateEnabled) {
+        logger.info('Weaviate retriever enabled in pipeline')
+      }
+    } catch (error) {
+      logger.debug('Weaviate not configured, using fallback retriever')
+    }
   }
 
   async run(options: PipelineOptions): Promise<PipelineResult> {
-    const { projectId, prompt, userId, onProgress, jobId } = options
+    const { projectId, prompt, userId, onProgress, jobId, stackId } = options
     const pipelineStartedAt = Date.now()
 
     // Stage 0 — Load project info, initialize memory, index existing files
@@ -61,7 +74,7 @@ export class GenerationPipeline {
 
     // Stage 1 — Intent analysis (schema extraction)
     await onProgress('Analyzing prompt', PROGRESS_STAGES.INTENT_ANALYSIS)
-    const schema = await this.analyzeIntent(prompt, projectId)
+    const schema = await this.analyzeIntent(prompt, projectId, stackId)
 
     // Stage 1.5 — Schema validation (relationship extraction and validation)
     await onProgress('Validating schema', PROGRESS_STAGES.SCHEMA_VALIDATION)
@@ -81,7 +94,8 @@ export class GenerationPipeline {
       jobId,
       onProgress,
       memoryBlock,
-      validationResult.relationships
+      validationResult.relationships,
+      stackId
     )
 
     // Stage 3.5 — Validate critical files are present
@@ -102,7 +116,7 @@ export class GenerationPipeline {
 
     // Stage 5 — Validate generated files
     await onProgress('Validating', PROGRESS_STAGES.FINAL_VALIDATION)
-    await this.validateGeneratedFiles(generatedFiles, projectId, onProgress)
+    await this.validateGeneratedFiles(generatedFiles, projectId, onProgress, stackId)
 
     // Stage 6 — Extract architecture metadata (CRITICAL - must succeed)
     await onProgress('Building architecture graph', PROGRESS_STAGES.ARCHITECTURE_EXTRACTION)
@@ -177,9 +191,9 @@ export class GenerationPipeline {
   /**
    * Analyzes user intent and extracts schema
    */
-  private async analyzeIntent(prompt: string, projectId: string): Promise<IntentSchema> {
+  private async analyzeIntent(prompt: string, projectId: string, stackId?: string): Promise<IntentSchema> {
     const intentStartedAt = Date.now()
-    const schema = await this.intentAnalyzer.analyze(prompt)
+    const schema = await this.intentAnalyzer.analyze(prompt, stackId)
     logger.info(
       'Pipeline: intent analysis completed in %dms for project %s',
       Date.now() - intentStartedAt,
@@ -262,9 +276,38 @@ export class GenerationPipeline {
     jobId: string | number | undefined,
     onProgress: PipelineOptions['onProgress'],
     memoryBlock: string,
-    relationships: ReturnType<SchemaValidator['validate']>['relationships']
+    relationships: ReturnType<SchemaValidator['validate']>['relationships'],
+    stackId?: string
   ): Promise<GeneratedFile[]> {
     const generationStartedAt = Date.now()
+
+    // Retrieve context from Weaviate if enabled
+    let ragContext: RetrievedContext | null = null
+    if (this.weaviateEnabled) {
+      try {
+        const weaviateRetriever = getWeaviateRetriever()
+        ragContext = await weaviateRetriever.retrieveContext(prompt, {
+          topK: 5,
+          includeFiles: true,
+          includeCodeSnippets: true,
+          includeDocumentation: true,
+          includeConversations: true,
+          includeSimilarProjects: true,
+          filters: { projectId },
+          minScore: 0.5,
+          enableReRanking: true
+        })
+
+        const stats = weaviateRetriever.getRetrievalStats(ragContext)
+        logger.info(
+          'Pipeline: retrieved %d items from Weaviate (avg score=%.3f)',
+          stats.totalItems,
+          stats.averageScore
+        )
+      } catch (error: any) {
+        logger.warn('Pipeline: Weaviate retrieval failed, continuing without RAG: %s', error.message)
+      }
+    }
 
     const generatedFiles = await this.fileGenerator.generateAll(
       prompt,
@@ -284,7 +327,7 @@ export class GenerationPipeline {
           jobTracker.trackGeneratedFile(jobId, { path: filePath })
         }
       },
-      { projectId, retriever: this.retriever, memoryBlock, relationships }
+      { projectId, retriever: this.retriever, memoryBlock, relationships, stackId, ragContext }
     )
 
     logger.info(
@@ -385,10 +428,17 @@ export class GenerationPipeline {
   private async validateGeneratedFiles(
     generatedFiles: GeneratedFile[],
     projectId: string,
-    onProgress: PipelineOptions['onProgress']
+    onProgress: PipelineOptions['onProgress'],
+    stackId?: string
   ): Promise<void> {
     const fileValidationStartedAt = Date.now()
-    const validationResults = await validateGeneratedFiles(generatedFiles, projectId, this.app, onProgress)
+    const validationResults = await validateGeneratedFiles(
+      generatedFiles,
+      projectId,
+      this.app,
+      onProgress,
+      stackId
+    )
 
     logger.info(
       'Pipeline: file validation completed in %dms for project %s',

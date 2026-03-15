@@ -1,4 +1,5 @@
 import { app } from './app'
+import { logger } from './logger'
 
 const REQUIRED_CONFIG = [
   'authentication.secret',
@@ -24,10 +25,10 @@ export function validateConfig(): void {
   }
 
   if (missing.length > 0) {
-    console.error('Missing required configuration:')
-    missing.forEach(k => console.error(`   - ${k}`))
+    logger.error('Missing required configuration:')
+    missing.forEach(k => logger.error(`   - ${k}`))
     process.exit(1)
   }
 
-  console.log('Configuration validated')
+  logger.info('Configuration validated')
 }

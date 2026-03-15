@@ -1,4 +1,5 @@
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
+import { createUniversalPromptBuilder } from '../../llm/prompts/universal-prompts'
 import { getProvider } from '../../llm/providers/registry'
 import { logger } from '../../logger'
 import type { IntentSchema } from './intent-analyzer'
@@ -18,18 +19,77 @@ const REQUIRED_FASTAPI_FILES: TaskPlan[] = [
   { path: 'main.py', description: 'FastAPI app entrypoint' }
 ]
 
+const REQUIRED_NESTJS_FILES: TaskPlan[] = [
+  { path: 'package.json', description: 'Node.js dependencies' },
+  { path: '.env.example', description: 'Environment variables template' },
+  { path: 'tsconfig.json', description: 'TypeScript configuration' },
+  { path: 'nest-cli.json', description: 'NestJS CLI configuration' },
+  { path: 'src/main.ts', description: 'NestJS app entrypoint' },
+  { path: 'src/app.module.ts', description: 'Root application module' }
+]
+
+const REQUIRED_GO_FILES: TaskPlan[] = [
+  { path: 'go.mod', description: 'Go module definition' },
+  { path: '.env.example', description: 'Environment variables template' },
+  { path: 'main.go', description: 'Go application entrypoint' }
+]
+
+const REQUIRED_RUST_FILES: TaskPlan[] = [
+  { path: 'Cargo.toml', description: 'Rust package configuration' },
+  { path: '.env.example', description: 'Environment variables template' },
+  { path: 'src/main.rs', description: 'Rust application entrypoint' }
+]
+
+const REQUIRED_JAVA_FILES: TaskPlan[] = [
+  { path: 'pom.xml', description: 'Maven dependencies' },
+  { path: '.env.example', description: 'Environment variables template' },
+  {
+    path: 'src/main/java/com/example/app/Application.java',
+    description: 'Spring Boot application entrypoint'
+  }
+]
+
+function getRequiredFilesForStack(stackId: string): TaskPlan[] {
+  switch (stackId) {
+    case 'nodejs-nestjs':
+      return REQUIRED_NESTJS_FILES
+    case 'go-gin':
+      return REQUIRED_GO_FILES
+    case 'rust-actix':
+      return REQUIRED_RUST_FILES
+    case 'java-springboot':
+      return REQUIRED_JAVA_FILES
+    case 'python-fastapi':
+    default:
+      return REQUIRED_FASTAPI_FILES
+  }
+}
+
 export class TaskPlanner {
-  async plan(prompt: string, schema: IntentSchema): Promise<TaskPlan[]> {
-    logger.debug('TaskPlanner: planning file structure for project "%s"', schema.projectName)
+  async plan(prompt: string, schema: IntentSchema, stackId?: string): Promise<TaskPlan[]> {
+    logger.debug(
+      'TaskPlanner: planning file structure for project "%s" with stack %s',
+      schema.projectName,
+      stackId || 'default'
+    )
 
     const provider = getProvider()
     let responseText = ''
 
-    for await (const chunk of provider.chatStream(
-      [{ role: 'user', content: buildGenerationPrompts.filePlan(prompt, schema) }],
-      undefined,
-      { temperature: 0.1 }
-    )) {
+    // Use universal prompt builder if stackId is provided, otherwise use old prompts for backward compatibility
+    const useUniversalPrompts = !!stackId
+    let planPrompt: string
+
+    if (useUniversalPrompts) {
+      const promptBuilder = createUniversalPromptBuilder()
+      planPrompt = promptBuilder.buildFilePlanningPrompt(prompt, schema, stackId || 'python-fastapi')
+    } else {
+      planPrompt = buildGenerationPrompts.filePlan(prompt, schema)
+    }
+
+    for await (const chunk of provider.chatStream([{ role: 'user', content: planPrompt }], undefined, {
+      temperature: 0.1
+    })) {
       responseText += chunk.message.content
     }
 
@@ -51,13 +111,15 @@ export class TaskPlanner {
       throw new Error('TaskPlanner: file plan is empty')
     }
 
-    return this.ensureRequiredFiles(normalized)
+    return this.ensureRequiredFiles(normalized, stackId)
   }
 
-  private ensureRequiredFiles(plan: TaskPlan[]): TaskPlan[] {
+  private ensureRequiredFiles(plan: TaskPlan[], stackId?: string): TaskPlan[] {
     const existing = new Set(plan.map(f => f.path))
     const result = [...plan]
-    for (const required of REQUIRED_FASTAPI_FILES) {
+    const requiredFiles = getRequiredFilesForStack(stackId || 'python-fastapi')
+
+    for (const required of requiredFiles) {
       if (!existing.has(required.path)) {
         logger.warn('TaskPlanner: injecting missing required file: %s', required.path)
         result.unshift(required)

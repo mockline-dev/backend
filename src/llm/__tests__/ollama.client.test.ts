@@ -42,7 +42,7 @@ describe('OllamaClient', () => {
       for await (const chunk of ollamaClient.chatStream([{ role: 'user', content: 'test' }], undefined, {
         temperature: 0.1
       })) {
-        chunks.push(chunk.message.content)
+        chunks.push(chunk.message.content || '')
       }
 
       expect(chunks).toEqual(['Hello', 'World'])

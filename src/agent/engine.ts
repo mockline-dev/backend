@@ -1,6 +1,6 @@
 import type { Application } from '../declarations'
 import { getProvider } from '../llm/providers/registry'
-import type { OllamaMessage } from '../llm/ollama.client'
+import type { LLMMessage } from '../llm/types'
 import { ContextRetriever } from './rag/retriever'
 import { AGENT_TOOLS } from './tools/definitions'
 import { executeToolCall, ToolResult } from './tools/executor'
@@ -16,7 +16,7 @@ export interface AgentRunOptions {
   projectId: string
   systemPrompt: string
   userMessage: string
-  history?: OllamaMessage[]
+  history?: LLMMessage[]
   maxIterations?: number
   onEvent: (event: AgentEvent) => void
 }
@@ -39,7 +39,7 @@ export class AgentEngine {
         ? `\n\nRelevant project files for this task:\n${relevantFiles.map(f => `=== ${f.path} ===\n${f.content}`).join('\n\n')}`
         : ''
 
-    const messages: OllamaMessage[] = [
+    const messages: LLMMessage[] = [
       { role: 'system', content: systemPrompt + contextBlock },
       ...history,
       { role: 'user', content: userMessage }
@@ -58,7 +58,7 @@ export class AgentEngine {
             onEvent({ type: 'token', payload: chunk.message.content })
           }
           if (chunk.message.tool_calls?.length) {
-            pendingToolCalls = chunk.message.tool_calls
+            pendingToolCalls.push(...chunk.message.tool_calls)
           }
         }
       } catch (err: any) {
@@ -66,7 +66,7 @@ export class AgentEngine {
         return
       }
 
-      const assistantMsg: OllamaMessage = {
+      const assistantMsg: LLMMessage = {
         role: 'assistant',
         content: responseContent
       }

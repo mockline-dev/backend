@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "nodejs-backend-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "c47fd9547c1b847b9fc11ebf7832f955bf81e62bff097b607d1497be8722e226"
+    }
+  }
+}

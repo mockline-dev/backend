@@ -1,7 +1,11 @@
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
+import { createUniversalPromptBuilder } from '../../llm/prompts/universal-prompts'
 import { getProvider } from '../../llm/providers/registry'
 import { logger } from '../../logger'
+import { createInitializedRegistry } from '../stacks'
+import type { StackConfig } from '../stacks/stack-config.types'
 import type { ContextRetriever } from '../rag/retriever'
+import type { RetrievedContext } from '../rag/weaviate'
 import type { IntentSchema } from './intent-analyzer'
 import type { Relationship } from './schema-validator'
 import type { TaskPlan } from './task-planner'
@@ -23,6 +27,10 @@ export interface FileGeneratorOptions {
   memoryBlock?: string
   /** Validated relationships between entities for proper foreign key implementation */
   relationships?: Relationship[]
+  /** Stack ID for language/framework-specific code generation */
+  stackId?: string
+  /** Optional RAG context for file generation */
+  ragContext?: RetrievedContext | null
 }
 
 export class FileGenerator {
@@ -119,7 +127,9 @@ export class FileGenerator {
             compactStableContext,
             compactExistingFiles,
             compactMemoryBlock(options.memoryBlock),
-            options.relationships
+            options.relationships,
+            options.stackId,
+            options.ragContext
           )
 
           generatedByIndex.set(index, { path: task.path, content })
@@ -148,33 +158,63 @@ export class FileGenerator {
     context: GeneratedFile[],
     existingFiles: { path: string; content: string }[] = [],
     memoryBlock?: string,
-    relationships?: Relationship[]
+    relationships?: Relationship[],
+    stackId?: string,
+    ragContext?: RetrievedContext | null
   ): Promise<string> {
     const provider = getProvider()
     const maxAttempts = 4
     const retryDelays = [1000, 2000, 4000] // Progressive delay: 1s, 2s, 4s
 
+    // Use universal prompt builder if stackId is provided, otherwise use old prompts for backward compatibility
+    const useUniversalPrompts = !!stackId
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const attemptStartedAt = Date.now()
       try {
         let raw = ''
+        let systemPrompt: string
+        let userPrompt: string
+
+        if (useUniversalPrompts) {
+          // Use universal prompt builder with stack-specific templates
+          const promptBuilder = createUniversalPromptBuilder()
+          userPrompt = await promptBuilder.buildFileGenerationPrompt(
+            task.path,
+            schema,
+            stackId || 'python-fastapi',
+            {
+              existingFiles,
+              memoryBlock,
+              relationships,
+              ragContext
+            }
+          )
+          // For universal prompts, we use a minimal system prompt
+          systemPrompt = 'You are a senior backend engineer generating production-ready code.'
+        } else {
+          // Use old prompts for backward compatibility
+          systemPrompt = buildGenerationPrompts.generateFileSystemPrompt(task.path)
+          userPrompt = buildGenerationPrompts.generateFileUserPrompt(
+            prompt,
+            schema,
+            task,
+            context,
+            existingFiles,
+            memoryBlock,
+            relationships
+          )
+        }
+
         for await (const chunk of provider.chatStream(
           [
             {
               role: 'system',
-              content: buildGenerationPrompts.generateFileSystemPrompt(task.path)
+              content: systemPrompt
             },
             {
               role: 'user',
-              content: buildGenerationPrompts.generateFileUserPrompt(
-                prompt,
-                schema,
-                task,
-                context,
-                existingFiles,
-                memoryBlock,
-                relationships
-              )
+              content: userPrompt
             }
           ],
           undefined,
@@ -230,36 +270,38 @@ function classifyTaskStage(path: string): number {
   const normalized = path.toLowerCase()
 
   if (
-    normalized === 'requirements.txt' ||
+    normalized.includes('requirements.txt') ||
+    normalized.includes('package.json') ||
+    normalized.includes('go.mod') ||
     normalized === '.env' ||
     normalized === '.env.example' ||
-    normalized === 'alembic.ini' ||
-    normalized.startsWith('app/core/')
+    normalized.includes('config') ||
+    normalized.includes('core')
   ) {
     return 0
   }
 
-  if (normalized.startsWith('app/models/')) {
+  if (normalized.includes('model') || normalized.includes('entity') || normalized.includes('schema')) {
     return 1
   }
 
-  if (normalized.startsWith('app/schemas/')) {
+  if (normalized.includes('dto') || normalized.includes('type') || normalized.includes('interface')) {
     return 2
   }
 
-  if (normalized.startsWith('app/services/') || normalized.startsWith('app/utils/')) {
+  if (normalized.includes('service') || normalized.includes('util') || normalized.includes('helper')) {
     return 3
   }
 
-  if (normalized.startsWith('app/api/')) {
+  if (normalized.includes('controller') || normalized.includes('route') || normalized.includes('api')) {
     return 4
   }
 
-  if (normalized === 'main.py' || normalized.startsWith('app/__')) {
+  if (normalized.includes('main') || normalized.includes('index') || normalized.includes('app')) {
     return 5
   }
 
-  if (normalized.startsWith('tests/') || normalized.startsWith('docs/') || normalized === 'readme.md') {
+  if (normalized.includes('test') || normalized.includes('doc') || normalized.includes('readme')) {
     return 6
   }
 
@@ -321,19 +363,19 @@ function parallelismForStage(stage: number, fileCount: number): number {
 function tokenBudgetForPath(path: string): number {
   const normalized = path.toLowerCase()
 
-  if (normalized.startsWith('app/models/') || normalized.startsWith('app/services/')) {
+  if (normalized.includes('model') || normalized.includes('service') || normalized.includes('controller')) {
     return 3200
   }
 
-  if (normalized.startsWith('app/api/') || normalized.startsWith('app/schemas/')) {
+  if (normalized.includes('api') || normalized.includes('schema') || normalized.includes('route')) {
     return 2600
   }
 
-  if (normalized === 'requirements.txt' || normalized === 'readme.md' || normalized.startsWith('docs/')) {
+  if (normalized.includes('.md') || normalized.includes('.json') || normalized.includes('.txt')) {
     return 1800
   }
 
-  if (normalized.startsWith('tests/')) {
+  if (normalized.includes('test')) {
     return 2200
   }
 
@@ -343,11 +385,11 @@ function tokenBudgetForPath(path: string): number {
 function contextWindowForPath(path: string): number {
   const normalized = path.toLowerCase()
 
-  if (normalized.startsWith('app/models/') || normalized.startsWith('app/services/')) {
+  if (normalized.includes('model') || normalized.includes('service') || normalized.includes('controller')) {
     return 12288
   }
 
-  if (normalized.startsWith('app/api/') || normalized.startsWith('app/schemas/')) {
+  if (normalized.includes('api') || normalized.includes('schema') || normalized.includes('route')) {
     return 10240
   }
 

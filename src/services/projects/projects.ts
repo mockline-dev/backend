@@ -19,6 +19,7 @@ import { excludeDeleted, softDelete } from '../../hooks/soft-delete'
 import { ProjectsService, getOptions } from './projects.class'
 import { projectsMethods, projectsPath } from './projects.shared'
 import { assertValidTransition } from './projects.state-machine'
+import { logger } from '../../logger'
 
 export * from './projects.class'
 export * from './projects.schema'
@@ -60,8 +61,16 @@ export const projects = (app: Application) => {
             filesGenerated: 0,
             totalFiles: 0
           }
-          context.data.framework = context.data.framework || 'fast-api'
-          context.data.language = context.data.language || 'python'
+          if (context.data.framework) {
+            context.data.framework = context.data.framework.toLowerCase()
+          } else {
+            context.data.framework = 'fast-api'
+          }
+          if (context.data.language) {
+            context.data.language = context.data.language.toLowerCase()
+          } else {
+            context.data.language = 'python'
+          }
           return context
         },
         schemaHooks.validateData(projectsDataValidator),
@@ -72,6 +81,12 @@ export const projects = (app: Application) => {
           // Validate status transitions
           if (context.data.status && context.result?.status) {
             assertValidTransition(context.result.status, context.data.status)
+          }
+          if (context.data.framework) {
+            context.data.framework = context.data.framework.toLowerCase()
+          }
+          if (context.data.language) {
+            context.data.language = context.data.language.toLowerCase()
           }
           return context
         },
@@ -118,64 +133,34 @@ export const projects = (app: Application) => {
           const projectId = result._id
           const user = context.params.user
 
-          // Don't await — run AI generation in background so the create response returns immediately
-          ;(async () => {
-            const maxRetries = 2
-            let attempt = 0
-            let lastError: any = null
-
-            while (attempt < maxRetries) {
-              try {
-                await app.service('ai-service').create(
-                  {
-                    projectId,
-                    prompt: result.description || result.name
-                  },
-                  { user }
-                )
-                // Success - break out of retry loop
-                break
-              } catch (error: any) {
-                lastError = error
-                attempt++
-
-                // Check if error is retryable
-                const isRetryable = error.message?.includes('timeout') ||
-                                   error.message?.includes('network') ||
-                                   error.message?.includes('ECONN') ||
-                                   error.code === 'ECONNRESET' ||
-                                   error.code === 'ETIMEDOUT'
-
-                if (!isRetryable || attempt >= maxRetries) {
-                  // Non-retryable error or max retries reached
-                  console.error(`Project ${projectId} generation failed (attempt ${attempt}):`, error.message)
-                  try {
-                    await app.service('projects')._patch(projectId, {
-                      status: 'error',
-                      errorMessage: error.message || 'Unexpected error during generation',
-                      errorType: isRetryable ? 'retryable_error' : 'permanent_error',
-                      retryAttempts: attempt,
-                      generationProgress: {
-                        percentage: 0,
-                        currentStage: 'error',
-                        filesGenerated: 0,
-                        totalFiles: 0,
-                        failedAt: Date.now()
-                      }
-                    })
-                  } catch (patchError) {
-                    console.error(`Failed to update project ${projectId} error status:`, patchError)
-                  }
-                  break
+          try {
+            // Await enqueueing the generation job directly to ensure it isn't lost
+            await app.service('ai-service').create(
+              {
+                projectId,
+                prompt: result.description || result.name
+              },
+              { user }
+            )
+          } catch (error: any) {
+            logger.error(`Project ${projectId} AI generation enqueue failed:`, error.message)
+            try {
+              await app.service('projects')._patch(projectId, {
+                status: 'error',
+                errorMessage: error.message || 'Failed to enqueue generation job',
+                errorType: 'permanent_error',
+                generationProgress: {
+                  percentage: 0,
+                  currentStage: 'error',
+                  filesGenerated: 0,
+                  totalFiles: 0,
+                  failedAt: Date.now()
                 }
-
-                // Retry with exponential backoff
-                const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000)
-                console.warn(`Project ${projectId} generation failed, retrying in ${backoffDelay}ms (attempt ${attempt}/${maxRetries})`)
-                await new Promise(resolve => setTimeout(resolve, backoffDelay))
-              }
+              })
+            } catch (patchError) {
+              logger.error(`Failed to update project ${projectId} error status:`, patchError)
             }
-          })()
+          }
 
           return context
         }
@@ -188,7 +173,7 @@ export const projects = (app: Application) => {
 
           // Log validation errors with details
           if (error?.name === 'BadRequest' || error?.name === 'ValidationError') {
-            console.error(`[Projects Service] Validation error on ${method}:`, {
+            logger.error(`[Projects Service] Validation error on ${method}:`, {
               error: error.message,
               data: context.data,
               params: params,
@@ -196,7 +181,7 @@ export const projects = (app: Application) => {
             })
           } else {
             // Log other errors
-            console.error(`[Projects Service] Error on ${method}:`, {
+            logger.error(`[Projects Service] Error on ${method}:`, {
               error: error?.message || error,
               stack: error?.stack,
               data: context.data,

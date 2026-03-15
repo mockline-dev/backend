@@ -1,4 +1,4 @@
-import type { HookContext } from '../declarations';
+import type { HookContext } from '../declarations'
 
 // In-memory store for rate limiting (resets on server restart)
 const requestCounts = new Map<string, { count: number; resetAt: number }>()

@@ -1,6 +1,7 @@
 import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
 import { getProvider } from '../../llm/providers/registry'
+import { logger } from '../../logger'
 
 interface ValidatePromptRequest {
   prompt: string
@@ -146,7 +147,7 @@ Keep the response concise and focused on backend development feasibility.`
           }
         }
       } catch (error) {
-        console.error('Error validating prompt:', error)
+        logger.error('Error validating prompt:', error)
         return {
           isValid: true,
           confidence: 0.5,

@@ -57,13 +57,18 @@ export const generationWorker = new Worker<GenerationJobData>(
     }
 
     try {
+      const project = await app.service('projects').get(projectId)
+      const stackId =
+        project.language && project.framework ? `${project.language}-${project.framework}` : undefined
+
       const pipeline = new GenerationPipeline(app)
       const result = await pipeline.run({
         projectId,
         prompt,
         userId: job.data.userId,
         onProgress: updateProgress,
-        jobId: jobId // Pass job ID for tracking
+        jobId: jobId, // Pass job ID for tracking
+        stackId // Pass constructed stackId down to the pipeline
       })
 
       // Check if there are warnings from the pipeline

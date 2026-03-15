@@ -2,6 +2,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
+import { logger } from '../../logger'
 
 export default function (app: any) {
   const awsConfig = app.get('aws')
@@ -41,7 +42,7 @@ export default function (app: any) {
 
         return { url }
       } catch (error) {
-        console.error('Error generating signed URL:', error)
+        logger.error('Error generating signed URL:', error)
         throw error
       }
     },

@@ -22,7 +22,7 @@ export const usersSchema = Type.Object(
 )
 export type Users = Static<typeof usersSchema>
 export const usersValidator = getValidator(usersSchema, dataValidator)
-export const usersResolver = resolve<UsersQuery, HookContext<UsersService>>({})
+export const usersResolver = resolve<Users, HookContext<UsersService>>({})
 
 export const usersExternalResolver = resolve<Users, HookContext<UsersService>>({})
 
@@ -32,7 +32,14 @@ export const usersDataSchema = Type.Pick(usersSchema, ['firebaseUid', 'firstName
 })
 export type UsersData = Static<typeof usersDataSchema>
 export const usersDataValidator = getValidator(usersDataSchema, dataValidator)
-export const usersDataResolver = resolve<UsersData, HookContext<UsersService>>({})
+export const usersDataResolver = resolve<Users, HookContext<UsersService>>({
+  createdAt: async () => {
+    return Date.now()
+  },
+  updatedAt: async () => {
+    return Date.now()
+  }
+})
 
 // Schema for updating existing entries
 export const usersPatchSchema = Type.Partial(usersSchema, {
@@ -43,7 +50,13 @@ export const usersPatchValidator = getValidator(usersPatchSchema, dataValidator)
 export const usersPatchResolver = resolve<UsersPatch, HookContext<UsersService>>({})
 
 // Schema for allowed query properties
-export const usersQueryProperties = Type.Pick(usersSchema, ['_id', 'firebaseUid', 'firstName', 'lastName', 'email'])
+export const usersQueryProperties = Type.Pick(usersSchema, [
+  '_id',
+  'firebaseUid',
+  'firstName',
+  'lastName',
+  'email'
+])
 export const usersQuerySchema = Type.Intersect(
   [
     querySyntax(usersQueryProperties),

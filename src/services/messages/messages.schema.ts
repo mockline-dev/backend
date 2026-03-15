@@ -29,9 +29,13 @@ export const messagesResolver = resolve<MessagesQuery, HookContext<MessagesServi
 export const messagesExternalResolver = resolve<Messages, HookContext<MessagesService>>({})
 
 // Schema for creating new entries
-export const messagesDataSchema = Type.Pick(messagesSchema, ['projectId', 'role', 'content', 'tokens', 'status', 'type'], {
-  $id: 'MessagesData'
-})
+export const messagesDataSchema = Type.Pick(
+  messagesSchema,
+  ['projectId', 'role', 'content', 'tokens', 'status', 'type'],
+  {
+    $id: 'MessagesData'
+  }
+)
 export type MessagesData = Static<typeof messagesDataSchema>
 export const messagesDataValidator = getValidator(messagesDataSchema, dataValidator)
 export const messagesDataResolver = resolve<Messages, HookContext<MessagesService>>({
@@ -56,7 +60,16 @@ export const messagesPatchResolver = resolve<MessagesPatch, HookContext<Messages
 })
 
 // Schema for allowed query properties
-export const messagesQueryProperties = Type.Pick(messagesSchema, ['_id', 'projectId', 'role', 'content', 'tokens', 'status', 'createdAt', 'updatedAt'])
+export const messagesQueryProperties = Type.Pick(messagesSchema, [
+  '_id',
+  'projectId',
+  'role',
+  'content',
+  'tokens',
+  'status',
+  'createdAt',
+  'updatedAt'
+])
 export const messagesQuerySchema = Type.Intersect(
   [
     querySyntax(messagesQueryProperties),

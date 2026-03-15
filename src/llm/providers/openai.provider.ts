@@ -1,7 +1,7 @@
 import config from 'config'
 import OpenAI from 'openai'
-import type { OllamaMessage, OllamaStreamChunk } from '../ollama.client'
 import type { ILLMProvider } from './base'
+import type { LLMMessage, LLMStreamChunk, LLMToolCall } from '../types'
 
 /**
  * ILLMProvider implementation backed by the OpenAI API (or any OpenAI-compatible endpoint).
@@ -38,37 +38,83 @@ export class OpenAIProvider implements ILLMProvider {
   }
 
   async *chatStream(
-    messages: OllamaMessage[],
-    _tools?: object[],
+    messages: LLMMessage[],
+    tools?: object[],
     options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
-  ): AsyncGenerator<OllamaStreamChunk> {
-    const openaiMessages = messages.map(m => ({
-      role: m.role as 'system' | 'user' | 'assistant',
-      content: m.content ?? ''
-    }))
+  ): AsyncGenerator<LLMStreamChunk> {
+    const openaiMessages: OpenAI.ChatCompletionMessageParam[] = messages.map(m => {
+      const base: any = { role: m.role, content: m.content ?? '' }
+      if (m.role === 'tool') {
+        base.tool_call_id = m.tool_call_id
+      }
+      if (m.role === 'assistant' && m.tool_calls) {
+        base.tool_calls = m.tool_calls.map((tc: any) => ({
+          id: tc.id,
+          type: tc.type,
+          function: { name: tc.function.name, arguments: tc.function.arguments }
+        }))
+        if (!base.content) {
+          base.content = null
+        }
+      }
+      return base as OpenAI.ChatCompletionMessageParam
+    })
 
     const stream = await this.client.chat.completions.create({
       model: this.model,
       messages: openaiMessages,
+      tools: tools && tools.length > 0 ? (tools as any) : undefined,
       stream: true,
       temperature: options.temperature ?? 0.3,
       top_p: options.top_p,
       max_tokens: options.num_predict
     })
 
+    let accumulatedToolCalls: LLMToolCall[] | undefined = undefined
+
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta
       const done = chunk.choices[0]?.finish_reason != null
 
+      let chunkToolCalls: LLMToolCall[] | undefined = undefined
+
+      if (delta?.tool_calls) {
+        if (!accumulatedToolCalls) accumulatedToolCalls = []
+
+        for (const tcDelta of delta.tool_calls) {
+          const index = tcDelta.index
+          if (!accumulatedToolCalls[index]) {
+            accumulatedToolCalls[index] = {
+              id: tcDelta.id ?? '',
+              type: 'function',
+              function: {
+                name: tcDelta.function?.name ?? '',
+                arguments: tcDelta.function?.arguments ?? ''
+              }
+            }
+          } else {
+            if (tcDelta.function?.arguments) {
+              accumulatedToolCalls[index].function.arguments += tcDelta.function.arguments
+            }
+          }
+        }
+      }
+
+      // Yield fully formed tool calls once at the end to prevent duplicates in engine
+      if (done && accumulatedToolCalls) {
+        chunkToolCalls = accumulatedToolCalls.filter(Boolean)
+      }
+
       yield {
         message: {
           role: 'assistant',
-          content: delta?.content ?? ''
+          content: delta?.content ?? '',
+          tool_calls: chunkToolCalls
         },
         done,
         eval_count: undefined,
         prompt_eval_count: undefined
-      } as OllamaStreamChunk
+      } as LLMStreamChunk
     }
   }
 

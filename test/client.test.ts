@@ -13,11 +13,11 @@ const appUrl = `http://${app.get('host')}:${port}`
 describe('application client tests', () => {
   const client = createClient(rest(appUrl).axios(axios))
 
-  before(async () => {
+  beforeAll(async () => {
     await app.listen(port)
   })
 
-  after(async () => {
+  afterAll(async () => {
     await app.teardown()
   })
 

@@ -8,8 +8,10 @@ import {
   S3Client,
   UploadPartCommand
 } from '@aws-sdk/client-s3'
+import { authenticate } from '@feathersjs/authentication'
 import { ObjectId } from 'mongodb'
 import type { Application } from '../../declarations'
+import { logger } from '../../logger'
 const path = require('path')
 
 export const uploadsPath = 'uploads'
@@ -181,7 +183,7 @@ export const uploads = (app: Application) => {
         const media = await app.service('files').create(payload)
         return media._id.toString()
       } catch (error) {
-        console.error('[Uploads] Failed to create file record:', error)
+        logger.error('[Uploads] Failed to create file record:', error)
         return null
       }
     },
@@ -217,7 +219,7 @@ export const uploads = (app: Application) => {
       all: []
     },
     before: {
-      all: [],
+      all: [authenticate('jwt')],
       create: [
         async (context: any) => {
           const { key, contentType, content } = context.data
@@ -299,7 +301,7 @@ export const uploads = (app: Application) => {
       update: [
         async (context: any) => {
           const { result, data } = context
-          console.log(`[Uploads] File upload completed: ${data.key}, fileId: ${result}`)
+          logger.info(`[Uploads] File upload completed: ${data.key}, fileId: ${result}`)
           return context
         }
       ]
@@ -307,7 +309,7 @@ export const uploads = (app: Application) => {
     error: {
       all: [
         async (context: any) => {
-          console.error(`[Uploads] Error in ${context.method}:`, context.error)
+          logger.error(`[Uploads] Error in ${context.method}:`, context.error)
           return context
         }
       ]

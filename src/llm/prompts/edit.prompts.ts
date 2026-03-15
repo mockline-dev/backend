@@ -46,17 +46,17 @@ You have access to tools: read_file, write_file, list_files, delete_file, finish
 === CODEBASE UNDERSTANDING GUIDELINES ===
 
 - Analyze existing code patterns before making changes:
-   * Naming conventions (snake_case for variables/functions, PascalCase for classes)
+   * Naming conventions (e.g. camelCase, snake_case, PascalCase as appropriate for the language)
    * Import organization (standard library, third-party, local)
-   * Error handling patterns (try-except, HTTPException)
-   * Database query patterns (SQLAlchemy usage)
-   * API response patterns (Pydantic schemas)
+   * Error handling patterns (try-catch, error boundaries, custom exceptions)
+   * Database query patterns (ORM usage, raw queries)
+   * API response patterns (serializers, views/schemas)
    * Logging patterns (logger usage)
    * Configuration patterns (environment variables, settings)
 - Identify and reuse existing utilities:
-   * Helper functions in utils/ directory
+   * Helper functions
    * Base classes or mixins
-   * Common decorators
+   * Common decorators or middleware
    * Shared constants or enums
 - Understand the project architecture:
    * How models, schemas, services, and routers interact
@@ -67,7 +67,7 @@ You have access to tools: read_file, write_file, list_files, delete_file, finish
 === CONSISTENCY MAINTENANCE ===
 
 - Follow the existing code style and patterns:
-   * Use the same indentation (4 spaces for Python)
+   * Use the project's standard indentation (e.g. 2 or 4 spaces)
    * Follow the same line length limits
    * Use the same comment style
    * Maintain the same formatting (imports spacing, blank lines)
@@ -89,21 +89,21 @@ You have access to tools: read_file, write_file, list_files, delete_file, finish
    * Invalid input data types
    * Missing or invalid foreign keys
 - Implement proper error handling:
-   * Use try-except blocks for database operations
-   * Catch specific exceptions, not generic Exception
-   * Raise HTTPException with appropriate status codes
+   * Use appropriate exception handling for the framework (try-catch etc)
+   * Catch specific exceptions, not generic Exceptions
+   * Return appropriate HTTP status codes and payloads
    * Provide clear, actionable error messages
    * Log errors with appropriate context
 - Validate user input:
-   * Use Pydantic models for request validation
+   * Use framework-standard validation methods
    * Add custom validators when needed
    * Validate relationships and constraints
    * Sanitize input to prevent injection attacks
 - Handle database errors:
-   * IntegrityError (duplicate entries, constraint violations)
-   * SQLAlchemyError (database connection issues)
-   * TimeoutError (slow queries)
-   * OperationalError (database operational issues)
+   * Duplicate entries, constraint violations
+   * Database connection issues
+   * Timeout errors or slow queries
+   * Operational issues
 
 === TESTING CONSIDERATIONS ===
 

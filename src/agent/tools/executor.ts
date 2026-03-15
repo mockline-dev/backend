@@ -47,24 +47,34 @@ export async function executeToolCall(
         const userId = project.userId
 
         // Internal service calls require user context for authorization
-        const existing = await app.service('files').find({
-          query: { projectId, key, $limit: 1 }
-        }, { user: { _id: userId } })
+        const existing = await app.service('files').find(
+          {
+            query: { projectId, key, $limit: 1 }
+          },
+          { user: { _id: userId } } as any
+        )
 
         if ((existing as any).total > 0) {
-          await app.service('files').patch((existing as any).data[0]._id, {
-            size: bytes,
-            key,
-            updatedAt: Date.now()
-          }, { user: { _id: userId } })
+          await app.service('files').patch(
+            (existing as any).data[0]._id,
+            {
+              size: bytes,
+              key,
+              updatedAt: Date.now()
+            },
+            { user: { _id: userId } } as any
+          )
         } else {
-          await app.service('files').create({
-            projectId,
-            name: path,
-            key,
-            size: bytes,
-            fileType: detectLanguage(path)
-          }, { user: { _id: userId } })
+          await app.service('files').create(
+            {
+              projectId,
+              name: path,
+              key,
+              size: bytes,
+              fileType: detectLanguage(path)
+            },
+            { user: { _id: userId } } as any
+          )
         }
 
         // Index the written file for RAG context retrieval
@@ -95,11 +105,14 @@ export async function executeToolCall(
         const userId = project.userId
 
         // Internal service calls require user context for authorization
-        const existing = await app.service('files').find({
-          query: { projectId, key, $limit: 1 }
-        }, { user: { _id: userId } })
+        const existing = await app.service('files').find(
+          {
+            query: { projectId, key, $limit: 1 }
+          },
+          { user: { _id: userId } } as any
+        )
         if ((existing as any).total > 0) {
-          await app.service('files').remove((existing as any).data[0]._id, {}, { user: { _id: userId } })
+          await app.service('files').remove((existing as any).data[0]._id, { user: { _id: userId } } as any)
         }
         embeddingStore.clear(projectId) // Re-index on next query
         return { success: true, data: { deleted: path } }

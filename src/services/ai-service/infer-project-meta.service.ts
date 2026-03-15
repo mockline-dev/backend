@@ -2,6 +2,7 @@ import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
 import { getProvider } from '../../llm/providers/registry'
 import { parseInferProjectMetaResponse } from '../../utils/parseMarkdown'
+import { logger } from '../../logger'
 
 const INFER_PROJECT_META_SYSTEM = `You are an expert product strategist for AI code generation systems.
 
@@ -47,7 +48,7 @@ export default function (app: any) {
 
         return parsed
       } catch (error) {
-        console.error('Error inferring project metadata:', error)
+        logger.error('Error inferring project metadata:', error)
         throw new Error('Failed to infer project metadata. Please try again later.')
       }
     }
@@ -59,7 +60,7 @@ export default function (app: any) {
       create: [
         async (context: any) => {
           const { enhancedPrompt } = context.data
-          console.log('Received enhanced prompt for project metadata inference:', enhancedPrompt)
+          logger.info('Received enhanced prompt for project metadata inference:', enhancedPrompt)
           return context
         }
       ],

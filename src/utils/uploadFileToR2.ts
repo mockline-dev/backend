@@ -4,6 +4,7 @@
  */
 
 import { Application } from '../declarations'
+import { logger } from '../logger'
 
 const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024 // 5MB chunks
 const MAX_RETRIES = 3
@@ -36,19 +37,19 @@ export interface UploadFileToR2Result {
  */
 async function generateSecureFileName(originalFilename: string): Promise<string> {
   const crypto = await import('crypto')
-  
+
   // Extract file extension
   const fileExtension = originalFilename.split('.').pop() || ''
-  
+
   // Generate a random salt using Node.js crypto
   const salt = crypto.randomBytes(16).toString('hex')
-  
+
   // Combine filename, salt, and timestamp for better uniqueness
   const data = `${originalFilename}-${Date.now()}-${salt}`
-  
+
   // Hash the data using SHA-256
   const hash = crypto.createHash('sha256').update(data).digest('hex')
-  
+
   return `${hash}-${salt}.${fileExtension}`
 }
 
@@ -61,13 +62,11 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Uploads a file to R2 storage using multipart upload.
- * 
+ *
  * @param options - Upload options including content, filename, and metadata
  * @returns Upload result with file ID, URL, and status
  */
-export async function uploadFileToR2(
-  options: UploadFileToR2Options
-): Promise<UploadFileToR2Result> {
+export async function uploadFileToR2(options: UploadFileToR2Options): Promise<UploadFileToR2Result> {
   const {
     app,
     content,
@@ -102,7 +101,7 @@ export async function uploadFileToR2(
     // Generate secure filename
     key = await generateSecureFileName(filename)
 
-    console.log(`[uploadFileToR2] Starting upload: ${filename} -> ${key} (${fileSize} bytes)`)
+    logger.info(`[uploadFileToR2] Starting upload: ${filename} -> ${key} (${fileSize} bytes)`)
 
     // Initialize multipart upload
     const initResponse = await app.service('uploads').create({
@@ -115,7 +114,7 @@ export async function uploadFileToR2(
       throw new Error('Failed to initialize multipart upload')
     }
 
-    console.log(`[uploadFileToR2] Upload initialized with ID: ${uploadId}`)
+    logger.info(`[uploadFileToR2] Upload initialized with ID: ${uploadId}`)
 
     // Calculate chunks
     const totalChunks = Math.ceil(fileSize / chunkSize)
@@ -151,17 +150,19 @@ export async function uploadFileToR2(
             PartNumber: partNumber
           })
 
-          console.log(`[uploadFileToR2] Uploaded part ${partNumber}/${totalChunks}`)
+          logger.info(`[uploadFileToR2] Uploaded part ${partNumber}/${totalChunks}`)
           break
         } catch (error: any) {
           retries++
-          console.error(
+          logger.error(
             `[uploadFileToR2] Failed to upload part ${partNumber} (attempt ${retries}/${MAX_RETRIES}):`,
             error.message
           )
 
           if (retries >= MAX_RETRIES) {
-            throw new Error(`Failed to upload part ${partNumber} after ${MAX_RETRIES} retries: ${error.message}`)
+            throw new Error(
+              `Failed to upload part ${partNumber} after ${MAX_RETRIES} retries: ${error.message}`
+            )
           }
 
           // Wait before retrying with exponential backoff
@@ -177,7 +178,7 @@ export async function uploadFileToR2(
     }
 
     // Complete multipart upload
-    console.log(`[uploadFileToR2] Completing multipart upload for ${key}`)
+    logger.info(`[uploadFileToR2] Completing multipart upload for ${key}`)
 
     const completeResponse = await app.service('uploads').update(null, {
       uploadId,
@@ -191,7 +192,7 @@ export async function uploadFileToR2(
     })
 
     // The uploads service returns the file ID directly as a string
-    const fileId = typeof completeResponse === 'string' ? completeResponse : completeResponse._id as string
+    const fileId = typeof completeResponse === 'string' ? completeResponse : (completeResponse._id as string)
     if (!fileId) {
       throw new Error('Failed to complete multipart upload - no file ID returned')
     }
@@ -199,7 +200,7 @@ export async function uploadFileToR2(
     // Generate public URL
     const fileUrl = generatePublicUrl(app, key)
 
-    console.log(`[uploadFileToR2] Upload complete: ${fileId} -> ${fileUrl}`)
+    logger.info(`[uploadFileToR2] Upload complete: ${fileId} -> ${fileUrl}`)
 
     return {
       success: true,
@@ -210,15 +211,15 @@ export async function uploadFileToR2(
       size: fileSize
     }
   } catch (error: any) {
-    console.error(`[uploadFileToR2] Upload failed:`, error)
+    logger.error(`[uploadFileToR2] Upload failed:`, error)
 
     // Cleanup: abort multipart upload if it was initialized
     if (uploadId && key) {
       try {
-        console.log(`[uploadFileToR2] Cleaning up failed upload: ${uploadId}`)
+        logger.info(`[uploadFileToR2] Cleaning up failed upload: ${uploadId}`)
         await app.service('uploads').remove(null, { query: { uploadId, key } })
       } catch (cleanupError: any) {
-        console.error(`[uploadFileToR2] Failed to cleanup:`, cleanupError.message)
+        logger.error(`[uploadFileToR2] Failed to cleanup:`, cleanupError.message)
       }
     }
 
@@ -248,7 +249,7 @@ function generatePublicUrl(app: Application, key: string): string {
 
 /**
  * Uploads multiple files to R2 storage.
- * 
+ *
  * @param app - Feathers application instance
  * @param files - Array of file objects with content, filename, and contentType
  * @param projectId - Project ID for the files
@@ -279,12 +280,12 @@ export async function uploadMultipleFilesToR2(
       projectId,
       messageId: options?.messageId,
       userId: options?.userId,
-      onProgress: (progress) => {
+      onProgress: progress => {
         if (options?.onFileProgress) {
           options.onFileProgress(file.filename, progress)
         }
         if (options?.onOverallProgress) {
-          const overallProgress = Math.round(((i + (progress / 100)) / files.length) * 100)
+          const overallProgress = Math.round(((i + progress / 100) / files.length) * 100)
           options.onOverallProgress(overallProgress)
         }
       }

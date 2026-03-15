@@ -21,12 +21,15 @@ export class MessagesService<ServiceParams extends Params = MessagesParams> exte
 export const getOptions = (app: Application): MongoDBAdapterOptions => {
   return {
     paginate: app.get('paginate'),
-    Model: app.get('mongodbClient').then((db) => db.collection('messages')).then(async collection => {
-      await collection.createIndex({ projectId: 1 })
-      await collection.createIndex({ projectId: 1, createdAt: -1 })
-      await collection.createIndex({ createdAt: -1 })
+    Model: app
+      .get('mongodbClient')
+      .then(db => db.collection('messages'))
+      .then(async collection => {
+        await collection.createIndex({ projectId: 1 })
+        await collection.createIndex({ projectId: 1, createdAt: -1 })
+        await collection.createIndex({ createdAt: -1 })
 
-      return collection
-    })
+        return collection
+      })
   }
 }

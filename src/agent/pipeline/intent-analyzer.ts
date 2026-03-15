@@ -1,6 +1,7 @@
 import { logger } from '../../logger'
 import { getProvider } from '../../llm/providers/registry'
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
+import { createUniversalPromptBuilder } from '../../llm/prompts/universal-prompts'
 
 export interface IntentSchema {
   projectName: string
@@ -21,17 +22,30 @@ export interface IntentSchema {
 }
 
 export class IntentAnalyzer {
-  async analyze(prompt: string): Promise<IntentSchema> {
-    logger.debug('IntentAnalyzer: analyzing prompt (%d chars)', prompt.length)
+  async analyze(prompt: string, stackId?: string): Promise<IntentSchema> {
+    logger.debug(
+      'IntentAnalyzer: analyzing prompt (%d chars) with stack %s',
+      prompt.length,
+      stackId || 'default'
+    )
 
     const provider = getProvider()
     let responseText = ''
 
-    for await (const chunk of provider.chatStream(
-      [{ role: 'user', content: buildGenerationPrompts.extractSchema(prompt) }],
-      undefined,
-      { temperature: 0.1 }
-    )) {
+    // Use universal prompt builder if stackId is provided, otherwise use old prompts for backward compatibility
+    const useUniversalPrompts = !!stackId
+    let schemaPrompt: string
+
+    if (useUniversalPrompts) {
+      const promptBuilder = createUniversalPromptBuilder()
+      schemaPrompt = promptBuilder.buildSchemaExtractionPrompt(prompt, stackId || 'python-fastapi')
+    } else {
+      schemaPrompt = buildGenerationPrompts.extractSchema(prompt)
+    }
+
+    for await (const chunk of provider.chatStream([{ role: 'user', content: schemaPrompt }], undefined, {
+      temperature: 0.1
+    })) {
       responseText += chunk.message.content
     }
 

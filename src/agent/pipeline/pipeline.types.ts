@@ -11,6 +11,7 @@ export interface PipelineOptions {
   userId: string
   onProgress: (stage: string, percentage: number, currentFile?: string) => Promise<void>
   jobId?: string | number
+  stackId?: string
 }
 
 export interface PipelineResult {

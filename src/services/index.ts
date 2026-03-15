@@ -4,6 +4,7 @@ import { messages } from './messages/messages'
 import { models } from './models/models'
 import { projects } from './projects/projects'
 import { snapshots } from './snapshots/snapshots'
+import { stacks } from './stacks/stacks'
 import { uploads } from './uploads/uploads'
 import { users } from './users/users'
 // For more information about this file see https://dove.feathersjs.com/guides/cli/application.html#configure-functions
@@ -23,6 +24,7 @@ export const services = (app: Application) => {
   app.configure(messages)
   app.configure(models)
   app.configure(projects)
+  app.configure(stacks)
   app.configure(users)
   app.configure(uploads)
   app.configure(aiService)

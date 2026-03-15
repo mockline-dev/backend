@@ -51,6 +51,18 @@ export const configurationSchema = Type.Intersect([
     }),
     firebase: Type.Object({
       serviceAccountPath: Type.String()
+    }),
+    weaviate: Type.Object({
+      host: Type.String(),
+      port: Type.Number(),
+      scheme: Type.Union([Type.Literal('http'), Type.Literal('https')]),
+      apiKey: Type.Optional(Type.String()),
+      enabled: Type.Boolean(),
+      timeout: Type.Number(),
+      maxRetries: Type.Number(),
+      retryDelay: Type.Number(),
+      batchSize: Type.Number(),
+      vectorDimension: Type.Number()
     })
   })
 ])

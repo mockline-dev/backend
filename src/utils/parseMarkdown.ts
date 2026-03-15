@@ -1,3 +1,4 @@
+import { logger } from '../logger'
 interface ParsedFile {
   filename: string
   content: string
@@ -20,7 +21,7 @@ interface ParsedInferProjectMetaResponse {
 }
 
 export const parseProjectResponse = (markdown: string): ParsedProjectResponse => {
-  console.log('Parsing key-value format response...')
+  logger.info('Parsing key-value format response...')
 
   const result: ParsedProjectResponse = {
     name: '',
@@ -32,7 +33,7 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
   if (nameMatch) {
     result.name = nameMatch[1].trim()
   } else {
-    console.log('Warning: PROJECT_NAME not found, trying fallback...')
+    logger.info('Warning: PROJECT_NAME not found, trying fallback...')
     const firstHeaderMatch: RegExpMatchArray | null = markdown.match(/^##\s+([^\n]+?)(?=\n##|$)/s)
     if (firstHeaderMatch) {
       const headerText: string = firstHeaderMatch[1].trim()
@@ -48,7 +49,7 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
   if (explanationMatch) {
     result.explanation = explanationMatch[1].trim()
   } else {
-    console.log('Warning: PROJECT_EXPLANATION not found, trying fallback...')
+    logger.info('Warning: PROJECT_EXPLANATION not found, trying fallback...')
     const fallbackExplanationMatch: RegExpMatchArray | null = markdown.match(
       /## Explanation\s*\n+(.*?)(?=\n##|\n### File:|$)/s
     )
@@ -62,7 +63,7 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
   if (filesMatch) {
     filesContent = filesMatch[1]
   } else {
-    console.log('Warning: PROJECT_FILES not found, using entire content for file extraction...')
+    logger.info('Warning: PROJECT_FILES not found, using entire content for file extraction...')
     filesContent = markdown
   }
 
@@ -74,7 +75,7 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
     const language: string = match[2] || 'text'
     const content: string = match[3]
 
-    console.log(`Extracted file: ${filename} (${language}), content length: ${content.length}`)
+    logger.info(`Extracted file: ${filename} (${language}), content length: ${content.length}`)
 
     result.files.push({
       filename,
@@ -84,14 +85,14 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
   }
 
   if (result.files.length === 0) {
-    console.log('No files found with primary pattern, trying alternatives...')
+    logger.info('No files found with primary pattern, trying alternatives...')
 
     const altPattern: RegExp = /### File:\s*([^\n]+)\s*\n+```\n([\s\S]*?)```/g
     while ((match = altPattern.exec(filesContent)) !== null) {
       const filename: string = match[1].trim()
       const content: string = match[2]
 
-      console.log(`Extracted file (alt pattern): ${filename}, content length: ${content.length}`)
+      logger.info(`Extracted file (alt pattern): ${filename}, content length: ${content.length}`)
 
       result.files.push({
         filename,
@@ -102,7 +103,7 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
   }
 
   if (result.files.length === 0) {
-    console.log('Still no files, trying to extract code blocks...')
+    logger.info('Still no files, trying to extract code blocks...')
 
     const codeBlockPattern: RegExp = /```(\w*)\n([\s\S]*?)```/g
     const commonFiles: Array<string> = ['main.py', 'requirements.txt', '.env.example', 'README.md']
@@ -120,7 +121,7 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
         filename = 'script.sh'
       }
 
-      console.log(`Extracted file (code block): ${filename}, content length: ${content.length}`)
+      logger.info(`Extracted file (code block): ${filename}, content length: ${content.length}`)
 
       result.files.push({
         filename,
@@ -132,7 +133,7 @@ export const parseProjectResponse = (markdown: string): ParsedProjectResponse =>
     }
   }
 
-  console.log(
+  logger.info(
     `Parsing complete. Name: "${result.name}", Explanation: "${result.explanation.substring(0, 50)}...", Files: ${result.files.length}`
   )
   return result
@@ -206,7 +207,7 @@ export const parseEnhancePromptResponse = (jsonString: string): ParsedEnhancePro
     const parsed = JSON.parse(clean)
     result.enhancedPrompt = parsed.enhancedPrompt || ''
   } catch (error) {
-    console.error('Failed to parse JSON enhance-prompt response:', error)
+    logger.error('Failed to parse JSON enhance-prompt response:', error)
   }
 
   return result
@@ -226,7 +227,7 @@ export const parseInferProjectMetaResponse = (jsonString: string): ParsedInferPr
     result.name = typeof parsed.name === 'string' ? parsed.name.trim().slice(0, 60) : ''
     result.description = typeof parsed.description === 'string' ? parsed.description.trim() : ''
   } catch (error) {
-    console.error('Failed to parse JSON infer-project-meta response:', error)
+    logger.error('Failed to parse JSON infer-project-meta response:', error)
   }
 
   return result

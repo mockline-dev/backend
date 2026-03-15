@@ -2,6 +2,7 @@ import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
 import { getProvider } from '../../llm/providers/registry'
 import { parseEnhancePromptResponse } from '../../utils/parseMarkdown'
+import { logger } from '../../logger'
 
 const ENHANCE_PROMPT_SYSTEM = `You are an expert software prompt engineer specialized in preparing high-quality prompts for coding AI models such as Qwen-Coder.
 
@@ -65,7 +66,7 @@ export default function (app: any) {
         const parsedResponse = parseEnhancePromptResponse(aiResponse)
         return parsedResponse
       } catch (error) {
-        console.error('Error enhancing prompt:', error)
+        logger.error('Error enhancing prompt:', error)
         throw new Error('Failed to enhance prompt. Please try again later.')
       }
     }
@@ -77,7 +78,7 @@ export default function (app: any) {
       create: [
         async (context: any) => {
           const { userPrompt } = context.data
-          console.log('Received prompt for enhancement:', userPrompt)
+          logger.info('Received prompt for enhancement:', userPrompt)
           return context
         }
       ],

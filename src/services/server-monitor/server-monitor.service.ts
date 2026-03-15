@@ -1,5 +1,6 @@
 import { authenticate } from '@feathersjs/authentication'
 import type { Application } from '../../declarations'
+import { logger } from '../../logger'
 
 interface ServerMonitorData {
   projectId: string
@@ -109,7 +110,7 @@ export default function (app: Application) {
         const server = await this.get(id, params)
         process.kill(server.pid, 'SIGTERM')
       } catch (error) {
-        console.error(`Failed to stop server ${id}:`, error)
+        logger.error(`Failed to stop server ${id}:`, error)
       }
 
       // Return mock response

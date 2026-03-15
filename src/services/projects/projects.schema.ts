@@ -14,8 +14,22 @@ export const projectsSchema = Type.Object(
     userId: ObjectIdSchema(),
     name: Type.String(),
     description: Type.String(),
-    framework: Type.Union([Type.Literal('fast-api'), Type.Literal('feathers')]),
-    language: Type.Union([Type.Literal('python'), Type.Literal('typescript')]),
+    framework: Type.Union([
+      Type.Literal('fast-api'),
+      Type.Literal('feathers'),
+      Type.Literal('express'),
+      Type.Literal('go-gin'),
+      Type.Literal('spring-boot'),
+      Type.Literal('actix'),
+      Type.Literal('nestjs')
+    ]),
+    language: Type.Union([
+      Type.Literal('python'),
+      Type.Literal('typescript'),
+      Type.Literal('go'),
+      Type.Literal('java'),
+      Type.Literal('rust')
+    ]),
     model: Type.String(),
     status: Type.Union([
       Type.Literal('initializing'),
@@ -64,7 +78,7 @@ export const projectsSchema = Type.Object(
 )
 export type Projects = Static<typeof projectsSchema>
 export const projectsValidator = getValidator(projectsSchema, dataValidator)
-export const projectsResolver = resolve<ProjectsQuery, HookContext<ProjectsService>>({
+export const projectsResolver = resolve<Projects, HookContext<ProjectsService>>({
   createdAt: async () => {
     return Date.now()
   },

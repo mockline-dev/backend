@@ -100,5 +100,17 @@
     "bullBoard": {
         "username": "admin",
         "password": "admin"
+    },
+    "weaviate": {
+        "host": "localhost",
+        "port": 8080,
+        "scheme": "http",
+        "apiKey": "",
+        "enabled": true,
+        "timeout": 30000,
+        "maxRetries": 3,
+        "retryDelay": 1000,
+        "batchSize": 100,
+        "vectorDimension": 1536
     }
 }

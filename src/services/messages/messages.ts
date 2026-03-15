@@ -18,6 +18,7 @@ import {
 import type { Application } from '../../declarations'
 import { MessagesService, getOptions } from './messages.class'
 import { messagesMethods, messagesPath } from './messages.shared'
+import { logger } from '../../logger'
 
 export * from './messages.class'
 export * from './messages.schema'
@@ -94,7 +95,7 @@ export const messages = (app: Application) => {
           const { error, method, params } = context
 
           if (error?.name === 'BadRequest' || error?.name === 'ValidationError') {
-            console.error(`[Messages Service] Validation error on ${method}:`, {
+            logger.error(`[Messages Service] Validation error on ${method}:`, {
               error: error.message,
               data: context.data,
               params,

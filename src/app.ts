@@ -35,36 +35,11 @@ app.use(
 // Configure services and transports
 app.configure(rest())
 app.configure(
-  socketio(
-    {
-      cors: {
-        origin: app.get('origins')
-      }
-    },
-    io => {
-      io.on('connection', socket => {
-        socket.on('join-project', (projectId?: string) => {
-          const targetId = projectId?.toString().trim()
-          if (!targetId) return
-
-          const connection = (socket as any).feathers
-          if (connection) {
-            app.channel(`projects/${targetId}`).join(connection)
-          }
-        })
-
-        socket.on('leave-project', (projectId?: string) => {
-          const targetId = projectId?.toString().trim()
-          if (!targetId) return
-
-          const connection = (socket as any).feathers
-          if (connection) {
-            app.channel(`projects/${targetId}`).leave(connection)
-          }
-        })
-      })
+  socketio({
+    cors: {
+      origin: app.get('origins')
     }
-  )
+  })
 )
 app.configure(mongodb)
 app.configure(authentication)

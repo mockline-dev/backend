@@ -1,13 +1,14 @@
 import 'reflect-metadata'
 import { app } from '../../../app'
 import { closeRedisClient, getRedisClient } from '../client'
+import { logger } from '../../../logger'
 
 async function flushRedis() {
-  console.log('🧹 Starting Redis database flush...')
+  logger.info('🧹 Starting Redis database flush...')
 
   try {
     const redisConfig = app.get('redisConfig')
-    console.log('🔴 Redis config:', {
+    logger.info('🔴 Redis config:', {
       host: redisConfig.host,
       port: redisConfig.port,
       db: redisConfig.db
@@ -22,15 +23,15 @@ async function flushRedis() {
     })
 
     const isProduction = process.env.NODE_ENV === 'production'
-    console.log(`⚠️ Running in ${isProduction ? 'PRODUCTION' : 'NON-PRODUCTION'} mode`)
+    logger.info(`⚠️ Running in ${isProduction ? 'PRODUCTION' : 'NON-PRODUCTION'} mode`)
 
     if (isProduction) {
-      console.log('⚠️⚠️ WARNING: You are about to flush a PRODUCTION Redis database!')
-      console.log('⚠️⚠️ This will delete ALL data in the current Redis DB!')
-      console.log('⚠️⚠️ This action is IRREVERSIBLE!')
+      logger.info('⚠️⚠️ WARNING: You are about to flush a PRODUCTION Redis database!')
+      logger.info('⚠️⚠️ This will delete ALL data in the current Redis DB!')
+      logger.info('⚠️⚠️ This action is IRREVERSIBLE!')
 
       if (process.env.CONFIRM_FLUSH !== 'YES_I_AM_SURE') {
-        console.error(
+        logger.error(
           '❌ Aborting: Set environment variable CONFIRM_FLUSH=YES_I_AM_SURE to confirm production flush'
         )
         process.exit(1)
@@ -38,26 +39,26 @@ async function flushRedis() {
     }
 
     const info = await redis.info('KEYSPACE')
-    console.log('📊 Current Redis keyspace info:', info)
+    logger.info('📊 Current Redis keyspace info:', info)
 
-    console.log('🔥 Flushing Redis database...')
+    logger.info('🔥 Flushing Redis database...')
     const result = await redis.flushdb()
-    console.log('✅ Flush result:', result)
+    logger.info('✅ Flush result:', result)
 
     const postInfo = await redis.info('KEYSPACE')
-    console.log('📊 Redis keyspace after flush:', postInfo)
+    logger.info('📊 Redis keyspace after flush:', postInfo)
 
     await closeRedisClient()
-    console.log('✅ Redis connection closed')
-    console.log('🎉 Redis database flush completed successfully!')
+    logger.info('✅ Redis connection closed')
+    logger.info('🎉 Redis database flush completed successfully!')
     process.exit(0)
   } catch (error) {
-    console.error('❌ Failed to flush Redis database:', error)
+    logger.error('❌ Failed to flush Redis database:', error)
     process.exit(1)
   }
 }
 
 flushRedis().catch(err => {
-  console.error('❌ Error during Redis flush:', err)
+  logger.error('❌ Error during Redis flush:', err)
   process.exit(1)
 })

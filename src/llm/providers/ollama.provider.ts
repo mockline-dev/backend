@@ -1,4 +1,5 @@
-import { ollamaClient, type OllamaMessage, type OllamaStreamChunk } from '../ollama.client'
+import { ollamaClient } from '../ollama.client'
+import type { LLMMessage, LLMStreamChunk } from '../types'
 import type { ILLMProvider } from './base'
 
 /**
@@ -6,10 +7,10 @@ import type { ILLMProvider } from './base'
  */
 export class OllamaProvider implements ILLMProvider {
   async *chatStream(
-    messages: OllamaMessage[],
+    messages: LLMMessage[],
     tools?: object[],
     options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
-  ): AsyncGenerator<OllamaStreamChunk> {
+  ): AsyncGenerator<LLMStreamChunk> {
     yield* ollamaClient.chatStream(messages, tools, options)
   }
 
@@ -18,7 +19,7 @@ export class OllamaProvider implements ILLMProvider {
     userPrompt: string,
     options: { temperature?: number; num_predict?: number; num_ctx?: number; top_p?: number } = {}
   ): Promise<string> {
-    const messages: OllamaMessage[] = [
+    const messages: LLMMessage[] = [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ]
@@ -26,7 +27,7 @@ export class OllamaProvider implements ILLMProvider {
     let result = ''
     for await (const chunk of ollamaClient.chatStream(messages, undefined, {
       temperature: options.temperature,
-      num_ctx: options.num_ctx ?? options.num_predict,
+      num_ctx: options.num_ctx,
       top_p: options.top_p
     })) {
       result += chunk.message.content

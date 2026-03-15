@@ -1,14 +1,14 @@
-import type { OllamaMessage, OllamaStreamChunk } from '../ollama.client'
+import type { LLMMessage, LLMStreamChunk } from '../types'
 
 export interface ILLMProvider {
   /**
    * Streaming chat. Yields chunks token-by-token.
    */
   chatStream(
-    messages: OllamaMessage[],
+    messages: LLMMessage[],
     tools?: object[],
     options?: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number }
-  ): AsyncGenerator<OllamaStreamChunk>
+  ): AsyncGenerator<LLMStreamChunk>
 
   /**
    * Non-streaming generate — accumulates chatStream internally.

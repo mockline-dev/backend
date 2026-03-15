@@ -1,3 +1,4 @@
+import { authenticate } from '@feathersjs/authentication'
 import { BadRequest, Forbidden, NotFound } from '@feathersjs/errors'
 import { rateLimit } from '../../hooks/rate-limit'
 import { ollamaClient } from '../../llm/ollama.client'
@@ -78,15 +79,17 @@ export default function (app: any) {
         }
       }
     })
-    .hooks({
-      before: {
-        create: [
-          rateLimit({
-            windowSeconds: 3600,
-            maxRequests: 10,
-            keyPrefix: 'generation'
-          })
-        ]
-      }
-    })
+    
+  app.service('ai-service').hooks({
+    before: {
+      create: [
+        authenticate('jwt'),
+        rateLimit({
+          windowSeconds: 3600,
+          maxRequests: 10,
+          keyPrefix: 'generation'
+        })
+      ]
+    }
+  })
 }

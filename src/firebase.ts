@@ -10,7 +10,19 @@ export const initializeFirebase = (app: Application) => {
   }
 
   const config = app.get('firebase')
-  const serviceAccount = JSON.parse(fs.readFileSync(config.serviceAccountPath, 'utf8'))
+  if (!config?.serviceAccountPath) {
+    throw new Error('Firebase serviceAccountPath is not configured')
+  }
+
+  let serviceAccount: Record<string, unknown>
+
+  try {
+    const raw = fs.readFileSync(config.serviceAccountPath, 'utf8')
+    serviceAccount = JSON.parse(raw)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`Failed to load Firebase service account from ${config.serviceAccountPath}: ${reason}`)
+  }
 
   firebaseAdmin = admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)

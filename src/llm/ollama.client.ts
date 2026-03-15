@@ -1,29 +1,5 @@
 import config from 'config'
-
-export interface OllamaMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string
-  tool_calls?: OllamaToolCall[]
-  tool_call_id?: string
-  name?: string
-}
-
-export interface OllamaToolCall {
-  id: string
-  type: 'function'
-  function: { name: string; arguments: string }
-}
-
-export interface OllamaStreamChunk {
-  message: {
-    role: string
-    content: string
-    tool_calls?: OllamaToolCall[]
-  }
-  done: boolean
-  eval_count?: number
-  prompt_eval_count?: number
-}
+import type { LLMMessage, LLMStreamChunk } from './types'
 
 export class OllamaClient {
   private baseUrl: string
@@ -35,7 +11,12 @@ export class OllamaClient {
   private readonly MAX_CONCURRENT_REQUESTS = 3
 
   constructor() {
-    const ollamaConfig = config.get<{ baseUrl: string; model: string; embeddingModel?: string; timeout: number }>('ollama')
+    const ollamaConfig = config.get<{
+      baseUrl: string
+      model: string
+      embeddingModel?: string
+      timeout: number
+    }>('ollama')
     this.baseUrl = ollamaConfig.baseUrl ?? 'http://localhost:11434'
     this.model = ollamaConfig.model
     // Make embedding model configurable via environment variable with a default fallback
@@ -63,10 +44,10 @@ export class OllamaClient {
   }
 
   async *chatStream(
-    messages: OllamaMessage[],
+    messages: LLMMessage[],
     tools?: object[],
     options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
-  ): AsyncGenerator<OllamaStreamChunk> {
+  ): AsyncGenerator<LLMStreamChunk> {
     // Acquire request slot to limit concurrent requests
     await this.acquireRequestSlot()
 
@@ -115,17 +96,28 @@ export class OllamaClient {
       const reader = response.body!.getReader()
       const decoder = new TextDecoder()
 
+      let buffer = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         refreshIdleTimer()
-        const text = decoder.decode(value, { stream: true })
-        for (const line of text.split('\n').filter(l => l.trim())) {
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (!line.trim()) continue
           try {
-            yield JSON.parse(line) as OllamaStreamChunk
+            yield JSON.parse(line) as LLMStreamChunk
           } catch {
             /* partial line — skip */
           }
+        }
+      }
+      if (buffer.trim()) {
+        try {
+          yield JSON.parse(buffer) as LLMStreamChunk
+        } catch {
+          /* partial line — skip */
         }
       }
     } catch (err: any) {

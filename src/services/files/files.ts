@@ -18,6 +18,7 @@ import {
 import type { Application, HookContext } from '../../declarations'
 import { FilesService, getOptions } from './files.class'
 import { filesMethods, filesPath } from './files.shared'
+import { logger } from '../../logger'
 
 export * from './files.class'
 export * from './files.schema'
@@ -78,7 +79,7 @@ export const files = (app: Application) => {
               await app.service('uploads').remove(null, { query: { key: filesItem.name } })
             }
           } catch (error) {
-            console.error('Failed to remove files', error)
+            logger.error('Failed to remove files', error)
             throw new Error('Failed to remove files')
           }
         }
@@ -89,7 +90,7 @@ export const files = (app: Application) => {
       create: [
         async (context: HookContext) => {
           const result = context.result
-          console.log(result)
+          logger.info(result)
         }
       ]
     },

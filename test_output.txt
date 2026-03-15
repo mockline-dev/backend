@@ -1,0 +1,918 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/shakhboz/Projects/mockline.dev/back[39m
+
+ [31m❯[39m lib/llm/__tests__/ollama.client.test.js [2m([22m[2m0 test[22m[2m)[22m
+ [31m❯[39m lib/agent/__tests__/engine.test.js [2m([22m[2m0 test[22m[2m)[22m
+ [31m❯[39m src/services/projects/__tests__/state-machine.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 13[2mms[22m[39m
+       [32m✓[39m should allow valid transitions[32m 1[2mms[22m[39m
+[31m       [31m×[31m should throw on invalid transitions[39m[32m 9[2mms[22m[39m
+ [31m❯[39m lib/storage/__tests__/r2.client.test.js [2m([22m[2m0 test[22m[2m)[22m
+ [31m❯[39m lib/services/projects/__tests__/state-machine.test.js [2m([22m[2m0 test[22m[2m)[22m
+ [31m❯[39m test/services/stacks/stacks.test.ts [2m([22m[2m0 test[22m[2m)[22m
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mInitialization[2m > [22m[2mshould create initialized registry with all stacks
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mInitialization[2m > [22m[2mshould have all required stacks registered
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mRetrieval[2m > [22m[2mshould retrieve Python FastAPI stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mRetrieval[2m > [22m[2mshould retrieve Node.js NestJS stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mRetrieval[2m > [22m[2mshould retrieve Go Gin stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mRetrieval[2m > [22m[2mshould retrieve Rust Actix stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mRetrieval[2m > [22m[2mshould retrieve Java Spring Boot stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mRetrieval[2m > [22m[2mshould return undefined for non-existent stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mFiltering[2m > [22m[2mshould get stacks by language
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mFiltering[2m > [22m[2mshould get stacks by framework
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mSearch[2m > [22m[2mshould search stacks by query
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mSearch[2m > [22m[2mshould return empty array for non-matching search
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mDefault Stack[2m > [22m[2mshould set and get default stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+info: StackRegistry: default stack set to python-fastapi
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mDefault Stack[2m > [22m[2mshould throw error when setting non-existent stack as default
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mStack Configuration Validation[2m > [22m[2mshould validate Python FastAPI stack configuration
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mStack Configuration Validation[2m > [22m[2mshould validate Node.js NestJS stack configuration
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mStack Configuration Validation[2m > [22m[2mshould validate Go Gin stack configuration
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mStack Configuration Validation[2m > [22m[2mshould validate Rust Actix stack configuration
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22m[2mStackRegistry[2m > [22m[2mStack Configuration Validation[2m > [22m[2mshould validate Java Spring Boot stack configuration
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+ [31m❯[39m src/agent/stacks/__tests__/stack-registry.test.ts [2m([22m[2m19 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 20[2mms[22m[39m
+       [32m✓[39m should create initialized registry with all stacks[32m 3[2mms[22m[39m
+       [32m✓[39m should have all required stacks registered[32m 1[2mms[22m[39m
+       [32m✓[39m should retrieve Python FastAPI stack[32m 1[2mms[22m[39m
+       [32m✓[39m should retrieve Node.js NestJS stack[32m 0[2mms[22m[39m
+       [32m✓[39m should retrieve Go Gin stack[32m 0[2mms[22m[39m
+       [32m✓[39m should retrieve Rust Actix stack[32m 1[2mms[22m[39m
+       [32m✓[39m should retrieve Java Spring Boot stack[32m 1[2mms[22m[39m
+       [32m✓[39m should return undefined for non-existent stack[32m 1[2mms[22m[39m
+       [32m✓[39m should get stacks by language[32m 1[2mms[22m[39m
+       [32m✓[39m should get stacks by framework[32m 0[2mms[22m[39m
+       [32m✓[39m should search stacks by query[32m 0[2mms[22m[39m
+       [32m✓[39m should return empty array for non-matching search[32m 0[2mms[22m[39m
+       [32m✓[39m should set and get default stack[32m 0[2mms[22m[39m
+[31m       [31m×[31m should throw error when setting non-existent stack as default[39m[32m 7[2mms[22m[39m
+       [32m✓[39m should validate Python FastAPI stack configuration[32m 1[2mms[22m[39m
+       [32m✓[39m should validate Node.js NestJS stack configuration[32m 1[2mms[22m[39m
+       [32m✓[39m should validate Go Gin stack configuration[32m 0[2mms[22m[39m
+       [32m✓[39m should validate Rust Actix stack configuration[32m 0[2mms[22m[39m
+[31m       [31m×[31m should validate Java Spring Boot stack configuration[39m[32m 1[2mms[22m[39m
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mVariable Interpolation[2m > [22m[2mshould interpolate framework variables
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mVariable Interpolation[2m > [22m[2mshould interpolate naming conventions
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mVariable Interpolation[2m > [22m[2mshould interpolate structure variables
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mVariable Interpolation[2m > [22m[2mshould interpolate dependency variables
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mVariable Interpolation[2m > [22m[2mshould handle additional context variables
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mVariable Interpolation[2m > [22m[2mshould handle missing variables gracefully
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mStack-Specific Compilation[2m > [22m[2mshould compile Python FastAPI template
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mStack-Specific Compilation[2m > [22m[2mshould compile Node.js NestJS template
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mStack-Specific Compilation[2m > [22m[2mshould compile Go Gin template
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mStack-Specific Compilation[2m > [22m[2mshould compile Rust Actix template
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mStack-Specific Compilation[2m > [22m[2mshould compile Java Spring Boot template
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mNested Variable Access[2m > [22m[2mshould handle deeply nested variables
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mNested Variable Access[2m > [22m[2mshould handle multiple levels of nesting
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mError Handling[2m > [22m[2mshould throw error for non-existent stack
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mError Handling[2m > [22m[2mshould handle empty template
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mError Handling[2m > [22m[2mshould handle template with no variables
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mComplex Templates[2m > [22m[2mshould handle multi-line templates
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mComplex Templates[2m > [22m[2mshould handle templates with repeated variables
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mCache Management[2m > [22m[2mshould clear cache
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mcreateTemplateEngine Factory[2m > [22m[2mshould create TemplateEngine instance
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | src/llm/templates/__tests__/template-engine.test.ts[2m > [22m[2mTemplateEngine[2m > [22m[2mcreateTemplateEngine Factory[2m > [22m[2mshould create engine that works correctly
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+ [32m✓[39m src/llm/templates/__tests__/template-engine.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstdout[2m | test/agent/pipeline/cross-file-validator.test.ts[2m > [22m[2mCrossFileValidator[2m > [22m[2mimport validation[2m > [22m[2mshould report errors for missing local imports
+[22m[39merror: CrossFileValidator: validation failed with 2 errors
+error:   - app/main.py: Import "app.models.user" references non-existent file: app/models/user.py
+error:   - app/main.py: Import "app.services.auth" references non-existent file: app/services/auth.py
+
+ [32m✓[39m test/agent/pipeline/cross-file-validator.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+[90mstdout[2m | test/services/files/files.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/client.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/app.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/services/messages/messages.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/services/snapshots/snapshots.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/services/files/files.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/client.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/app.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/services/projects/projects.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/services/messages/messages.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/services/snapshots/snapshots.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/services/projects/projects.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/app.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | test/services/projects/projects.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | test/services/snapshots/snapshots.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | test/services/files/files.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | test/services/messages/messages.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | test/client.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+[90mstdout[2m | test/app.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/app.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+[90mstdout[2m | test/client.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/client.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+[90mstdout[2m | test/services/snapshots/snapshots.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/services/snapshots/snapshots.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+ [31m❯[39m test/app.test.ts [2m([22m[2m0 test[22m[2m)[22m
+[90mstdout[2m | test/services/projects/projects.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/services/projects/projects.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+[90mstdout[2m | test/services/files/files.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/services/files/files.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+[90mstdout[2m | test/services/messages/messages.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/services/messages/messages.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+ [32m✓[39m test/services/snapshots/snapshots.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m test/services/projects/projects.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m test/services/messages/messages.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m test/services/files/files.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [31m❯[39m test/client.test.ts [2m([22m[2m0 test[22m[2m)[22m
+ [31m❯[39m src/storage/__tests__/r2.client.test.ts [2m([22m[2m10 tests[22m[2m | [22m[31m9 failed[39m[2m)[22m[33m 2682[2mms[22m[39m
+[31m       [31m×[31m should upload content to R2[39m[33m 640[2mms[22m[39m
+[31m       [31m×[31m should retry on failure[39m[33m 313[2mms[22m[39m
+[31m       [31m×[31m should timeout after configured duration[39m[32m 289[2mms[22m[39m
+[31m       [31m×[31m should download content from R2[39m[32m 207[2mms[22m[39m
+[31m       [31m×[31m should delete object from R2[39m[32m 190[2mms[22m[39m
+[31m       [31m×[31m should list objects with pagination[39m[32m 156[2mms[22m[39m
+[31m       [31m×[31m should copy all objects from source to dest prefix[39m[32m 158[2mms[22m[39m
+[31m         [31m×[31m should delete all objects under a prefix[39m[32m 179[2mms[22m[39m
+[31m         [31m×[31m should return true when object exists[39m[32m 164[2mms[22m[39m
+         [33m[2m✓[22m[39m should return false when object does not exist [33m 384[2mms[22m[39m
+[90mstdout[2m | test/services/architecture/architecture.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/services/users/users.test.ts
+[22m[39minfo: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+
+[90mstdout[2m | test/services/architecture/architecture.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/services/users/users.test.ts
+[22m[39minfo: Redis connected successfully
+
+[90mstdout[2m | test/services/architecture/architecture.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/services/architecture/architecture.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+[90mstdout[2m | test/services/users/users.test.ts
+[22m[39minfo: Redis ready to accept commands
+
+[90mstdout[2m | test/services/users/users.test.ts
+[22m[39minfo: Redis client initialized successfully
+
+[90mstdout[2m | test/services/architecture/architecture.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+ [32m✓[39m test/services/architecture/architecture.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 1[2mms[22m[39m
+[90mstdout[2m | test/services/users/users.test.ts
+[22m[39minfo: StackRegistry: registered stack python-fastapi (Python FastAPI)
+info: StackRegistry: registered stack nodejs-nestjs (TypeScript NestJS)
+info: StackRegistry: registered stack go-gin (Go Gin)
+info: StackRegistry: registered stack rust-actix (Rust Actix)
+info: StackRegistry: registered stack java-springboot (Java Spring Boot)
+
+ [32m✓[39m test/services/users/users.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 1[2mms[22m[39m
+ [31m❯[39m src/agent/__tests__/engine.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[33m 5014[2mms[22m[39m
+[31m       [31m×[31m should emit tokens as they are generated[39m[33m 5012[2mms[22m[39m
+[31m       [31m×[31m should stop after finish tool call[39m[32m 1[2mms[22m[39m
+[31m       [31m×[31m should stop after max iterations[39m[32m 0[2mms[22m[39m
+ [31m❯[39m src/llm/__tests__/ollama.client.test.ts [2m([22m[2m7 tests[22m[2m | [22m[31m6 failed[39m[2m)[22m[33m 10021[2mms[22m[39m
+[31m       [31m×[31m should stream chat chunks from Ollama[39m[32m 4[2mms[22m[39m
+[31m       [31m×[31m should handle fetch errors[39m[32m 1[2mms[22m[39m
+[31m       [31m×[31m should timeout after configured duration[39m[32m 3[2mms[22m[39m
+[31m       [31m×[31m should generate embeddings[39m[32m 1[2mms[22m[39m
+[31m       [31m×[31m should return true when Ollama is reachable[39m[33m 5006[2mms[22m[39m
+       [32m✓[39m should return false when Ollama is not reachable[32m 1[2mms[22m[39m
+[31m       [31m×[31m should timeout health check after 3 seconds[39m[33m 5003[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 7 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/app.test.ts[2m [ test/app.test.ts ][22m
+[31m[1mReferenceError[22m: before is not defined[39m
+[36m [2m❯[22m test/app.test.ts:[2m13:3[22m[39m
+    [90m 11| [39m  [35mlet[39m server[33m:[39m [33mServer[39m
+    [90m 12| [39m
+    [90m 13| [39m  [34mbefore[39m([35masync[39m () [33m=>[39m {
+    [90m   | [39m  [31m^[39m
+    [90m 14| [39m    server [33m=[39m [35mawait[39m app[33m.[39m[34mlisten[39m(port)
+    [90m 15| [39m  })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/client.test.ts[2m [ test/client.test.ts ][22m
+[31m[1mReferenceError[22m: before is not defined[39m
+[36m [2m❯[22m test/client.test.ts:[2m16:3[22m[39m
+    [90m 14| [39m  [35mconst[39m client [33m=[39m [34mcreateClient[39m([34mrest[39m(appUrl)[33m.[39m[34maxios[39m(axios))
+    [90m 15| [39m
+    [90m 16| [39m  [34mbefore[39m([35masync[39m () [33m=>[39m {
+    [90m   | [39m  [31m^[39m
+    [90m 17| [39m    [35mawait[39m app[33m.[39m[34mlisten[39m(port)
+    [90m 18| [39m  })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m lib/agent/__tests__/engine.test.js[2m [ lib/agent/__tests__/engine.test.js ][22m
+[31m[1mError[22m: Vitest cannot be imported in a CommonJS module using require(). Please use "import" instead.
+
+If you are using "import" in your source code, then it's possible it was bundled into require() automatically by your bundler. In that case, do not bundle CommonJS output since it will never work with Vitest, or use dynamic import() which is available in all CommonJS modules.[39m
+[90m [2m❯[22m Object.<anonymous> node_modules/vitest/index.cjs:[2m1:7[22m[39m
+[36m [2m❯[22m src/agent/__tests__/engine.test.ts:[2m1:1[22m[39m
+    [90m  1| [39mimport { afterEach, beforeEach, describe, expect, it, vi } from 'vites…
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m[35mimport[39m type { [33mAgentEventType[39m } [35mfrom[39m [32m'../engine'[39m
+    [90m  3| [39m[35mimport[39m { [33mAgentEngine[39m } [35mfrom[39m [32m'../engine'[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m lib/llm/__tests__/ollama.client.test.js[2m [ lib/llm/__tests__/ollama.client.test.js ][22m
+[31m[1mError[22m: Vitest cannot be imported in a CommonJS module using require(). Please use "import" instead.
+
+If you are using "import" in your source code, then it's possible it was bundled into require() automatically by your bundler. In that case, do not bundle CommonJS output since it will never work with Vitest, or use dynamic import() which is available in all CommonJS modules.[39m
+[90m [2m❯[22m Object.<anonymous> node_modules/vitest/index.cjs:[2m1:7[22m[39m
+[36m [2m❯[22m src/llm/__tests__/ollama.client.test.ts:[2m1:1[22m[39m
+    [90m  1| [39mimport { afterEach, beforeEach, describe, expect, it, vi } from 'vites…
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m[35mimport[39m { ollamaClient } [35mfrom[39m [32m'../ollama.client'[39m
+    [90m  3| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m lib/storage/__tests__/r2.client.test.js[2m [ lib/storage/__tests__/r2.client.test.js ][22m
+[31m[1mError[22m: Vitest cannot be imported in a CommonJS module using require(). Please use "import" instead.
+
+If you are using "import" in your source code, then it's possible it was bundled into require() automatically by your bundler. In that case, do not bundle CommonJS output since it will never work with Vitest, or use dynamic import() which is available in all CommonJS modules.[39m
+[90m [2m❯[22m Object.<anonymous> node_modules/vitest/index.cjs:[2m1:7[22m[39m
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m1:1[22m[39m
+    [90m  1| [39mimport { afterEach, beforeEach, describe, expect, it, vi } from 'vites…
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m[35mimport[39m { r2Client } [35mfrom[39m [32m'../r2.client'[39m
+    [90m  3| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/services/stacks/stacks.test.ts[2m [ test/services/stacks/stacks.test.ts ][22m
+[31m[1mReferenceError[22m: app is not defined[39m
+[36m [2m❯[22m test/services/stacks/stacks.test.ts:[2m4:25[22m[39m
+    [90m  2| [39m
+    [90m  3| [39m[34mdescribe[39m([32m'Stacks Service'[39m[33m,[39m () [33m=>[39m {
+    [90m  4| [39m  [35mconst[39m stacksService [33m=[39m app[33m.[39m[34mservice[39m([32m'stacks'[39m)
+    [90m   | [39m                        [31m^[39m
+    [90m  5| [39m
+    [90m  6| [39m  [34mdescribe[39m([32m'find() - Get all stacks'[39m[33m,[39m () [33m=>[39m {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m lib/services/projects/__tests__/state-machine.test.js[2m [ lib/services/projects/__tests__/state-machine.test.js ][22m
+[31m[1mError[22m: Vitest cannot be imported in a CommonJS module using require(). Please use "import" instead.
+
+If you are using "import" in your source code, then it's possible it was bundled into require() automatically by your bundler. In that case, do not bundle CommonJS output since it will never work with Vitest, or use dynamic import() which is available in all CommonJS modules.[39m
+[90m [2m❯[22m Object.<anonymous> node_modules/vitest/index.cjs:[2m1:7[22m[39m
+[36m [2m❯[22m src/services/projects/__tests__/state-machine.test.ts:[2m1:1[22m[39m
+    [90m  1| [39m[35mimport[39m { describe[33m,[39m expect[33m,[39m it } [35mfrom[39m [32m'vitest'[39m
+    [90m   | [39m[31m^[39m
+    [90m  2| [39m[35mimport[39m { assertValidTransition } [35mfrom[39m [32m'../projects.state-machine'[39m
+    [90m  3| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/28]⎯[22m[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 21 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/agent/__tests__/engine.test.ts[2m > [22mAgentEngine[2m > [22mrun[2m > [22mshould emit tokens as they are generated
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/agent/__tests__/engine.test.ts:[2m15:5[22m[39m
+    [90m 13| [39m
+    [90m 14| [39m  [34mdescribe[39m([32m'run'[39m[33m,[39m () [33m=>[39m {
+    [90m 15| [39m    [34mit[39m([32m'should emit tokens as they are generated'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m 16| [39m      [35mconst[39m mockApp [33m=[39m {
+    [90m 17| [39m        channel[33m:[39m vi[33m.[39m[34mfn[39m()[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/agent/__tests__/engine.test.ts[2m > [22mAgentEngine[2m > [22mrun[2m > [22mshould stop after finish tool call
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'mockImplementation')[39m
+[36m [2m❯[22m src/agent/__tests__/engine.test.ts:[2m61:23[22m[39m
+    [90m 59| [39m      }))
+    [90m 60| [39m
+    [90m 61| [39m      mockApp[33m.[39mservice[33m.[39m[34mmockImplementation[39m((name[33m:[39m string) [33m=>[39m ({
+    [90m   | [39m                      [31m^[39m
+    [90m 62| [39m        find[33m:[39m vi[33m.[39m[34mfn[39m()[33m.[39m[34mmockResolvedValue[39m({ data[33m:[39m [] })[33m,[39m
+    [90m 63| [39m        create[33m:[39m vi[33m.[39m[34mfn[39m()[33m.[39m[34mmockResolvedValue[39m({ _id[33m:[39m [32m'test-id'[39m })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/agent/__tests__/engine.test.ts[2m > [22mAgentEngine[2m > [22mrun[2m > [22mshould stop after max iterations
+[31m[1mError[22m: Calling the test function inside another test function is not allowed. Please put it inside "describe" or "suite" so it can be properly collected.[39m
+[36m [2m❯[22m src/agent/__tests__/engine.test.ts:[2m88:7[22m[39m
+    [90m 86| [39m        channel[33m:[39m vi[33m.[39m[34mfn[39m()
+    [90m 87| [39m      } [35mas[39m any
+    [90m 88| [39m      [34mit[39m([32m'should handle tool calls and emit events'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m      [31m^[39m
+    [90m 89| [39m        [35mconst[39m engine [33m=[39m [35mnew[39m [33mAgentEngine[39m(mockApp)
+    [90m 90| [39m        [35mconst[39m events[33m:[39m [33mAgentEventType[39m[] [33m=[39m []
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/llm/__tests__/ollama.client.test.ts[2m > [22mOllamaClient[2m > [22mchatStream[2m > [22mshould stream chat chunks from Ollama
+[31m[1mTypeError[22m: The "input" argument must be an instance of SharedArrayBuffer, ArrayBuffer or ArrayBufferView.[39m
+[36m [2m❯[22m OllamaClient.chatStream src/llm/ollama.client.ts:[2m99:27[22m[39m
+    [90m 97| [39m        [35mif[39m (done) [35mbreak[39m
+    [90m 98| [39m        [34mrefreshIdleTimer[39m()
+    [90m 99| [39m        buffer [33m+=[39m decoder[33m.[39m[34mdecode[39m(value[33m,[39m { stream[33m:[39m [35mtrue[39m })
+    [90m   | [39m                          [31m^[39m
+    [90m100| [39m        [35mconst[39m lines [33m=[39m buffer[33m.[39m[34msplit[39m([32m'\n'[39m)
+    [90m101| [39m        buffer [33m=[39m lines[33m.[39m[34mpop[39m() [33m||[39m [32m''[39m
+[90m [2m❯[22m src/llm/__tests__/ollama.client.test.ts:[2m42:24[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/llm/__tests__/ollama.client.test.ts[2m > [22mOllamaClient[2m > [22mchatStream[2m > [22mshould handle fetch errors
+[31m[1mTypeError[22m: You must provide a Promise to expect() when using .rejects, not 'object'.[39m
+[36m [2m❯[22m src/llm/__tests__/ollama.client.test.ts:[2m65:7[22m[39m
+    [90m 63| [39m      [35mawait[39m [34mexpect[39m(
+    [90m 64| [39m        ollamaClient.chatStream([{ role: 'user', content: 'test' }], u…
+    [90m 65| [39m      )[33m.[39mrejects[33m.[39m[34mtoThrow[39m([32m'Ollama API error 500: Network error'[39m)
+    [90m   | [39m      [31m^[39m
+    [90m 66| [39m    })
+    [90m 67| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/llm/__tests__/ollama.client.test.ts[2m > [22mOllamaClient[2m > [22mchatStream[2m > [22mshould timeout after configured duration
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/llm/__tests__/ollama.client.test.ts:[2m79:46[22m[39m
+    [90m 77| [39m      [90m// Should complete within timeout (120s)[39m
+    [90m 78| [39m      [34mexpect[39m([33mDate[39m[33m.[39m[34mnow[39m() [33m-[39m startTime)[33m.[39m[34mtoBeLessThan[39m([34m125000[39m)
+    [90m 79| [39m      [34mexpect[39m(abortController[33m.[39msignal[33m.[39maborted)[33m.[39m[34mtoBe[39m([35mtrue[39m)
+    [90m   | [39m                                             [31m^[39m
+    [90m 80| [39m    })
+    [90m 81| [39m  })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/llm/__tests__/ollama.client.test.ts[2m > [22mOllamaClient[2m > [22membed[2m > [22mshould generate embeddings
+[31m[1mError[22m: Network error[39m
+[36m [2m❯[22m src/llm/__tests__/ollama.client.test.ts:[2m61:39[22m[39m
+    [90m 59| [39m
+    [90m 60| [39m    [34mit[39m([32m'should handle fetch errors'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m 61| [39m      mockFetch[33m.[39m[34mmockRejectedValueOnce[39m([35mnew[39m [33mError[39m([32m'Network error'[39m))
+    [90m   | [39m                                      [31m^[39m
+    [90m 62| [39m
+    [90m 63| [39m      [35mawait[39m [34mexpect[39m(
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/llm/__tests__/ollama.client.test.ts[2m > [22mOllamaClient[2m > [22mhealthCheck[2m > [22mshould return true when Ollama is reachable
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/llm/__tests__/ollama.client.test.ts:[2m115:5[22m[39m
+    [90m113| [39m
+    [90m114| [39m  [34mdescribe[39m([32m'healthCheck'[39m[33m,[39m () [33m=>[39m {
+    [90m115| [39m    [34mit[39m([32m'should return true when Ollama is reachable'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m116| [39m      mockFetch[33m.[39m[34mmockResolvedValue[39m({
+    [90m117| [39m        ok[33m:[39m [35mtrue[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/llm/__tests__/ollama.client.test.ts[2m > [22mOllamaClient[2m > [22mhealthCheck[2m > [22mshould timeout health check after 3 seconds
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/llm/__tests__/ollama.client.test.ts:[2m138:5[22m[39m
+    [90m136| [39m    })
+    [90m137| [39m
+    [90m138| [39m    [34mit[39m([32m'should timeout health check after 3 seconds'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m    [31m^[39m
+    [90m139| [39m      mockFetch[33m.[39m[34mmockImplementationOnce[39m(() [33m=>[39m {
+    [90m140| [39m        [35mreturn[39m [35mnew[39m [33mPromise[39m(() [33m=>[39m {})
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mputObject[2m > [22mshould upload content to R2
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with arguments: [ StringContaining{…}, …(1) ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m26:25[22m[39m
+    [90m 24| [39m      [35mawait[39m r2Client[33m.[39m[34mputObject[39m([32m'test-key'[39m[33m,[39m [32m'test content'[39m)
+    [90m 25| [39m
+    [90m 26| [39m      [34mexpect[39m(mockFetch)[33m.[39m[34mtoHaveBeenCalledWith[39m(
+    [90m   | [39m                        [31m^[39m
+    [90m 27| [39m        expect[33m.[39m[34mstringContaining[39m([32m'.r2.cloudflarestorage.com'[39m)[33m,[39m
+    [90m 28| [39m        expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mputObject[2m > [22mshould retry on failure
+[31m[1mAssertionError[22m: expected +0 to be 3 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m48:28[22m[39m
+    [90m 46| [39m
+    [90m 47| [39m      [90m// Should complete within timeout with retries[39m
+    [90m 48| [39m      [34mexpect[39m(attemptCount)[33m.[39m[34mtoBe[39m([34m3[39m)
+    [90m   | [39m                           [31m^[39m
+    [90m 49| [39m      [34mexpect[39m([33mDate[39m[33m.[39m[34mnow[39m() [33m-[39m startTime)[33m.[39m[34mtoBeLessThan[39m([34m125000[39m)
+    [90m 50| [39m    })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mputObject[2m > [22mshould timeout after configured duration
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m63:46[22m[39m
+    [90m 61| [39m      [90m// Should complete within timeout[39m
+    [90m 62| [39m      [34mexpect[39m([33mDate[39m[33m.[39m[34mnow[39m() [33m-[39m startTime)[33m.[39m[34mtoBeLessThan[39m([34m125000[39m)
+    [90m 63| [39m      [34mexpect[39m(abortController[33m.[39msignal[33m.[39maborted)[33m.[39m[34mtoBe[39m([35mtrue[39m)
+    [90m   | [39m                                             [31m^[39m
+    [90m 64| [39m    })
+    [90m 65| [39m  })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mgetObject[2m > [22mshould download content from R2
+[31m[1mAssertionError[22m: expected 'test content' to be 'Downloaded content' // Object.is equality[39m
+
+Expected: [32m"[7mDownloaded[27m content"[39m
+Received: [31m"[7mtest[27m content"[39m
+
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m85:22[22m[39m
+    [90m 83| [39m      [35mconst[39m result [33m=[39m [35mawait[39m r2Client[33m.[39m[34mgetObject[39m([32m'test-key'[39m)
+    [90m 84| [39m
+    [90m 85| [39m      [34mexpect[39m(result)[33m.[39m[34mtoBe[39m(mockContent)
+    [90m   | [39m                     [31m^[39m
+    [90m 86| [39m      [34mexpect[39m(mockFetch)[33m.[39m[34mtoHaveBeenCalledWith[39m(
+    [90m 87| [39m        expect[33m.[39m[34mstringContaining[39m([32m'.r2.cloudflarestorage.com'[39m)[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mdeleteObject[2m > [22mshould delete object from R2
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with arguments: [ StringContaining{…}, …(1) ][90m
+
+Number of calls: [1m0[22m
+[31m[39m
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m104:25[22m[39m
+    [90m102| [39m      [35mawait[39m r2Client[33m.[39m[34mdeleteObject[39m([32m'test-key'[39m)
+    [90m103| [39m
+    [90m104| [39m      [34mexpect[39m(mockFetch)[33m.[39m[34mtoHaveBeenCalledWith[39m(
+    [90m   | [39m                        [31m^[39m
+    [90m105| [39m        expect[33m.[39m[34mstringContaining[39m([32m'.r2.cloudflarestorage.com'[39m)[33m,[39m
+    [90m106| [39m        expect[33m.[39m[34mobjectContaining[39m({
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mlistObjects[2m > [22mshould list objects with pagination
+[31m[1mAssertionError[22m: expected [] to have a length of 3 but got +0[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m131:22[22m[39m
+    [90m129| [39m      [35mconst[39m result [33m=[39m [35mawait[39m r2Client[33m.[39m[34mlistObjects[39m([32m'test/'[39m)
+    [90m130| [39m
+    [90m131| [39m      [34mexpect[39m(result)[33m.[39m[34mtoHaveLength[39m([34m3[39m)
+    [90m   | [39m                     [31m^[39m
+    [90m132| [39m      [34mexpect[39m(mockFetch)[33m.[39m[34mtoHaveBeenCalledTimes[39m([34m2[39m)
+    [90m133| [39m    })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mcopyPrefix[2m > [22mshould copy all objects from source to dest prefix
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called 2 times, but got 0 times[39m
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m165:25[22m[39m
+    [90m163| [39m      [35mawait[39m r2Client[33m.[39m[34mcopyPrefix[39m([32m'source/'[39m[33m,[39m [32m'dest/'[39m)
+    [90m164| [39m
+    [90m165| [39m      [34mexpect[39m(mockFetch)[33m.[39m[34mtoHaveBeenCalledTimes[39m([34m2[39m)
+    [90m   | [39m                        [31m^[39m
+    [90m166| [39m    })
+    [90m167| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mcopyPrefix[2m > [22mdeletePrefix[2m > [22mshould delete all objects under a prefix
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called 2 times, but got 0 times[39m
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m182:27[22m[39m
+    [90m180| [39m        [35mawait[39m r2Client[33m.[39m[34mdeletePrefix[39m([32m'prefix/'[39m)
+    [90m181| [39m
+    [90m182| [39m        [34mexpect[39m(mockFetch)[33m.[39m[34mtoHaveBeenCalledTimes[39m([34m2[39m)
+    [90m   | [39m                          [31m^[39m
+    [90m183| [39m      })
+    [90m184| [39m    })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/storage/__tests__/r2.client.test.ts[2m > [22mR2Client[2m > [22mcopyPrefix[2m > [22mexists[2m > [22mshould return true when object exists
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/storage/__tests__/r2.client.test.ts:[2m195:24[22m[39m
+    [90m193| [39m        [35mconst[39m result [33m=[39m [35mawait[39m r2Client[33m.[39m[34mexists[39m([32m'test-key'[39m)
+    [90m194| [39m
+    [90m195| [39m        [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([35mtrue[39m)
+    [90m   | [39m                       [31m^[39m
+    [90m196| [39m        [34mexpect[39m(mockFetch)[33m.[39m[34mtoHaveBeenCalledWith[39m(
+    [90m197| [39m          expect[33m.[39m[34mstringContaining[39m([32m'.r2.cloudflarestorage.com'[39m)[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22mStackRegistry[2m > [22mDefault Stack[2m > [22mshould throw error when setting non-existent stack as default
+[31m[1mAssertionError[22m: expected [Function] to throw error including 'Cannot set non-existent stack "non-ex…' but got 'Cannot set default: stack \'non-exist…'[39m
+
+Expected: [32m"Cannot set [7mnon-existent[27m stack [7m"[27mnon-existent[7m" as default[27m"[39m
+Received: [31m"Cannot set [7mdefault:[27m stack [7m'[27mnon-existent[7m' is not registered[27m"[39m
+
+[36m [2m❯[22m src/agent/stacks/__tests__/stack-registry.test.ts:[2m181:68[22m[39m
+    [90m179| [39m    it('should throw error when setting non-existent stack as default'…
+    [90m180| [39m      [35mconst[39m initializedRegistry [33m=[39m [34mcreateInitializedRegistry[39m()
+    [90m181| [39m      expect(() => initializedRegistry.setDefault('non-existent')).toT…
+    [90m   | [39m                                                                   [31m^[39m
+    [90m182| [39m        [32m'Cannot set non-existent stack "non-existent" as default'[39m
+    [90m183| [39m      )
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/agent/stacks/__tests__/stack-registry.test.ts[2m > [22mStackRegistry[2m > [22mStack Configuration Validation[2m > [22mshould validate Java Spring Boot stack configuration
+[31m[1mAssertionError[22m: expected 'JUnit 5' to be 'JUnit' // Object.is equality[39m
+
+Expected: [32m"JUnit"[39m
+Received: [31m"JUnit[7m 5[27m"[39m
+
+[36m [2m❯[22m src/agent/stacks/__tests__/stack-registry.test.ts:[2m268:40[22m[39m
+    [90m266| [39m      [34mexpect[39m(stack[33m?.[39mdependencies[33m.[39mpackageManager)[33m.[39m[34mtoBe[39m([32m'maven'[39m)
+    [90m267| [39m      [34mexpect[39m(stack[33m?.[39mvalidation[33m.[39mlinter)[33m.[39m[34mtoBe[39m([32m'checkstyle'[39m)
+    [90m268| [39m      [34mexpect[39m(stack[33m?.[39mtesting[33m.[39mframework)[33m.[39m[34mtoBe[39m([32m'JUnit'[39m)
+    [90m   | [39m                                       [31m^[39m
+    [90m269| [39m    })
+    [90m270| [39m  })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/28]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/services/projects/__tests__/state-machine.test.ts[2m > [22mProjects State Machine[2m > [22massertValidTransition[2m > [22mshould throw on invalid transitions
+[31m[1mAssertionError[22m: expected [Function] to throw an error[39m
+
+[32m- Expected:[39m 
+null
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m src/services/projects/__tests__/state-machine.test.ts:[2m26:66[22m[39m
+    [90m 24| [39m        [32m'Invalid status transition: generating → ready'[39m
+    [90m 25| [39m      )
+    [90m 26| [39m      expect(() => assertValidTransition('validating', 'error')).toThr…
+    [90m   | [39m                                                                 [31m^[39m
+    [90m 27| [39m        [32m'Invalid status transition: validating → error'[39m
+    [90m 28| [39m      )
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/28]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m12 failed[39m[22m[2m | [22m[1m[32m8 passed[39m[22m[90m (20)[39m
+[2m      Tests [22m [1m[31m21 failed[39m[22m[2m | [22m[1m[32m54 passed[39m[22m[90m (75)[39m
+[2m   Start at [22m 17:08:13
+[2m   Duration [22m 10.27s[2m (transform 1.92s, setup 0ms, import 12.74s, tests 17.78s, environment 2ms)[22m
+
