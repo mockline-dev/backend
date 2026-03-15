@@ -42,16 +42,21 @@ export async function executeToolCall(
         const key = `${prefix}${path}`
         await r2Client.putObject(key, args.content)
 
+        // Get userId from project for authorization in internal service calls
+        const project = await app.service('projects').get(projectId)
+        const userId = project.userId
+
+        // Internal service calls require user context for authorization
         const existing = await app.service('files').find({
           query: { projectId, key, $limit: 1 }
-        })
+        }, { user: { _id: userId } })
 
         if ((existing as any).total > 0) {
           await app.service('files').patch((existing as any).data[0]._id, {
             size: bytes,
             key,
             updatedAt: Date.now()
-          })
+          }, { user: { _id: userId } })
         } else {
           await app.service('files').create({
             projectId,
@@ -59,7 +64,7 @@ export async function executeToolCall(
             key,
             size: bytes,
             fileType: detectLanguage(path)
-          })
+          }, { user: { _id: userId } })
         }
 
         // Index the written file for RAG context retrieval
@@ -84,11 +89,17 @@ export async function executeToolCall(
 
         const key = `${prefix}${path}`
         await r2Client.deleteObject(key)
+
+        // Get userId from project for authorization in internal service calls
+        const project = await app.service('projects').get(projectId)
+        const userId = project.userId
+
+        // Internal service calls require user context for authorization
         const existing = await app.service('files').find({
           query: { projectId, key, $limit: 1 }
-        })
+        }, { user: { _id: userId } })
         if ((existing as any).total > 0) {
-          await app.service('files').remove((existing as any).data[0]._id)
+          await app.service('files').remove((existing as any).data[0]._id, {}, { user: { _id: userId } })
         }
         embeddingStore.clear(projectId) // Re-index on next query
         return { success: true, data: { deleted: path } }

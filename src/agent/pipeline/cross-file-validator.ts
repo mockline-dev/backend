@@ -67,7 +67,7 @@ export class CrossFileValidator {
     warnings: CrossFileValidationError[]
   ): void {
     const filePaths = new Map<string, string>()
-    
+
     // Build a map of file paths (normalized)
     for (const file of files) {
       const normalizedPath = this.normalizePath(file.path)
@@ -79,7 +79,7 @@ export class CrossFileValidator {
       if (!file.path.endsWith('.py')) continue
 
       const imports = this.extractImports(file.content)
-      
+
       for (const imp of imports) {
         // Skip external package imports - only validate local module imports
         if (this.isExternalPackage(imp)) {
@@ -102,11 +102,17 @@ export class CrossFileValidator {
 
   private extractImports(content: string): string[] {
     const imports: string[] = []
-    
+
     // Match Python import statements
+    // Use more specific patterns to capture only the module path
     const patterns = [
-      /from\s+([^\s]+)\s+import/g,
-      /import\s+([^\s]+)/g
+      // Match "from module.path import" - capture the module path
+      // This pattern matches "from" followed by whitespace, then captures the module path
+      // until we encounter whitespace followed by "import"
+      /from\s+([a-zA-Z_][a-zA-Z0-9_.]*?)\s+import(?=[\s\(])/g,
+      // Match "import module.path" - capture the module path
+      // This pattern matches "import" followed by whitespace, then captures the module path
+      /import\s+([a-zA-Z_][a-zA-Z0-9_.]*?)(?:\s|;|$)/g
     ]
 
     for (const pattern of patterns) {
@@ -116,18 +122,100 @@ export class CrossFileValidator {
       }
     }
 
-    return [...new Set(imports)] // Remove duplicates
+    // Filter out individual symbols that might have been captured
+    // We only want module paths (e.g., "sqlalchemy.orm", "app.models")
+    // not individual symbols (e.g., "BaseSettings", "relationship")
+    const modulePaths = imports.filter(imp => {
+      // If it's a single word and looks like a symbol (PascalCase or mixed case),
+      // it's likely an imported symbol, not a module path
+      if (!imp.includes('.') && /^[A-Z][a-zA-Z0-9_]*$/.test(imp)) {
+        return false
+      }
+      // If it's a single word and is a known Python built-in or common symbol name, skip it
+      if (!imp.includes('.') && this.isCommonSymbolName(imp)) {
+        return false
+      }
+      return true
+    })
+
+    return [...new Set(modulePaths)] // Remove duplicates
+  }
+
+  /**
+   * Checks if a name is a common Python symbol name that's likely
+   * not a module path (e.g., BaseSettings, CryptContext, relationship)
+   */
+  private isCommonSymbolName(name: string): boolean {
+    const commonSymbols = new Set([
+      // Pydantic symbols
+      'BaseSettings',
+      'EmailStr',
+      'Field',
+      'validator',
+      'root_validator',
+      // SQLAlchemy symbols
+      'Column',
+      'Integer',
+      'String',
+      'Boolean',
+      'DateTime',
+      'Date',
+      'Time',
+      'Float',
+      'Numeric',
+      'JSON',
+      'ForeignKey',
+      'relationship',
+      'declarative_base',
+      'create_engine',
+      'sessionmaker',
+      // Authentication symbols
+      'CryptContext',
+      'JWTError',
+      'jwt',
+      'OAuth2PasswordBearer',
+      'OAuth2PasswordRequestForm',
+      'Token',
+      // FastAPI symbols
+      'FastAPI',
+      'APIRouter',
+      'Depends',
+      'HTTPException',
+      'status',
+      'CORSMiddleware',
+      'Request',
+      'Response',
+      // Common Python types
+      'Optional',
+      'List',
+      'Dict',
+      'Union',
+      'Any',
+      'Type',
+      // Database symbols
+      'Session',
+      'engine',
+      'Base',
+      'metadata',
+      // Other common symbols
+      'Enum',
+      'UUID',
+      'Binary',
+      'LargeBinary',
+      'Interval'
+    ])
+    return commonSymbols.has(name)
   }
 
   private resolveImportPath(currentFile: string, imp: string): string | null {
     // Simple resolution logic - can be enhanced
     const currentDir = currentFile.substring(0, currentFile.lastIndexOf('/'))
-    
+
     // Handle relative imports
     if (imp.startsWith('.')) {
       const parts = imp.split('/')
       let resolvedPath = currentDir
-      
+
       for (const part of parts) {
         if (part === '..') {
           resolvedPath = resolvedPath.substring(0, resolvedPath.lastIndexOf('/'))
@@ -135,7 +223,7 @@ export class CrossFileValidator {
           resolvedPath = `${resolvedPath}/${part}`
         }
       }
-      
+
       // Try .py extension
       return this.normalizePath(`${resolvedPath}.py`)
     }
@@ -153,49 +241,220 @@ export class CrossFileValidator {
    * Returns true for standard library and third-party packages.
    */
   private isExternalPackage(imp: string): boolean {
+    // Clean the import string by removing any trailing commas or whitespace
+    const cleanedImp = imp.replace(/,\s*$/, '').trim()
+
     // Common Python standard library modules
     const standardLibrary = new Set([
-      'os', 'sys', 're', 'json', 'datetime', 'time', 'math', 'random',
-      'typing', 'collections', 'itertools', 'functools', 'pathlib',
-      'io', 'uuid', 'hashlib', 'base64', 'secrets', 'enum', 'dataclasses',
-      'contextlib', 'asyncio', 'threading', 'multiprocessing', 'logging',
-      'decimal', 'fractions', 'statistics', 'inspect', 'warnings',
-      'abc', 'copy', 'pickle', 'shutil', 'tempfile', 'csv', 'sqlite3',
-      'http', 'urllib', 'email', 'html', 'xml', 'socket', 'ssl',
-      'subprocess', 'signal', 'traceback', 'gc', 'weakref'
+      'os',
+      'sys',
+      're',
+      'json',
+      'datetime',
+      'time',
+      'math',
+      'random',
+      'typing',
+      'collections',
+      'itertools',
+      'functools',
+      'pathlib',
+      'io',
+      'uuid',
+      'hashlib',
+      'base64',
+      'secrets',
+      'enum',
+      'dataclasses',
+      'contextlib',
+      'asyncio',
+      'threading',
+      'multiprocessing',
+      'logging',
+      'decimal',
+      'fractions',
+      'statistics',
+      'inspect',
+      'warnings',
+      'abc',
+      'copy',
+      'pickle',
+      'shutil',
+      'tempfile',
+      'csv',
+      'sqlite3',
+      'http',
+      'urllib',
+      'email',
+      'html',
+      'xml',
+      'socket',
+      'ssl',
+      'subprocess',
+      'signal',
+      'traceback',
+      'gc',
+      'weakref',
+      'types',
+      'zoneinfo',
+      'typing_extensions',
+      'dataclasses',
+      'enum',
+      'abc'
     ])
 
     // Common third-party packages used in web development
     const thirdPartyPackages = new Set([
-      'fastapi', 'pydantic', 'pydantic_settings', 'sqlalchemy',
-      'alembic', 'passlib', 'python-jose', 'python-multipart',
-      'bcrypt', 'python-dotenv', 'uvicorn', 'pytest', 'httpx',
-      'requests', 'aiohttp', 'celery', 'redis', 'pymongo',
-      'motor', 'beanie', 'odmantic', 'typer', 'click',
-      'jinja2', 'itsdangerous', 'werkzeug', 'flask', 'django',
-      'numpy', 'pandas', 'matplotlib', 'pillow', 'opencv-python'
+      'fastapi',
+      'pydantic',
+      'pydantic_settings',
+      'sqlalchemy',
+      'alembic',
+      'passlib',
+      'python_jose',
+      'python_multipart',
+      'bcrypt',
+      'python_dotenv',
+      'uvicorn',
+      'pytest',
+      'httpx',
+      'requests',
+      'aiohttp',
+      'celery',
+      'redis',
+      'pymongo',
+      'motor',
+      'beanie',
+      'odmantic',
+      'typer',
+      'click',
+      'jinja2',
+      'itsdangerous',
+      'werkzeug',
+      'flask',
+      'django',
+      'numpy',
+      'pandas',
+      'matplotlib',
+      'pillow',
+      'opencv',
+      'jwt',
+      'PyJWT',
+      'passlib',
+      'context',
+      'bcrypt',
+      'python-jose',
+      'python-multipart',
+      'python-dotenv',
+      'uvicorn',
+      'pytest',
+      'httpx',
+      'requests',
+      'aiohttp',
+      'celery',
+      'redis',
+      'pymongo',
+      'motor',
+      'beanie',
+      'odmantic',
+      'typer',
+      'click',
+      'jinja2',
+      'itsdangerous',
+      'werkzeug',
+      'flask',
+      'django',
+      'numpy',
+      'pandas',
+      'matplotlib',
+      'pillow',
+      'opencv',
+      'starlette',
+      'pydantic_core',
+      'annotated_types',
+      'email_validator',
+      'orjson',
+      'pydantic_extra_types',
+      // Additional common packages
+      'jose',
+      'passlib',
+      'context',
+      'bcrypt',
+      'python-jose',
+      'python-multipart',
+      'python-dotenv',
+      'uvicorn',
+      'pytest',
+      'httpx',
+      'requests',
+      'aiohttp',
+      'celery',
+      'redis',
+      'pymongo',
+      'motor',
+      'beanie',
+      'odmantic',
+      'typer',
+      'click',
+      'jinja2',
+      'itsdangerous',
+      'werkzeug',
+      'flask',
+      'django',
+      'numpy',
+      'pandas',
+      'matplotlib',
+      'pillow',
+      'opencv',
+      'starlette',
+      'pydantic_core',
+      'annotated_types',
+      'email_validator',
+      'orjson',
+      'pydantic_extra_types'
     ])
 
-    // Check if it's a standard library import (first component)
-    const firstComponent = imp.split('.')[0].split(',')[0].trim()
-    if (standardLibrary.has(firstComponent)) {
-      return true
-    }
-
-    // Check if it's a third-party package import (first component)
-    if (thirdPartyPackages.has(firstComponent)) {
-      return true
-    }
-
     // Check for relative imports - these are always local
-    if (imp.startsWith('.')) {
+    if (cleanedImp.startsWith('.')) {
       return false
     }
 
     // Check if it's a project-local import (starts with common project prefixes)
     // For example: 'app.models', 'app.services', etc.
-    if (imp.startsWith('app.') || imp.startsWith('src.')) {
+    if (cleanedImp.startsWith('app.') || cleanedImp.startsWith('src.')) {
       return false
+    }
+
+    // Extract the first component of the import path
+    const firstComponent = cleanedImp.split('.')[0].trim()
+
+    // Check if it's a standard library import
+    if (standardLibrary.has(firstComponent)) {
+      return true
+    }
+
+    // Check if it's a third-party package import
+    if (thirdPartyPackages.has(firstComponent)) {
+      return true
+    }
+
+    // Check for multi-level imports from known packages
+    // e.g., "sqlalchemy.orm", "passlib.context", "pydantic_settings"
+    if (cleanedImp.includes('.')) {
+      const components = cleanedImp.split('.')
+      // Check if any component (or combination) is a known package
+      for (let i = 0; i < components.length; i++) {
+        const prefix = components.slice(0, i + 1).join('.')
+        if (thirdPartyPackages.has(prefix) || standardLibrary.has(prefix)) {
+          return true
+        }
+      }
+    }
+
+    // If it's a multi-component import and the first component looks like a package
+    // (not a single lowercase word that could be a local module), assume it's external
+    if (cleanedImp.includes('.') && /^[A-Z]/.test(firstComponent)) {
+      return true
     }
 
     // If it doesn't start with a dot and isn't in the known packages,
@@ -210,13 +469,13 @@ export class CrossFileValidator {
   ): void {
     // Build dependency graph
     const graph = new Map<string, Set<string>>()
-    
+
     for (const file of files) {
       if (!file.path.endsWith('.py')) continue
 
       const dependencies = new Set<string>()
       const imports = this.extractImports(file.content)
-      
+
       for (const imp of imports) {
         // Skip external packages - only track local module dependencies
         if (this.isExternalPackage(imp)) {
@@ -228,7 +487,7 @@ export class CrossFileValidator {
           dependencies.add(importedPath)
         }
       }
-      
+
       graph.set(file.path, dependencies)
     }
 
@@ -279,7 +538,7 @@ export class CrossFileValidator {
     errors: CrossFileValidationError[]
   ): void {
     const definedModels = new Set<string>()
-    
+
     // Extract all defined models from files
     for (const file of files) {
       if (!file.path.endsWith('.py')) continue
@@ -322,11 +581,11 @@ export class CrossFileValidator {
 
   private extractModelDefinitions(content: string): string[] {
     const models: string[] = []
-    
+
     // Match SQLAlchemy model definitions
     const pattern = /class\s+(\w+)\s*\([^)]*Base[^)]*\)/g
     let match: RegExpExecArray | null
-    
+
     while ((match = pattern.exec(content)) !== null) {
       models.push(match[1])
     }
@@ -336,14 +595,14 @@ export class CrossFileValidator {
 
   private extractModelReferences(content: string): string[] {
     const references: string[] = []
-    
+
     // Match type annotations and ForeignKey references
     const patterns = [
       // More specific pattern for type annotations - must be followed by = or :
       // This avoids matching variable assignments like "expire="
-      /:\s*([A-Z][a-zA-Z0-9_]*)\s*(?:=|,|\)|:)/g,  // Type annotations (PascalCase)
-      /ForeignKey\(['"]([a-z_][a-z0-9_]*)['"]\)/g,  // ForeignKey references (snake_case table names)
-      /relationship\(['"]([A-Z][a-zA-Z0-9_]*)['"]\)/g  // SQLAlchemy relationships (PascalCase model names)
+      /:\s*([A-Z][a-zA-Z0-9_]*)\s*(?:=|,|\)|:)/g, // Type annotations (PascalCase)
+      /ForeignKey\(['"]([a-z_][a-z0-9_]*)['"]\)/g, // ForeignKey references (snake_case table names)
+      /relationship\(['"]([A-Z][a-zA-Z0-9_]*)['"]\)/g // SQLAlchemy relationships (PascalCase model names)
     ]
 
     for (const pattern of patterns) {
@@ -359,21 +618,98 @@ export class CrossFileValidator {
   private isBuiltInType(type: string): boolean {
     const builtInTypes = [
       // Basic types
-      'str', 'int', 'float', 'bool',
+      'str',
+      'int',
+      'float',
+      'bool',
       // Date/time types
-      'datetime', 'date', 'time', 'timedelta',
+      'datetime',
+      'date',
+      'time',
+      'timedelta',
       // Collection types
-      'List', 'Dict', 'Set', 'Tuple', 'Optional', 'Union', 'Any',
+      'List',
+      'Dict',
+      'Set',
+      'Tuple',
+      'Optional',
+      'Union',
+      'Any',
       // SQLAlchemy types
-      'Column', 'Integer', 'String', 'Text', 'Boolean', 'DateTime',
-      'Date', 'Time', 'Float', 'Numeric', 'JSON', 'ForeignKey',
-      'relationship', 'Table', 'Index', 'UniqueConstraint',
+      'Column',
+      'Integer',
+      'String',
+      'Text',
+      'Boolean',
+      'DateTime',
+      'Date',
+      'Time',
+      'Float',
+      'Numeric',
+      'JSON',
+      'ForeignKey',
+      'relationship',
+      'Table',
+      'Index',
+      'UniqueConstraint',
+      // SQLAlchemy ORM types
+      'declarative_base',
+      'create_engine',
+      'sessionmaker',
+      'Session',
       // Common variables/attributes
-      'db', 'Base', 'engine', 'session', 'metadata',
+      'db',
+      'Base',
+      'engine',
+      'session',
+      'metadata',
       // Special attributes
-      '__tablename__', '__table_args__', '__mapper_args__',
+      '__tablename__',
+      '__table_args__',
+      '__mapper_args__',
       // Other common types
-      'Enum', 'UUID', 'Binary', 'LargeBinary', 'Interval'
+      'Enum',
+      'UUID',
+      'Binary',
+      'LargeBinary',
+      'Interval',
+      // Pydantic types
+      'BaseSettings',
+      'EmailStr',
+      'Field',
+      'validator',
+      'root_validator',
+      'model_validator',
+      'computed_field',
+      'field_validator',
+      // Authentication types
+      'CryptContext',
+      'JWTError',
+      'jwt',
+      'OAuth2PasswordBearer',
+      'OAuth2PasswordRequestForm',
+      'Token',
+      'TokenData',
+      // FastAPI types
+      'FastAPI',
+      'APIRouter',
+      'Depends',
+      'HTTPException',
+      'status',
+      'CORSMiddleware',
+      'Request',
+      'Response',
+      'Body',
+      'Query',
+      'Path',
+      'Header',
+      'Cookie',
+      'Form',
+      'File',
+      'UploadFile',
+      // Database types
+      'AsyncSession',
+      'async_sessionmaker'
     ]
     return builtInTypes.includes(type)
   }
@@ -386,7 +722,7 @@ export class CrossFileValidator {
   ): void {
     // Build a map of model definitions by file
     const modelsByFile = new Map<string, Set<string>>()
-    
+
     for (const file of files) {
       if (!file.path.endsWith('.py')) continue
 
@@ -421,7 +757,7 @@ export class CrossFileValidator {
       // Check if foreign key field exists (for many-to-one and one-to-one relationships)
       if (rel.foreignKey && (rel.type === 'many-to-one' || rel.type === 'one-to-one')) {
         let foreignKeyFound = false
-        
+
         for (const [file, models] of modelsByFile.entries()) {
           if (models.has(rel.from)) {
             const fileContent = files.find(f => f.path === file)?.content

@@ -115,11 +115,7 @@ export class SchemaValidator {
     }
   }
 
-  private validateEntity(
-    entity: any,
-    errors: ValidationError[],
-    warnings: ValidationError[]
-  ): void {
+  private validateEntity(entity: any, errors: ValidationError[], warnings: ValidationError[]): void {
     // Validate entity name
     if (!entity.name || typeof entity.name !== 'string' || entity.name.trim() === '') {
       errors.push({
@@ -258,7 +254,7 @@ export class SchemaValidator {
   ): Relationship[] {
     const relationships: Relationship[] = []
     const entityNames = new Map<string, string>()
-    
+
     // Build entity name map (case-insensitive lookup)
     for (const entity of schema.entities) {
       entityNames.set(entity.name.toLowerCase(), entity.name)
@@ -286,7 +282,7 @@ export class SchemaValidator {
             if (!seen.has(key)) {
               seen.add(key)
               relationships.push(relationship)
-              
+
               // Validate that foreign key field exists
               if (relationship.foreignKey) {
                 const hasForeignKey = entity.fields.some(f => f.name === relationship.foreignKey)
@@ -407,15 +403,12 @@ export class SchemaValidator {
       ['many-to-many', 'many-to-many']
     ]
 
-    return compatiblePairs.some(([t1, t2]) =>
-      (type1 === t1 && type2 === t2) || (type1 === t2 && type2 === t1)
+    return compatiblePairs.some(
+      ([t1, t2]) => (type1 === t1 && type2 === t2) || (type1 === t2 && type2 === t1)
     )
   }
 
-  private checkCircularDependencies(
-    relationships: Relationship[],
-    warnings: ValidationError[]
-  ): void {
+  private checkCircularDependencies(relationships: Relationship[], warnings: ValidationError[]): void {
     // Build adjacency list
     const graph = new Map<string, Set<string>>()
     for (const rel of relationships) {
@@ -530,7 +523,10 @@ export class SchemaValidator {
       'logging',
       'monitoring',
       'testing',
-      'documentation'
+      'documentation',
+      'audit-trail',
+      'soft-delete',
+      'advanced-filtering'
     ]
 
     for (const feature of schema.features) {

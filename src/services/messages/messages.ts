@@ -1,5 +1,6 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.html
 import { authenticate } from '@feathersjs/authentication'
+import { Forbidden } from '@feathersjs/errors'
 
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
@@ -51,6 +52,28 @@ export const messages = (app: Application) => {
           if (!context.data?.type) {
             context.data.type = 'text'
           }
+
+          // Authorization: Verify user owns the project
+          const userId = context.params.user?._id
+          const projectId = context.data.projectId
+
+          if (projectId) {
+            const project = await context.app.service('projects').get(projectId as any)
+
+            // Null checks before calling toString()
+            if (!project.userId) {
+              throw new Forbidden('Project userId is missing')
+            }
+            if (!userId) {
+              throw new Forbidden('User ID is missing')
+            }
+
+            if (project.userId.toString() !== userId.toString()) {
+              // Use FeathersJS Forbidden error class
+              throw new Forbidden('You do not have permission to create messages for this project')
+            }
+          }
+
           return context
         },
         schemaHooks.validateData(messagesDataValidator),

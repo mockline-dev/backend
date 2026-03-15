@@ -31,6 +31,8 @@ export const projectsSchema = Type.Object(
     updatedAt: Type.Number(),
     // BullMQ job tracking
     jobId: Type.Optional(Type.String()),
+    // Architecture reference
+    architectureId: Type.Optional(ObjectIdSchema()),
     // Soft delete
     deletedAt: Type.Optional(Type.Number()),
     // Nested progress object
@@ -85,7 +87,8 @@ export const projectsDataSchema = Type.Pick(
     'model',
     'status',
     'jobId',
-    'generationProgress'
+    'generationProgress',
+    'architectureId'
   ],
   {
     $id: 'ProjectsData'
@@ -161,6 +164,7 @@ export const projectsQueryProperties = Type.Pick(projectsSchema, [
   'createdAt',
   'updatedAt',
   'jobId',
+  'architectureId',
   'deletedAt'
 ])
 export const projectsQuerySchema = Type.Intersect(

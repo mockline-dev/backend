@@ -1,5 +1,6 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.html
 import { authenticate } from '@feathersjs/authentication'
+import { BadRequest, Forbidden } from '@feathersjs/errors'
 
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
@@ -41,8 +42,7 @@ export const files = (app: Application) => {
     },
     before: {
       all: [schemaHooks.validateQuery(filesQueryValidator), schemaHooks.resolveQuery(filesQueryResolver)],
-      find: [
-      ],
+      find: [],
       get: [],
       create: [schemaHooks.validateData(filesDataValidator), schemaHooks.resolveData(filesDataResolver)],
       patch: [schemaHooks.validateData(filesPatchValidator), schemaHooks.resolveData(filesPatchResolver)],
@@ -50,6 +50,7 @@ export const files = (app: Application) => {
         async (context: HookContext) => {
           const app = context.app
           const filesId = context.id
+          const userId = context.params.user?._id
 
           try {
             if (!filesId) {
@@ -59,6 +60,21 @@ export const files = (app: Application) => {
             const filesItem = await app.service(filesPath).get(filesId)
 
             if (filesItem) {
+              // Authorization: Verify user owns the file
+              const project = await app.service('projects').get(filesItem.projectId as any)
+
+              // Null checks before calling toString()
+              if (!project.userId) {
+                throw new BadRequest('Project userId is missing')
+              }
+              if (!userId) {
+                throw new BadRequest('User ID is missing')
+              }
+
+              if (project.userId.toString() !== userId.toString()) {
+                throw new Forbidden('You do not have permission to delete this file')
+              }
+
               await app.service('uploads').remove(null, { query: { key: filesItem.name } })
             }
           } catch (error) {

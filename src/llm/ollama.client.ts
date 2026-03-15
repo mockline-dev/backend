@@ -28,13 +28,38 @@ export interface OllamaStreamChunk {
 export class OllamaClient {
   private baseUrl: string
   private model: string
+  private embeddingModel: string
   private timeout: number
+  private requestQueue: Array<() => void> = []
+  private activeRequests = 0
+  private readonly MAX_CONCURRENT_REQUESTS = 3
 
   constructor() {
-    const ollamaConfig = config.get<{ baseUrl: string; model: string; timeout: number }>('ollama')
+    const ollamaConfig = config.get<{ baseUrl: string; model: string; embeddingModel?: string; timeout: number }>('ollama')
     this.baseUrl = ollamaConfig.baseUrl ?? 'http://localhost:11434'
     this.model = ollamaConfig.model
+    // Make embedding model configurable via environment variable with a default fallback
+    this.embeddingModel = ollamaConfig.embeddingModel ?? 'nomic-embed-text'
     this.timeout = ollamaConfig.timeout ?? 120000
+  }
+
+  private async acquireRequestSlot(): Promise<void> {
+    if (this.activeRequests < this.MAX_CONCURRENT_REQUESTS) {
+      this.activeRequests++
+      return
+    }
+
+    return new Promise(resolve => {
+      this.requestQueue.push(resolve)
+    })
+  }
+
+  private releaseRequestSlot(): void {
+    this.activeRequests--
+    const next = this.requestQueue.shift()
+    if (next) {
+      next()
+    }
   }
 
   async *chatStream(
@@ -42,6 +67,9 @@ export class OllamaClient {
     tools?: object[],
     options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
   ): AsyncGenerator<OllamaStreamChunk> {
+    // Acquire request slot to limit concurrent requests
+    await this.acquireRequestSlot()
+
     const controller = new AbortController()
     const idleTimeout = this.timeout
     let timer: NodeJS.Timeout | undefined
@@ -111,6 +139,8 @@ export class OllamaClient {
       if (timer) {
         clearTimeout(timer)
       }
+      // Release request slot when done
+      this.releaseRequestSlot()
     }
   }
 
@@ -118,7 +148,7 @@ export class OllamaClient {
     const res = await fetch(`${this.baseUrl}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text', prompt: text })
+      body: JSON.stringify({ model: this.embeddingModel, prompt: text })
     })
     if (!res.ok) throw new Error(`Embed error: ${res.statusText}`)
     return (await res.json()).embedding
