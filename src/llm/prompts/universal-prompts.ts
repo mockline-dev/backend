@@ -74,7 +74,8 @@ export class UniversalPromptBuilder {
       prompt,
       schema,
       FRAMEWORK: {
-        name: stack.framework,
+        name: stack.name,
+        framework: stack.framework,
         language: stack.language
       },
       STRUCTURE: {
@@ -135,7 +136,8 @@ export class UniversalPromptBuilder {
       filePath,
       schema,
       FRAMEWORK: {
-        name: stack.framework,
+        name: stack.name,
+        framework: stack.framework,
         language: stack.language
       },
       FILE_SPECIFIC_INSTRUCTIONS: this.buildFileSpecificInstructions(filePath, stack),
