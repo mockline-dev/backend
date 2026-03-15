@@ -7,7 +7,7 @@
 import type { StackConfig } from '../stack-config.types'
 
 export const nodejsNestJsStack: StackConfig = {
-  id: 'nodejs-nestjs',
+  id: 'typescript-nestjs',
   name: 'NestJS',
   language: 'TypeScript',
   framework: 'NestJS',

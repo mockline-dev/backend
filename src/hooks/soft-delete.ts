@@ -15,5 +15,5 @@ export const softDelete = async (context: HookContext) => {
 
 export const excludeDeleted = async (context: HookContext) => {
   if (!context.params.query) context.params.query = {}
-  context.params.query.deletedAt = null
+  context.params.query.deletedAt = { $exists: false }
 }

@@ -16,10 +16,10 @@ import {
 
 import type { Application, HookContext } from '../../declarations'
 import { excludeDeleted, softDelete } from '../../hooks/soft-delete'
+import { logger } from '../../logger'
 import { ProjectsService, getOptions } from './projects.class'
 import { projectsMethods, projectsPath } from './projects.shared'
 import { assertValidTransition } from './projects.state-machine'
-import { logger } from '../../logger'
 
 export * from './projects.class'
 export * from './projects.schema'
@@ -79,8 +79,11 @@ export const projects = (app: Application) => {
       patch: [
         async (context: HookContext) => {
           // Validate status transitions
-          if (context.data.status && context.result?.status) {
-            assertValidTransition(context.result.status, context.data.status)
+          if (context.data.status) {
+            const existing = await context.service.get(context.id)
+            if (existing?.status) {
+              assertValidTransition(existing.status, context.data.status)
+            }
           }
           if (context.data.framework) {
             context.data.framework = context.data.framework.toLowerCase()

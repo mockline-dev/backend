@@ -90,7 +90,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       } as any)
 
       // Determine status based on warnings
-      const status = warnings.length > 0 ? 'ready' : 'ready'
+      const status = 'ready'
       const currentStage = warnings.length > 0 ? 'complete_with_warnings' : 'complete'
 
       await flushProgressPatch()
