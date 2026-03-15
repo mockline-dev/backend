@@ -62,14 +62,17 @@ export class ContextRetriever {
     })) as any
     const files: any[] = result.data ?? result
 
-    for (const file of files) {
+    // Index files in parallel for better performance
+    const indexingPromises = files.map(async file => {
       try {
         const content = await r2Client.getObject(file.key)
         await embeddingStore.add(projectId, file.name, content)
       } catch {
         // Non-fatal — skip unreadable files
       }
-    }
+    })
+
+    await Promise.allSettled(indexingPromises)
 
     logger.info('ContextRetriever: indexed %d files for project %s', files.length, projectId)
   }

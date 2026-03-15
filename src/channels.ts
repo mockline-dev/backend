@@ -12,11 +12,28 @@ export const channels = (app: Application) => {
     // Client can emit 'join-project' / 'leave-project' over Socket.IO to manage project subscriptions
     const socket = (connection as any)?.socket
     if (socket?.on) {
-      socket.on('join-project', (projectId?: string) => {
+      socket.on('join-project', async (projectId?: string) => {
         const targetId = projectId?.toString().trim()
         if (!targetId) {
           return
         }
+
+        // Authentication: Verify user is authenticated
+        const userId = (connection as any)?.user?._id?.toString()
+        if (!userId) {
+          return // Not authenticated, don't allow joining
+        }
+
+        // Authorization: Verify user owns the project
+        try {
+          const project = await app.service('projects').get(targetId)
+          if (project.userId.toString() !== userId) {
+            return // User doesn't own this project
+          }
+        } catch (error) {
+          return // Project doesn't exist or other error
+        }
+
         app.channel(`projects/${targetId}`).join(connection)
       })
 

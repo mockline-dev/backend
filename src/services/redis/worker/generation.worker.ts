@@ -90,7 +90,8 @@ export const generationWorker = new Worker<GenerationJobData>(
 
       await flushProgressPatch()
 
-      await app.service('projects').patch(projectId, {
+      // Link architecture to project
+      const projectPatchData: any = {
         status,
         generationProgress: {
           percentage: 100,
@@ -100,7 +101,26 @@ export const generationWorker = new Worker<GenerationJobData>(
           completedAt: Date.now(),
           ...(warnings.length > 0 && { warnings })
         }
-      } as any)
+      }
+
+      // Include architectureId if it was created
+      if (result.architectureId) {
+        projectPatchData.architectureId = result.architectureId
+        logger.info(
+          'Generation job %s: linking architecture %s to project %s',
+          jobId,
+          result.architectureId,
+          projectId
+        )
+      } else {
+        logger.warn(
+          'Generation job %s: no architectureId returned from pipeline for project %s',
+          jobId,
+          projectId
+        )
+      }
+
+      await app.service('projects').patch(projectId, projectPatchData)
 
       // Log warnings if any
       if (warnings.length > 0) {
@@ -186,7 +206,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       }
     }
   },
-  { connection: redisConnection as any, concurrency: 1 }
+  { connection: redisConnection as any, concurrency: 3 }
 )
 
 generationWorker.on('failed', (job, err) => {

@@ -31,8 +31,8 @@ export interface ArchRelation {
   from: string
   to: string
   type: 'one-to-many' | 'many-to-one' | 'many-to-many' | 'one-to-one'
-  foreignKey?: string
-  bidirectional?: boolean
+  // Note: foreignKey and bidirectional are not included as they're not in the main schema
+  // They are used internally for validation but not persisted
 }
 
 export interface ArchRoute {
@@ -50,7 +50,11 @@ export interface ArchitectureData {
 }
 
 export class ArchitectureExtractor {
-  extract(schema: IntentSchema, files: GeneratedFile[], relationships: Relationship[] = []): ArchitectureData {
+  extract(
+    schema: IntentSchema,
+    files: GeneratedFile[],
+    relationships: Relationship[] = []
+  ): ArchitectureData {
     const routes = this.extractRoutes(files, schema)
     const routeByService = new Map<string, ArchRoute[]>()
     for (const route of routes) {
@@ -72,10 +76,9 @@ export class ArchitectureExtractor {
     }))
 
     // Use pre-validated relationships if available, otherwise infer them
-    const relations = relationships.length > 0 
-      ? this.convertRelationships(relationships)
-      : this.inferRelations(schema)
-    
+    const relations =
+      relationships.length > 0 ? this.convertRelationships(relationships) : this.inferRelations(schema)
+
     const serviceDependencies = this.buildServiceDependencies(relations)
     const dependencyMap = new Map<string, Set<string>>()
     for (const dep of serviceDependencies) {
@@ -150,9 +153,9 @@ export class ArchitectureExtractor {
     return relationships.map(rel => ({
       from: rel.from,
       to: rel.to,
-      type: rel.type,
-      foreignKey: rel.foreignKey,
-      bidirectional: rel.bidirectional
+      type: rel.type
+      // Note: foreignKey and bidirectional are not included in the main schema
+      // They are used internally for validation but not persisted
     }))
   }
 

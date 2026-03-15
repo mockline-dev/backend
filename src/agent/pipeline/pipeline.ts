@@ -5,25 +5,20 @@ import { ProjectMemory } from '../memory/project-memory'
 import { ContextRetriever } from '../rag/retriever'
 import { validateGeneratedFiles } from '../validation/validator'
 import { ArchitectureExtractor } from './architecture-extractor'
+import { CriticalFilesValidator } from './critical-files-validator'
 import { CrossFileValidator } from './cross-file-validator'
 import { FileGenerator, type GeneratedFile } from './file-generator'
-import { IntentAnalyzer } from './intent-analyzer'
+import { IntentAnalyzer, type IntentSchema } from './intent-analyzer'
+import { PROGRESS_STAGES } from './pipeline.constants'
+import type { PersistedFileInfo, PipelineOptions, PipelineResult, ProjectData } from './pipeline.types'
+import {
+  filterValidationErrors,
+  handleValidationErrors,
+  logValidationWarnings,
+  validateFileContent
+} from './pipeline.utils'
 import { SchemaValidator } from './schema-validator'
-import { TaskPlanner } from './task-planner'
-
-export interface PipelineOptions {
-  projectId: string
-  prompt: string
-  userId: string
-  onProgress: (stage: string, percentage: number, currentFile?: string) => Promise<void>
-  jobId?: string | number
-}
-
-export interface PipelineResult {
-  files: GeneratedFile[]
-  fileCount: number
-  totalSize: number
-}
+import { TaskPlanner, type TaskPlan } from './task-planner'
 
 export class GenerationPipeline {
   private app: Application
@@ -32,8 +27,10 @@ export class GenerationPipeline {
   private taskPlanner = new TaskPlanner()
   private fileGenerator = new FileGenerator()
   private crossFileValidator = new CrossFileValidator()
+  private criticalFilesValidator = new CriticalFilesValidator()
   private memory: ProjectMemory
   private retriever: ContextRetriever
+  private allWarnings: string[] = []
 
   constructor(app: Application) {
     this.app = app
@@ -42,27 +39,127 @@ export class GenerationPipeline {
   }
 
   async run(options: PipelineOptions): Promise<PipelineResult> {
-    const { projectId, prompt, onProgress, jobId } = options
+    const { projectId, prompt, userId, onProgress, jobId } = options
     const pipelineStartedAt = Date.now()
 
     // Stage 0 — Load project info, initialize memory, index existing files
-    let project: any
-    try {
-      project = await this.app.service('projects').get(projectId)
-    } catch {
-      project = null
-    }
+    const project = await this.loadProject(projectId)
 
     // Initialize memory if it doesn't exist yet, then record this prompt
     if (project) {
-      await this.memory.initialize(projectId, { language: project.language, framework: project.framework })
+      await this.memory.initialize(projectId, {
+        language: project.language,
+        framework: project.framework
+      })
     }
     await this.memory.recordPrompt(projectId, prompt)
     const memoryData = await this.memory.load(projectId)
     const memoryBlock = this.memory.buildContextBlock(memoryData)
 
-    // Index any pre-existing project files into the RAG store so generators have context
+    // Index any pre-existing project files into RAG store so generators have context
+    this.indexProjectFiles(projectId)
+
+    // Stage 1 — Intent analysis (schema extraction)
+    await onProgress('Analyzing prompt', PROGRESS_STAGES.INTENT_ANALYSIS)
+    const schema = await this.analyzeIntent(prompt, projectId)
+
+    // Stage 1.5 — Schema validation (relationship extraction and validation)
+    await onProgress('Validating schema', PROGRESS_STAGES.SCHEMA_VALIDATION)
+    const validationResult = this.validateSchema(schema, projectId)
+
+    // Stage 2 — Task planning (file structure)
+    await onProgress('Planning files', PROGRESS_STAGES.TASK_PLANNING)
+    const plan = await this.planFiles(prompt, schema, projectId)
+    await this.updateProjectProgress(projectId, userId, plan)
+
+    // Stage 3 — File generation
+    const generatedFiles = await this.generateFiles(
+      prompt,
+      schema,
+      plan,
+      projectId,
+      jobId,
+      onProgress,
+      memoryBlock,
+      validationResult.relationships
+    )
+
+    // Stage 3.5 — Validate critical files are present
+    await onProgress('Validating file structure', PROGRESS_STAGES.FILE_STRUCTURE_VALIDATION)
+    this.validateCriticalFilesStructure(generatedFiles)
+
+    // Stage 3.5 — Cross-file validation
+    await onProgress('Validating cross-file dependencies', PROGRESS_STAGES.CROSS_FILE_VALIDATION)
+    this.validateCrossFiles(generatedFiles, schema, validationResult)
+
+    // Stage 4 — Validate files before persistence
+    await onProgress('Validating files before save', PROGRESS_STAGES.VALIDATION_BEFORE_PERSISTENCE)
+    const validFiles = this.validateFilesBeforePersistence(generatedFiles, projectId)
+
+    // Stage 4.5 — Persist files to R2 + MongoDB
+    await onProgress('Saving files', PROGRESS_STAGES.SAVING_FILES)
+    const persistedFiles = await this.persistFiles(projectId, validFiles, userId, jobId)
+
+    // Stage 5 — Validate generated files
+    await onProgress('Validating', PROGRESS_STAGES.FINAL_VALIDATION)
+    await this.validateGeneratedFiles(generatedFiles, projectId, onProgress)
+
+    // Stage 6 — Extract architecture metadata (CRITICAL - must succeed)
+    await onProgress('Building architecture graph', PROGRESS_STAGES.ARCHITECTURE_EXTRACTION)
+    const architectureId = await this.extractAndSaveArchitecture(
+      schema,
+      generatedFiles,
+      validationResult.relationships,
+      projectId,
+      userId
+    )
+
+    await onProgress('Complete', PROGRESS_STAGES.COMPLETE)
+
+    const totalSize = persistedFiles.reduce((sum, f) => sum + f.size, 0)
+
+    const result: PipelineResult = {
+      files: generatedFiles,
+      fileCount: persistedFiles.length,
+      totalSize,
+      architectureId
+    }
+
+    // Attach warnings to result if any
+    if (this.allWarnings.length > 0) {
+      result.warnings = this.allWarnings
+    }
+
+    logger.info(
+      'Pipeline: completed in %dms for project %s (files=%d, warnings=%d)',
+      Date.now() - pipelineStartedAt,
+      projectId,
+      result.fileCount,
+      this.allWarnings.length
+    )
+
+    return result
+  }
+
+  /**
+   * Loads project data from database
+   */
+  private async loadProject(projectId: string): Promise<ProjectData> {
+    try {
+      const project = await this.app.service('projects').get(projectId)
+      return project as ProjectData
+    } catch (error) {
+      logger.warn('Pipeline: Failed to load project %s: %s', projectId, error)
+      return null
+    }
+  }
+
+  /**
+   * Indexes project files into RAG store (non-blocking)
+   */
+  private indexProjectFiles(projectId: string): void {
     const ragIndexStartedAt = Date.now()
+
     void this.retriever
       .indexProject(projectId)
       .then(() => {
@@ -72,12 +169,15 @@ export class GenerationPipeline {
           projectId
         )
       })
-      .catch((err: any) => {
-        logger.warn('Pipeline: RAG indexing failed (non-fatal): %s', err.message)
+      .catch((error: Error) => {
+        logger.warn('Pipeline: RAG indexing failed (non-fatal): %s', error.message)
       })
+  }
 
-    // Stage 1 — Intent analysis (schema extraction)
-    await onProgress('Analyzing prompt', 5)
+  /**
+   * Analyzes user intent and extracts schema
+   */
+  private async analyzeIntent(prompt: string, projectId: string): Promise<IntentSchema> {
     const intentStartedAt = Date.now()
     const schema = await this.intentAnalyzer.analyze(prompt)
     logger.info(
@@ -85,11 +185,16 @@ export class GenerationPipeline {
       Date.now() - intentStartedAt,
       projectId
     )
+    return schema
+  }
 
-    // Stage 1.5 — Schema validation (relationship extraction and validation)
-    await onProgress('Validating schema', 10)
+  /**
+   * Validates extracted schema
+   */
+  private validateSchema(schema: IntentSchema, projectId: string): ReturnType<SchemaValidator['validate']> {
     const schemaValidationStartedAt = Date.now()
     const validationResult = this.schemaValidator.validate(schema)
+
     logger.info(
       'Pipeline: schema validation completed in %dms for project %s',
       Date.now() - schemaValidationStartedAt,
@@ -97,47 +202,31 @@ export class GenerationPipeline {
     )
 
     // Collect all warnings for later reporting
-    const allWarnings: string[] = []
+    this.allWarnings = []
 
     // Log warnings if any
     if (validationResult.warnings.length > 0) {
-      const warningMessages = validationResult.warnings.map(w => `- ${w.field}: ${w.message}`).join('\n')
-      logger.warn('Pipeline: Schema validation warnings:\n%s', warningMessages)
-      allWarnings.push(...validationResult.warnings.map(w => `Schema: ${w.field} - ${w.message}`))
+      const warningMessages = logValidationWarnings(validationResult.warnings, 'Schema')
+      this.allWarnings.push(...warningMessages)
     }
 
-    // Only throw on critical errors, not warnings
+    // Handle validation errors
     if (!validationResult.isValid && validationResult.errors.length > 0) {
-      // Check if errors are critical or can be treated as warnings
-      const criticalErrors = validationResult.errors.filter(e => {
-        // Treat missing optional fields as warnings
-        if (e.message.includes('missing') || e.message.includes('Missing')) {
-          return false
-        }
-        // Treat relationship issues as warnings
-        if (e.message.includes('relationship') || e.message.includes('Relationship')) {
-          return false
-        }
-        // All other errors are critical
-        return true
-      })
-
-      if (criticalErrors.length > 0) {
-        const errorMessages = criticalErrors.map(e => `- ${e.field}: ${e.message}`).join('\n')
-        logger.error('Pipeline: Schema validation failed with critical errors:\n%s', errorMessages)
-        throw new Error(`Schema validation failed:\n${errorMessages}`)
-      } else {
-        // Treat non-critical errors as warnings
-        const warningMessages = validationResult.errors.map(e => `- ${e.field}: ${e.message}`).join('\n')
-        logger.warn('Pipeline: Schema validation errors treated as warnings:\n%s', warningMessages)
-        allWarnings.push(...validationResult.errors.map(e => `Schema: ${e.field} - ${e.message}`))
-      }
+      handleValidationErrors(validationResult, 'Schema')
+      // Add non-critical errors as warnings
+      const { warnings } = filterValidationErrors(validationResult.errors)
+      this.allWarnings.push(...warnings.map(e => `Schema: ${e.field} - ${e.message}`))
     }
 
     logger.info('Pipeline: Schema validated with %d relationships', validationResult.relationships.length)
 
-    // Stage 2 — Task planning (file structure)
-    await onProgress('Planning files', 15)
+    return validationResult
+  }
+
+  /**
+   * Plans file structure for project
+   */
+  private async planFiles(prompt: string, schema: IntentSchema, projectId: string): Promise<TaskPlan[]> {
     const planningStartedAt = Date.now()
     const plan = await this.taskPlanner.plan(prompt, schema)
     logger.info(
@@ -145,24 +234,48 @@ export class GenerationPipeline {
       Date.now() - planningStartedAt,
       projectId
     )
+    return plan
+  }
 
+  /**
+   * Updates project progress in database
+   */
+  private async updateProjectProgress(projectId: string, userId: string, plan: TaskPlan[]): Promise<void> {
     await this.app.service('projects').patch(projectId, {
       generationProgress: {
         totalFiles: plan.length,
         currentStage: 'planning_files',
-        percentage: 15,
+        percentage: PROGRESS_STAGES.TASK_PLANNING,
         filesGenerated: 0
       }
-    } as any)
+    })
+  }
 
-    // Stage 3 — File generation
+  /**
+   * Generates all files for project
+   */
+  private async generateFiles(
+    prompt: string,
+    schema: IntentSchema,
+    plan: TaskPlan[],
+    projectId: string,
+    jobId: string | number | undefined,
+    onProgress: PipelineOptions['onProgress'],
+    memoryBlock: string,
+    relationships: ReturnType<SchemaValidator['validate']>['relationships']
+  ): Promise<GeneratedFile[]> {
     const generationStartedAt = Date.now()
+
     const generatedFiles = await this.fileGenerator.generateAll(
       prompt,
       schema,
       plan,
       async (index, total, filePath) => {
-        const percentage = 20 + Math.round((index / total) * 60)
+        const percentage =
+          PROGRESS_STAGES.FILE_GENERATION_START +
+          Math.round(
+            (index / total) * (PROGRESS_STAGES.FILE_GENERATION_END - PROGRESS_STAGES.FILE_GENERATION_START)
+          )
         await onProgress('Generating files', percentage, filePath)
 
         // Track generated files for cleanup
@@ -171,8 +284,9 @@ export class GenerationPipeline {
           jobTracker.trackGeneratedFile(jobId, { path: filePath })
         }
       },
-      { projectId, retriever: this.retriever, memoryBlock, relationships: validationResult.relationships }
+      { projectId, retriever: this.retriever, memoryBlock, relationships }
     )
+
     logger.info(
       'Pipeline: file generation completed in %dms for project %s (%d files)',
       Date.now() - generationStartedAt,
@@ -180,74 +294,108 @@ export class GenerationPipeline {
       generatedFiles.length
     )
 
-    // Stage 3.5 — Cross-file validation
-    await onProgress('Validating cross-file dependencies', 80)
+    return generatedFiles
+  }
+
+  /**
+   * Validates that critical files are present and properly structured
+   */
+  private validateCriticalFilesStructure(generatedFiles: GeneratedFile[]): void {
+    const validationStartedAt = Date.now()
+    const { warnings } = this.criticalFilesValidator.validate(generatedFiles)
+    this.allWarnings.push(...warnings)
+
+    logger.info('Pipeline: file structure validation completed in %dms', Date.now() - validationStartedAt)
+  }
+
+  /**
+   * Validates cross-file dependencies and references
+   */
+  private validateCrossFiles(
+    generatedFiles: GeneratedFile[],
+    schema: IntentSchema,
+    validationResult: ReturnType<SchemaValidator['validate']>
+  ): void {
     const crossFileValidationStartedAt = Date.now()
     const crossFileValidation = this.crossFileValidator.validate(
       generatedFiles,
       schema,
       validationResult.relationships
     )
+
     logger.info(
-      'Pipeline: cross-file validation completed in %dms for project %s',
-      Date.now() - crossFileValidationStartedAt,
-      projectId
+      'Pipeline: cross-file validation completed in %dms',
+      Date.now() - crossFileValidationStartedAt
     )
 
     // Log warnings if any
     if (crossFileValidation.warnings.length > 0) {
       const warningMessages = crossFileValidation.warnings.map(w => `- ${w.file}: ${w.message}`).join('\n')
       logger.warn('Pipeline: Cross-file validation warnings:\n%s', warningMessages)
-      allWarnings.push(...crossFileValidation.warnings.map(w => `Cross-file: ${w.file} - ${w.message}`))
+      this.allWarnings.push(...crossFileValidation.warnings.map(w => `Cross-file: ${w.file} - ${w.message}`))
     }
 
-    // Only throw on critical cross-file errors
+    // Handle validation errors
     if (!crossFileValidation.isValid && crossFileValidation.errors.length > 0) {
-      // Check if errors are critical or can be treated as warnings
-      const criticalErrors = crossFileValidation.errors.filter(e => {
-        // Treat missing references as warnings
-        if (e.message.includes('not found') || e.message.includes('undefined')) {
-          return false
-        }
-        // Treat import issues as warnings
-        if (e.message.includes('import') || e.message.includes('Import')) {
-          return false
-        }
-        // All other errors are critical
-        return true
-      })
-
+      // Filter critical errors for cross-file validation
+      const criticalErrors = crossFileValidation.errors.filter(e => e.severity === 'error')
       if (criticalErrors.length > 0) {
         const errorMessages = criticalErrors.map(e => `- ${e.file}: ${e.message}`).join('\n')
         logger.error('Pipeline: Cross-file validation failed with critical errors:\n%s', errorMessages)
         throw new Error(`Cross-file validation failed:\n${errorMessages}`)
       } else {
         // Treat non-critical errors as warnings
-        const warningMessages = crossFileValidation.errors.map(e => `- ${e.file}: ${e.message}`).join('\n')
-        logger.warn('Pipeline: Cross-file validation errors treated as warnings:\n%s', warningMessages)
-        allWarnings.push(...crossFileValidation.errors.map(e => `Cross-file: ${e.file} - ${e.message}`))
+        this.allWarnings.push(...crossFileValidation.errors.map(e => `Cross-file: ${e.file} - ${e.message}`))
       }
     }
+  }
 
-    // Stage 4 — Persist files to R2 + MongoDB
-    await onProgress('Saving files', 82)
-    const persistenceStartedAt = Date.now()
-    const persistedFiles = await this.persistFiles(projectId, generatedFiles, jobId)
+  /**
+   * Validates file contents before persistence
+   */
+  private validateFilesBeforePersistence(
+    generatedFiles: GeneratedFile[],
+    projectId: string
+  ): GeneratedFile[] {
+    const validationBeforePersistenceStartedAt = Date.now()
+
+    const validFiles = generatedFiles.filter(file => {
+      const validation = validateFileContent(file)
+      if (!validation.isValid) {
+        logger.warn('Pipeline: skipping invalid file %s: %s', file.path, validation.reason)
+        return false
+      }
+      return true
+    })
+
     logger.info(
-      'Pipeline: persistence completed in %dms for project %s',
-      Date.now() - persistenceStartedAt,
-      projectId
+      'Pipeline: validation before persistence completed in %dms for project %s (valid=%d, invalid=%d)',
+      Date.now() - validationBeforePersistenceStartedAt,
+      projectId,
+      validFiles.length,
+      generatedFiles.length - validFiles.length
     )
 
-    // Stage 5 — Validate generated files
-    await onProgress('Validating', 90)
+    return validFiles
+  }
+
+  /**
+   * Validates generated files using external validators
+   */
+  private async validateGeneratedFiles(
+    generatedFiles: GeneratedFile[],
+    projectId: string,
+    onProgress: PipelineOptions['onProgress']
+  ): Promise<void> {
     const fileValidationStartedAt = Date.now()
     const validationResults = await validateGeneratedFiles(generatedFiles, projectId, this.app, onProgress)
+
     logger.info(
       'Pipeline: file validation completed in %dms for project %s',
       Date.now() - fileValidationStartedAt,
       projectId
     )
+
     if (validationResults.failCount > 0) {
       logger.warn(
         'Pipeline: %d/%d files failed validation for project %s',
@@ -256,75 +404,117 @@ export class GenerationPipeline {
         projectId
       )
       // Don't throw - allow generation to complete even with validation failures
-      allWarnings.push(`${validationResults.failCount} files failed validation`)
+      this.allWarnings.push(`${validationResults.failCount} files failed validation`)
     }
-
-    // Stage 6 — Extract architecture metadata
-    try {
-      await onProgress('Building architecture graph', 95)
-      const architectureStartedAt = Date.now()
-      const extractor = new ArchitectureExtractor()
-      const architectureData = extractor.extract(schema, generatedFiles, validationResult.relationships)
-      await this.app.service('architecture').create({
-        projectId,
-        ...architectureData,
-        updatedAt: Date.now()
-      } as any)
-      logger.info(
-        'Pipeline: architecture extraction completed in %dms for project %s',
-        Date.now() - architectureStartedAt,
-        projectId
-      )
-
-      // Persist architecture decisions into project memory
-      const decisions: string[] = [
-        ...((architectureData as any).services ?? []).map((s: string) => `Service: ${s}`),
-        ...((architectureData as any).relations ?? []).map(
-          (r: any) => `Relation: ${r.from} → ${r.to} (${r.type})`
-        )
-      ]
-      if (decisions.length) {
-        await this.memory.recordDecisions(projectId, decisions)
-      }
-    } catch (err: any) {
-      logger.warn('Pipeline: architecture extraction failed (non-fatal): %s', err.message)
-    }
-
-    await onProgress('Complete', 100)
-
-    const totalSize = persistedFiles.reduce((sum, f) => sum + f.size, 0)
-
-    // Include warnings in the result
-    const result: PipelineResult = {
-      files: generatedFiles,
-      fileCount: persistedFiles.length,
-      totalSize
-    }
-
-    // Attach warnings to the result if any
-    if (allWarnings.length > 0) {
-      ;(result as any).warnings = allWarnings
-    }
-
-    logger.info(
-      'Pipeline: completed in %dms for project %s (files=%d, warnings=%d)',
-      Date.now() - pipelineStartedAt,
-      projectId,
-      result.fileCount,
-      allWarnings.length
-    )
-
-    return result
   }
 
+  /**
+   * Extracts and saves architecture metadata
+   */
+  private async extractAndSaveArchitecture(
+    schema: IntentSchema,
+    generatedFiles: GeneratedFile[],
+    relationships: ReturnType<SchemaValidator['validate']>['relationships'],
+    projectId: string,
+    userId: string
+  ): Promise<string> {
+    const architectureStartedAt = Date.now()
+
+    logger.info('Pipeline: starting architecture extraction for project %s', projectId)
+
+    const extractor = new ArchitectureExtractor()
+    const architectureData = extractor.extract(schema, generatedFiles, relationships)
+
+    // Validate architecture data structure before saving
+    this.validateArchitectureData(architectureData)
+
+    logger.info(
+      'Pipeline: architecture extracted with %d services, %d models, %d relations, %d routes for project %s',
+      architectureData.services.length,
+      architectureData.models.length,
+      architectureData.relations.length,
+      architectureData.routes.length,
+      projectId
+    )
+
+    const architectureRecord = await this.app.service('architecture').create({
+      projectId,
+      ...architectureData,
+      updatedAt: Date.now()
+    })
+
+    logger.info(
+      'Pipeline: architecture extraction completed in %dms for project %s (architectureId: %s)',
+      Date.now() - architectureStartedAt,
+      projectId,
+      architectureRecord._id?.toString()
+    )
+
+    // Persist architecture decisions into project memory
+    const decisions: string[] = [
+      ...(architectureData.services ?? []).map(s => `Service: ${s.name}`),
+      ...(architectureData.relations ?? []).map(r => `Relation: ${r.from} → ${r.to} (${r.type})`)
+    ]
+    if (decisions.length) {
+      await this.memory.recordDecisions(projectId, decisions)
+    }
+
+    return architectureRecord._id?.toString() ?? ''
+  }
+
+  /**
+   * Validates architecture data structure
+   */
+  private validateArchitectureData(architectureData: ReturnType<ArchitectureExtractor['extract']>): void {
+    if (!architectureData.services || !Array.isArray(architectureData.services)) {
+      throw new Error('Architecture extraction failed: services array is missing or invalid')
+    }
+    if (!architectureData.models || !Array.isArray(architectureData.models)) {
+      throw new Error('Architecture extraction failed: models array is missing or invalid')
+    }
+    if (!architectureData.relations || !Array.isArray(architectureData.relations)) {
+      throw new Error('Architecture extraction failed: relations array is missing or invalid')
+    }
+    if (!architectureData.routes || !Array.isArray(architectureData.routes)) {
+      throw new Error('Architecture extraction failed: routes array is missing or invalid')
+    }
+  }
+
+  /**
+   * Persists files to R2 and MongoDB
+   */
   private async persistFiles(
     projectId: string,
     files: GeneratedFile[],
+    userId: string,
     jobId?: string | number
-  ): Promise<Array<{ path: string; size: number }>> {
-    const results: Array<{ path: string; size: number }> = []
+  ): Promise<PersistedFileInfo[]> {
+    const persistenceStartedAt = Date.now()
 
-    for (const file of files) {
+    // Upload all files to R2 in parallel
+    const uploadResults = await this.uploadFilesToR2(projectId, files, jobId)
+
+    // Upsert file records in MongoDB in parallel
+    const dbResults = await this.upsertFileRecords(projectId, uploadResults, userId)
+
+    logger.info(
+      'Pipeline: persistence completed in %dms for project %s',
+      Date.now() - persistenceStartedAt,
+      projectId
+    )
+
+    return dbResults
+  }
+
+  /**
+   * Uploads files to R2 storage
+   */
+  private async uploadFilesToR2(
+    projectId: string,
+    files: GeneratedFile[],
+    jobId?: string | number
+  ): Promise<Array<{ path: string; size: number; key: string }>> {
+    const uploadPromises = files.map(async file => {
       const key = `projects/${projectId}/${file.path}`
       const size = Buffer.byteLength(file.content)
 
@@ -336,29 +526,44 @@ export class GenerationPipeline {
         jobTracker.trackR2Key(jobId, key)
       }
 
-      // Upsert file record in MongoDB
-      const existing = (await this.app.service('files').find({
+      return { path: file.path, size, key }
+    })
+
+    return Promise.all(uploadPromises)
+  }
+
+  /**
+   * Upserts file records in MongoDB
+   */
+  private async upsertFileRecords(
+    projectId: string,
+    uploadResults: Array<{ path: string; size: number; key: string }>,
+    userId: string
+  ): Promise<PersistedFileInfo[]> {
+    const dbPromises = uploadResults.map(async ({ path, size, key }) => {
+      // Check if file already exists
+      const existing = await this.app.service('files').find({
         query: { projectId, key, $limit: 1 }
-      })) as any
+      })
 
       if (existing.total > 0) {
-        await this.app.service('files').patch(existing.data[0]._id, {
+        await this.app.service('files').patch(String(existing.data[0]._id), {
           size,
           updatedAt: Date.now()
         })
       } else {
         await this.app.service('files').create({
           projectId,
-          name: file.path,
+          name: path,
           key,
-          fileType: file.path.split('.').pop() || 'text',
+          fileType: path.split('.').pop() || 'text',
           size
         })
       }
 
-      results.push({ path: file.path, size })
-    }
+      return { path, size }
+    })
 
-    return results
+    return Promise.all(dbPromises)
   }
 }

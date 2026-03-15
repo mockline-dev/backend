@@ -10,8 +10,44 @@ import {
 } from '@aws-sdk/client-s3'
 import { ObjectId } from 'mongodb'
 import type { Application } from '../../declarations'
+const path = require('path')
 
 export const uploadsPath = 'uploads'
+
+// Upload validation constants
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_CONTENT_TYPES = [
+  'text/plain',
+  'text/javascript',
+  'text/typescript',
+  'text/x-python',
+  'text/x-java',
+  'text/x-c',
+  'text/x-c++',
+  'application/json',
+  'application/xml',
+  'text/markdown',
+  'text/html',
+  'text/css',
+  'text/yaml',
+  'application/x-yaml'
+]
+const DANGEROUS_EXTENSIONS = [
+  '.exe',
+  '.sh',
+  '.bat',
+  '.cmd',
+  '.ps1',
+  '.vbs',
+  '.js',
+  '.jar',
+  '.app',
+  '.deb',
+  '.rpm',
+  '.dmg',
+  '.pkg',
+  '.msi'
+]
 
 export const uploads = (app: Application) => {
   const awsConfig = app.get('aws')
@@ -184,13 +220,40 @@ export const uploads = (app: Application) => {
       all: [],
       create: [
         async (context: any) => {
-          const { key, contentType } = context.data
+          const { key, contentType, content } = context.data
+
           if (!key) {
             throw new Error('Key is required')
           }
           if (!contentType) {
             throw new Error('ContentType is required')
           }
+
+          // Validate file size (check buffer size)
+          let bufferSize = 0
+          if (content) {
+            if (typeof content === 'string') {
+              bufferSize = Buffer.byteLength(content)
+            } else if (Buffer.isBuffer(content)) {
+              bufferSize = content.length
+            }
+          }
+
+          if (bufferSize > MAX_FILE_SIZE) {
+            throw new Error(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB`)
+          }
+
+          // Validate content type
+          if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+            throw new Error(`File type ${contentType} is not allowed`)
+          }
+
+          // Validate file extension from key
+          const ext = path.extname(key).toLowerCase()
+          if (DANGEROUS_EXTENSIONS.includes(ext)) {
+            throw new Error(`File extension ${ext} is not allowed for security reasons`)
+          }
+
           return context
         }
       ],

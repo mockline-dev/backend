@@ -51,6 +51,7 @@ export const architectureSchema = Type.Object(
         to: Type.String(),
         type: Type.Union([
           Type.Literal('one-to-many'),
+          Type.Literal('many-to-one'),
           Type.Literal('many-to-many'),
           Type.Literal('one-to-one')
         ])
@@ -84,7 +85,7 @@ export const architectureExternalResolver = resolve<Architecture, HookContext<Ar
 // Schema for creating new entries
 export const architectureDataSchema = Type.Pick(
   architectureSchema,
-  ['projectId', 'services', 'models', 'relations', 'routes', 'updatedAt'],
+  ['projectId', 'services', 'models', 'relations', 'routes', 'serviceDependencies', 'updatedAt'],
   {
     $id: 'ArchitectureData'
   }

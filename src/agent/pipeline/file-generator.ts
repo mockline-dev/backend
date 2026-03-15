@@ -44,6 +44,30 @@ export class FileGenerator {
     const generatedByIndex = new Map<number, GeneratedFile>()
     let startedCount = 0
 
+    // Pre-fetch all RAG context before starting file generation
+    const ragCache = new Map<string, { path: string; content: string }[]>()
+    if (options.retriever && options.projectId) {
+      logger.info('FileGenerator: pre-fetching RAG context for %d files', plan.length)
+      const ragPrefetchStartedAt = Date.now()
+
+      const ragPrefetchPromises = plan.map(async task => {
+        try {
+          const existingFiles = await options.retriever!.getRelevantFiles(
+            options.projectId!,
+            `${task.path}: ${task.description}`,
+            3
+          )
+          ragCache.set(task.path, existingFiles)
+        } catch (err: any) {
+          logger.warn('FileGenerator: RAG pre-fetch failed for %s: %s', task.path, err.message)
+          ragCache.set(task.path, [])
+        }
+      })
+
+      await Promise.allSettled(ragPrefetchPromises)
+      logger.info('FileGenerator: RAG pre-fetch completed in %dms', Date.now() - ragPrefetchStartedAt)
+    }
+
     for (let stage = 0; stage < totalStages; stage++) {
       const stageTasks = indexedPlan.filter(item => item.stage === stage).sort((a, b) => a.index - b.index)
 
@@ -53,7 +77,7 @@ export class FileGenerator {
         'FileGenerator: starting stage %d with %d files (parallelism=%d)',
         stage,
         stageTasks.length,
-        parallelismForStage(stage)
+        parallelismForStage(stage, stageTasks.length)
       )
 
       const stableContext = [...generatedByIndex.entries()]
@@ -63,7 +87,7 @@ export class FileGenerator {
       const compactStableContext = compactGeneratedContext(stableContext)
 
       let nextTaskCursor = 0
-      const workerCount = Math.min(parallelismForStage(stage), stageTasks.length)
+      const workerCount = Math.min(parallelismForStage(stage, stageTasks.length), stageTasks.length)
       const stageWorkers = Array.from({ length: workerCount }, async () => {
         while (true) {
           const cursor = nextTaskCursor
@@ -80,18 +104,10 @@ export class FileGenerator {
 
           await onProgress(progressIndex, plan.length, task.path)
 
-          // Fetch semantically relevant existing project files (RAG)
+          // Use pre-fetched RAG context from cache
           let existingFiles: { path: string; content: string }[] = []
-          if (options.retriever && options.projectId) {
-            try {
-              existingFiles = await options.retriever.getRelevantFiles(
-                options.projectId,
-                `${task.path}: ${task.description}`,
-                3
-              )
-            } catch (err: any) {
-              logger.warn('FileGenerator: RAG retrieval failed for %s: %s', task.path, err.message)
-            }
+          if (ragCache.has(task.path)) {
+            existingFiles = ragCache.get(task.path)!
           }
 
           const compactExistingFiles = compactExternalContext(existingFiles)
@@ -163,7 +179,7 @@ export class FileGenerator {
           ],
           undefined,
           {
-            temperature: 0.1,
+            temperature: 0.35,
             num_ctx: contextWindowForPath(task.path),
             num_predict: tokenBudgetForPath(task.path)
           }
@@ -293,12 +309,13 @@ function truncateForContext(content: string, maxChars: number): string {
   )}`
 }
 
-function parallelismForStage(stage: number): number {
-  if (stage <= 4) {
-    return 2
-  }
+function parallelismForStage(stage: number, fileCount: number): number {
+  // Dynamic parallelism based on number of files in stage
+  // More files = more parallelism (up to limit)
+  const baseParallelism = stage <= 4 ? 2 : 3
+  const dynamicParallelism = Math.min(baseParallelism + Math.floor(fileCount / 3), 5)
 
-  return 3
+  return dynamicParallelism
 }
 
 function tokenBudgetForPath(path: string): number {

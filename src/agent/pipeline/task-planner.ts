@@ -1,6 +1,6 @@
-import { logger } from '../../logger'
-import { getProvider } from '../../llm/providers/registry'
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
+import { getProvider } from '../../llm/providers/registry'
+import { logger } from '../../logger'
 import type { IntentSchema } from './intent-analyzer'
 
 export interface TaskPlan {
@@ -10,6 +10,11 @@ export interface TaskPlan {
 
 const REQUIRED_FASTAPI_FILES: TaskPlan[] = [
   { path: 'requirements.txt', description: 'Python dependencies' },
+  { path: '.env.example', description: 'Environment variables template' },
+  { path: 'app/__init__.py', description: 'App package initialization' },
+  { path: 'app/core/config.py', description: 'Configuration management' },
+  { path: 'app/core/security.py', description: 'Security utilities (password hashing, JWT)' },
+  { path: 'app/core/database.py', description: 'Database connection and session management' },
   { path: 'main.py', description: 'FastAPI app entrypoint' }
 ]
 
