@@ -5,12 +5,36 @@ import { app } from '../../../app'
 import { logger } from '../../../logger'
 import { jobTracker } from '../queues/job-tracker'
 import { redisConnection } from '../queues/queue.client'
-import { validationQueue, type GenerationJobData } from '../queues/queues'
+import { embeddingQueue, validationQueue, type GenerationJobData } from '../queues/queues'
+
+interface BullmqWorkerTuning {
+  concurrency?: number
+  lockDurationMs?: number
+  stalledIntervalMs?: number
+  maxStalledCount?: number
+}
+
+interface BullmqConfig {
+  workers?: {
+    generation?: BullmqWorkerTuning
+  }
+}
+
+const bullmqConfig = (app.get('bullmq') || {}) as BullmqConfig
+const generationTuning = bullmqConfig.workers?.generation || {}
+
+const generationWorkerOptions = {
+  connection: redisConnection as any,
+  concurrency: generationTuning.concurrency ?? 1,
+  lockDuration: generationTuning.lockDurationMs ?? 300_000,
+  stalledInterval: generationTuning.stalledIntervalMs ?? 60_000,
+  maxStalledCount: generationTuning.maxStalledCount ?? 2
+}
 
 export const generationWorker = new Worker<GenerationJobData>(
   'code-generation',
   async (job: Job<GenerationJobData>) => {
-    const { projectId, prompt } = job.data
+    const { projectId, prompt, generationId, framework, language, model } = job.data
     const jobId = job.id || 'unknown'
     const maxAttempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1
     const currentAttempt = job.attemptsMade + 1
@@ -62,6 +86,9 @@ export const generationWorker = new Worker<GenerationJobData>(
         projectId,
         prompt,
         userId: job.data.userId,
+        framework,
+        language,
+        model,
         onProgress: updateProgress,
         jobId: jobId // Pass job ID for tracking
       })
@@ -76,6 +103,12 @@ export const generationWorker = new Worker<GenerationJobData>(
         { attempts: 2, backoff: { type: 'exponential', delay: 3000 }, removeOnComplete: true }
       )
 
+      await embeddingQueue.add(
+        'embed_generation',
+        { projectId, files: result.files },
+        { attempts: 2, backoff: { type: 'fixed', delay: 1000 }, removeOnComplete: true }
+      )
+
       // The snapshots before-create hook auto-increments version, copies R2 files,
       // and populates r2Prefix, files, totalSize, fileCount, createdAt from the DB.
       await app.service('snapshots').create({
@@ -85,7 +118,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       } as any)
 
       // Determine status based on warnings
-      const status = warnings.length > 0 ? 'ready' : 'ready'
+      const status = 'ready'
       const currentStage = warnings.length > 0 ? 'complete_with_warnings' : 'complete'
 
       await flushProgressPatch()
@@ -98,9 +131,31 @@ export const generationWorker = new Worker<GenerationJobData>(
           filesGenerated: result.fileCount,
           totalFiles: result.fileCount,
           completedAt: Date.now(),
+          stepMetrics: (result as any).stepMetrics || [],
           ...(warnings.length > 0 && { warnings })
         }
       } as any)
+
+      if (generationId) {
+        await app.service('generations').patch(generationId, {
+          status: warnings.length > 0 ? 'completed_with_warnings' : 'completed',
+          warningCount: warnings.length,
+          completedAt: Date.now(),
+          updatedAt: Date.now()
+        } as any)
+      }
+
+      app.channel(`projects/${projectId}`).send({
+        type: 'generation.completed',
+        payload: {
+          generationId,
+          projectId,
+          fileCount: result.fileCount,
+          stepMetrics: (result as any).stepMetrics || [],
+          warnings,
+          completedAt: Date.now()
+        }
+      })
 
       // Log warnings if any
       if (warnings.length > 0) {
@@ -166,6 +221,25 @@ export const generationWorker = new Worker<GenerationJobData>(
         }
       } as any)
 
+      if (generationId) {
+        await app.service('generations').patch(generationId, {
+          status: 'failed',
+          errorMessage: err.message,
+          failedAt: Date.now(),
+          updatedAt: Date.now()
+        } as any)
+      }
+
+      app.channel(`projects/${projectId}`).send({
+        type: 'generation.failed',
+        payload: {
+          generationId,
+          projectId,
+          errorMessage: err.message,
+          failedAt: Date.now()
+        }
+      })
+
       // Cleanup job resources
       await jobTracker.cancelJob(jobId)
 
@@ -177,7 +251,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       }
     }
   },
-  { connection: redisConnection as any, concurrency: 1 }
+  generationWorkerOptions
 )
 
 generationWorker.on('failed', (job, err) => {
@@ -206,4 +280,8 @@ generationWorker.on('failed', (job, err) => {
 generationWorker.on('completed', job => {
   const jobId = job?.id || 'unknown'
   logger.info('Generation job %s completed successfully', jobId)
+})
+
+generationWorker.on('stalled', jobId => {
+  logger.warn('Generation job stalled: id=%s', jobId)
 })

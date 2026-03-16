@@ -2,7 +2,6 @@ import { BadRequest, Forbidden, NotFound } from '@feathersjs/errors'
 import { rateLimit } from '../../hooks/rate-limit'
 import { ollamaClient } from '../../llm/ollama.client'
 import { logger } from '../../logger'
-import { generationQueue } from '../redis/queues/queues'
 
 export default function (app: any) {
   /**
@@ -39,20 +38,22 @@ export default function (app: any) {
         }
 
         const ollamaConfig = app.get('ollama')
+        const requestedModel =
+          project.model ||
+          ollamaConfig.roleModels?.generator ||
+          ollamaConfig.models?.fast ||
+          ollamaConfig.model
 
-        const job = await generationQueue.add(
-          'generate',
-          { projectId, prompt, userId, model: ollamaConfig.model },
-          {
-            attempts: 1,
-            removeOnComplete: false,
-            removeOnFail: false
-          }
-        )
+        const generation = await app.service('generations').create({
+          projectId,
+          prompt,
+          userId,
+          model: requestedModel
+        })
 
         await app.service('projects').patch(projectId, {
           status: 'generating',
-          jobId: job.id?.toString(),
+          jobId: generation.jobId?.toString?.() || generation.jobId,
           generationProgress: {
             percentage: 0,
             currentStage: 'Queued',
@@ -62,18 +63,28 @@ export default function (app: any) {
           }
         })
 
-        logger.info('Generation job enqueued %O', { projectId, userId, jobId: job.id })
+        logger.info('Generation job enqueued %O', {
+          projectId,
+          userId,
+          generationId: generation._id?.toString?.() || generation._id,
+          jobId: generation.jobId
+        })
 
-        return { jobId: job.id, status: 'generating' }
+        return {
+          generationId: generation._id?.toString?.() || generation._id,
+          jobId: generation.jobId,
+          status: 'generating'
+        }
       },
 
       async find(_params: any) {
         const healthy = await ollamaClient.healthCheck()
+        const ollamaConfig = app.get('ollama')
         return {
           service: 'ai-generator',
           status: healthy ? 'running' : 'degraded',
           ollama: { reachable: healthy },
-          model: app.get('ollama').model
+          model: ollamaConfig.roleModels?.generator || ollamaConfig.model
         }
       }
     })

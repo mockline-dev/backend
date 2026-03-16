@@ -72,20 +72,31 @@ export const architectureSchema = Type.Object(
         })
       )
     ),
+    summary: Type.Optional(Type.String()),
     updatedAt: Type.Number()
   },
   { $id: 'Architecture', additionalProperties: false }
 )
 export type Architecture = Static<typeof architectureSchema>
 export const architectureValidator = getValidator(architectureSchema, dataValidator)
-export const architectureResolver = resolve<ArchitectureQuery, HookContext<ArchitectureService>>({})
+export const architectureResolver = resolve<Architecture, HookContext<ArchitectureService>>({
+  // _id: async (value, architecture, context) => {
+  //   const paramsWithProjectId = context.params as (typeof context.params & { projectId?: unknown }) | undefined
+  //   const requestedProjectId = paramsWithProjectId?.projectId?.toString()
+  //   const architectureProjectId = architecture?.projectId?.toString()
+  //   if (requestedProjectId && architectureProjectId && architectureProjectId !== requestedProjectId) {
+  //     throw new Forbidden('You do not have permission to access this architecture.')
+  //   }
+  //   return value
+  // }
+})
 
 export const architectureExternalResolver = resolve<Architecture, HookContext<ArchitectureService>>({})
 
 // Schema for creating new entries
 export const architectureDataSchema = Type.Pick(
   architectureSchema,
-  ['projectId', 'services', 'models', 'relations', 'routes', 'updatedAt'],
+  ['projectId', 'services', 'models', 'relations', 'routes', 'summary', 'updatedAt'],
   {
     $id: 'ArchitectureData'
   }

@@ -12,6 +12,8 @@ interface ParsedProjectResponse {
 
 interface ParsedEnhancePromptResponse {
   enhancedPrompt: string
+  assumptions?: string[]
+  clarifications?: string[]
 }
 
 interface ParsedInferProjectMetaResponse {
@@ -197,16 +199,33 @@ export function determineFileType(filename: string, language?: string): string {
 
 export const parseEnhancePromptResponse = (jsonString: string): ParsedEnhancePromptResponse => {
   const result: ParsedEnhancePromptResponse = {
-    enhancedPrompt: ''
+    enhancedPrompt: '',
+    assumptions: [],
+    clarifications: []
   }
 
   try {
     const fenceMatch: RegExpMatchArray | null = jsonString.match(/```(?:json)?\s*([\s\S]*?)```/)
-    const clean: string = fenceMatch ? fenceMatch[1].trim() : jsonString.trim()
+    const fencedOrRaw: string = fenceMatch ? fenceMatch[1].trim() : jsonString.trim()
+    const jsonObjectMatch: RegExpMatchArray | null = fencedOrRaw.match(/\{[\s\S]*\}/)
+    const clean: string = jsonObjectMatch ? jsonObjectMatch[0] : fencedOrRaw
     const parsed = JSON.parse(clean)
     result.enhancedPrompt = parsed.enhancedPrompt || ''
+    if (Array.isArray(parsed.assumptions)) {
+      result.assumptions = parsed.assumptions.filter((item: unknown) => typeof item === 'string')
+    }
+    if (Array.isArray(parsed.clarifications)) {
+      result.clarifications = parsed.clarifications.filter((item: unknown) => typeof item === 'string')
+    }
   } catch (error) {
-    console.error('Failed to parse JSON enhance-prompt response:', error)
+    console.warn('Failed to parse JSON enhance-prompt response, using raw fallback text')
+    const fallback = jsonString
+      .replace(/```(?:json)?/gi, '')
+      .replace(/```/g, '')
+      .trim()
+    if (fallback) {
+      result.enhancedPrompt = fallback
+    }
   }
 
   return result

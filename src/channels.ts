@@ -64,6 +64,26 @@ export const channels = (app: Application) => {
     return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
   })
 
+  app.service('generations').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  app.service('agents').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  app.service('versions').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  app.service('deployments').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
   // Publish ai-stream events to project-scoped channels
   app.service('ai-stream').publish((data: any) => {
     return app.channel(`projects/${data.projectId}`)

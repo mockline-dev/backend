@@ -2,7 +2,13 @@ import { createBullBoard } from '@bull-board/api'
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
 import { KoaAdapter } from '@bull-board/koa'
 import { logger } from '../../../logger'
-import { generationQueue, validationQueue } from '../queues/queues'
+import {
+  agentQueue,
+  deploymentQueue,
+  embeddingQueue,
+  generationQueue,
+  validationQueue
+} from '../queues/queues'
 
 function basicAuth(ctx: any, next: any) {
   const auth = ctx.get('Authorization')
@@ -40,7 +46,13 @@ export async function initBullBoard(app: any) {
   serverAdapter.setBasePath('/admin/queues')
 
   createBullBoard({
-    queues: [new BullMQAdapter(generationQueue), new BullMQAdapter(validationQueue)],
+    queues: [
+      new BullMQAdapter(generationQueue),
+      new BullMQAdapter(validationQueue),
+      new BullMQAdapter(agentQueue),
+      new BullMQAdapter(embeddingQueue),
+      new BullMQAdapter(deploymentQueue)
+    ],
     serverAdapter
   })
 

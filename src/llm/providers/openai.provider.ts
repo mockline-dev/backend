@@ -1,101 +1,63 @@
-import config from 'config'
 import OpenAI from 'openai'
-import type { OllamaMessage, OllamaStreamChunk } from '../ollama.client'
-import type { ILLMProvider } from './base'
 
-/**
- * ILLMProvider implementation backed by the OpenAI API (or any OpenAI-compatible endpoint).
- *
- * Configure via config/default.json (or environment overrides):
- * {
- *   "openai": {
- *     "apiKey": "sk-...",
- *     "model": "gpt-4o-mini",
- *     "baseUrl": "https://api.openai.com/v1",   // optional — defaults to OpenAI
- *     "embedModel": "text-embedding-3-small"     // optional
- *   }
- * }
- */
-export class OpenAIProvider implements ILLMProvider {
-  private client: OpenAI
-  private model: string
-  private embedModel: string
+import type { LLMGenerateOptions, LLMMessage, LLMProvider, LLMStreamChunk } from './types'
 
-  constructor() {
-    const cfg = config.get<{
-      apiKey: string
-      model?: string
-      baseUrl?: string
-      embedModel?: string
-    }>('openai')
+export class OpenAIProvider implements LLMProvider {
+  id = 'openai'
 
-    this.client = new OpenAI({
-      apiKey: cfg.apiKey,
-      baseURL: cfg.baseUrl
-    })
-    this.model = cfg.model ?? 'gpt-4o-mini'
-    this.embedModel = cfg.embedModel ?? 'text-embedding-3-small'
-  }
+  private readonly client: OpenAI
+  private readonly defaultModel: string
 
-  async *chatStream(
-    messages: OllamaMessage[],
-    _tools?: object[],
-    options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
-  ): AsyncGenerator<OllamaStreamChunk> {
-    const openaiMessages = messages.map(m => ({
-      role: m.role as 'system' | 'user' | 'assistant',
-      content: m.content ?? ''
-    }))
-
-    const stream = await this.client.chat.completions.create({
-      model: this.model,
-      messages: openaiMessages,
-      stream: true,
-      temperature: options.temperature ?? 0.3,
-      top_p: options.top_p,
-      max_tokens: options.num_predict
-    })
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta
-      const done = chunk.choices[0]?.finish_reason != null
-
-      yield {
-        message: {
-          role: 'assistant',
-          content: delta?.content ?? ''
-        },
-        done,
-        eval_count: undefined,
-        prompt_eval_count: undefined
-      } as OllamaStreamChunk
-    }
+  constructor(apiKey: string, model: string) {
+    this.client = new OpenAI({ apiKey })
+    this.defaultModel = model
   }
 
   async generate(
     systemPrompt: string,
     userPrompt: string,
-    options: { temperature?: number; num_predict?: number; num_ctx?: number; top_p?: number } = {}
+    options: LLMGenerateOptions = {}
   ): Promise<string> {
     const response = await this.client.chat.completions.create({
-      model: this.model,
+      model: options.model || this.defaultModel,
+      temperature: options.temperature,
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: options.temperature ?? 0.3,
-      top_p: options.top_p,
-      max_tokens: options.num_predict
+        ...(systemPrompt?.trim() ? [{ role: 'system' as const, content: systemPrompt }] : []),
+        { role: 'user' as const, content: userPrompt }
+      ]
     })
-    return response.choices[0]?.message?.content?.trim() ?? ''
+
+    return response.choices[0]?.message?.content || ''
   }
 
-  async embed(text: string): Promise<number[]> {
-    const response = await this.client.embeddings.create({
-      model: this.embedModel,
-      input: text
+  async *chatStream(
+    messages: LLMMessage[],
+    model?: string,
+    options: LLMGenerateOptions = {}
+  ): AsyncGenerator<LLMStreamChunk> {
+    const response = await this.client.chat.completions.create({
+      model: model || options.model || this.defaultModel,
+      temperature: options.temperature,
+      messages,
+      stream: true
     })
-    return response.data[0].embedding
+
+    for await (const chunk of response) {
+      const content = chunk.choices[0]?.delta?.content || ''
+      if (!content) {
+        continue
+      }
+
+      yield {
+        message: { role: 'assistant', content },
+        done: false
+      }
+    }
+
+    yield {
+      message: { role: 'assistant', content: '' },
+      done: true
+    }
   }
 
   async healthCheck(): Promise<boolean> {

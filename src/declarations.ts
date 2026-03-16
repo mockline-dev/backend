@@ -23,6 +23,11 @@ export interface ServiceTypes {
   'validate-prompt': any
   'server-monitor': any
   models: any
+  generations: any
+  agents: any
+  versions: any
+  prompts: any
+  deployments: any
 }
 
 // The application instance type that will be used everywhere else

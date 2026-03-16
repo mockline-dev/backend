@@ -11,8 +11,10 @@ interface ValidatePromptResponse {
   isValid: boolean
   confidence: number
   category: string
+  complexity?: 'low' | 'medium' | 'high'
   reason: string
   suggestions?: string[]
+  missingAreas?: string[]
   error?: string
 }
 
@@ -68,11 +70,28 @@ export default function (app: any) {
         ]
         const hasBackendKeywords = backendKeywords.some(keyword => promptLower.includes(keyword))
 
+        const capabilityChecks = [
+          { label: 'authentication', test: /(auth|jwt|oauth|login|signup)/ },
+          { label: 'data modeling', test: /(database|schema|model|entity|migration)/ },
+          { label: 'validation', test: /(validation|validator|constraints)/ },
+          { label: 'error handling', test: /(error|exception|failure)/ },
+          { label: 'testing', test: /(test|testing|spec|unit|integration)/ }
+        ]
+
+        const missingAreas = capabilityChecks
+          .filter(check => !check.test.test(promptLower))
+          .map(check => check.label)
+
+        const complexityScore = capabilityChecks.length - missingAreas.length + (prompt.length > 600 ? 1 : 0)
+        const complexity: 'low' | 'medium' | 'high' =
+          complexityScore >= 5 ? 'high' : complexityScore >= 3 ? 'medium' : 'low'
+
         if (!hasBackendKeywords) {
           return {
             isValid: true,
             confidence: 0.6,
             category: 'general',
+            complexity,
             reason:
               'Prompt lacks specific backend/API keywords. The AI will generate a general FastAPI template.',
             suggestions: [
@@ -80,7 +99,8 @@ export default function (app: any) {
               'Specify authentication requirements (e.g., "JWT auth", "OAuth")',
               'Mention database models (e.g., "User model", "Product model")',
               'Include data validation requirements'
-            ]
+            ],
+            missingAreas
           }
         }
 
@@ -96,9 +116,11 @@ Respond in this exact JSON format:
 {
   "isValid": true/false,
   "confidence": 0.0-1.0,
+  "complexity": "low|medium|high",
   "category": "fastapi|rest-api|database|auth|general",
   "reason": "brief explanation",
-  "suggestions": ["optional suggestion 1", "optional suggestion 2"]
+  "suggestions": ["optional suggestion 1", "optional suggestion 2"],
+  "missingAreas": ["authentication", "validation"]
 }
 
 Keep the response concise and focused on backend development feasibility.`
@@ -119,8 +141,12 @@ Keep the response concise and focused on backend development feasibility.`
                 isValid: aiResult.isValid !== undefined ? aiResult.isValid : true,
                 confidence: aiResult.confidence || 0.8,
                 category: aiResult.category || 'general',
+                complexity: aiResult.complexity || complexity,
                 reason: aiResult.reason || 'AI validation completed',
-                suggestions: aiResult.suggestions || []
+                suggestions: aiResult.suggestions || [],
+                missingAreas: Array.isArray(aiResult.missingAreas)
+                  ? aiResult.missingAreas.filter((item: unknown) => typeof item === 'string')
+                  : missingAreas
               }
             }
           } catch (parseError) {
@@ -132,8 +158,10 @@ Keep the response concise and focused on backend development feasibility.`
             isValid: true,
             confidence: 0.7,
             category: this.categorizePrompt(promptLower),
+            complexity,
             reason: 'AI validation available, using basic validation',
-            suggestions: this.generateSuggestions(promptLower)
+            suggestions: this.generateSuggestions(promptLower),
+            missingAreas
           }
         } catch (aiError) {
           console.warn('AI validation unavailable, using basic validation:', aiError)
@@ -141,8 +169,10 @@ Keep the response concise and focused on backend development feasibility.`
             isValid: true,
             confidence: 0.6,
             category: this.categorizePrompt(promptLower),
+            complexity,
             reason: 'AI validation unavailable, using basic validation',
-            suggestions: this.generateSuggestions(promptLower)
+            suggestions: this.generateSuggestions(promptLower),
+            missingAreas
           }
         }
       } catch (error) {

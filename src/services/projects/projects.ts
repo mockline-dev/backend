@@ -1,5 +1,6 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.html
 import { authenticate } from '@feathersjs/authentication'
+import { BadRequest } from '@feathersjs/errors'
 
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
@@ -52,6 +53,28 @@ export const projects = (app: Application) => {
         async (context: HookContext) => {
           const { user } = context.params
           context.data.userId = user._id
+          const requestedLanguage = context.data.language
+          const requestedFramework = context.data.framework
+
+          if (requestedFramework && !['fast-api', 'feathers'].includes(requestedFramework)) {
+            throw new BadRequest('Supported frameworks are fast-api and feathers')
+          }
+
+          if (requestedLanguage && !['python', 'typescript'].includes(requestedLanguage)) {
+            throw new BadRequest('Supported languages are python and typescript')
+          }
+
+          const framework = requestedFramework || 'fast-api'
+          const language = requestedLanguage || (framework === 'feathers' ? 'typescript' : 'python')
+
+          const validCombination =
+            (framework === 'fast-api' && language === 'python') ||
+            (framework === 'feathers' && language === 'typescript')
+
+          if (!validCombination) {
+            throw new BadRequest('Valid stack combinations are fast-api/python and feathers/typescript')
+          }
+
           context.data.status = 'initializing'
           // Keep progress in the nested object to match the validated schema.
           context.data.generationProgress = {
@@ -60,8 +83,8 @@ export const projects = (app: Application) => {
             filesGenerated: 0,
             totalFiles: 0
           }
-          context.data.framework = context.data.framework || 'fast-api'
-          context.data.language = context.data.language || 'python'
+          context.data.framework = framework
+          context.data.language = language
           return context
         },
         schemaHooks.validateData(projectsDataValidator),
@@ -140,11 +163,12 @@ export const projects = (app: Application) => {
                 attempt++
 
                 // Check if error is retryable
-                const isRetryable = error.message?.includes('timeout') ||
-                                   error.message?.includes('network') ||
-                                   error.message?.includes('ECONN') ||
-                                   error.code === 'ECONNRESET' ||
-                                   error.code === 'ETIMEDOUT'
+                const isRetryable =
+                  error.message?.includes('timeout') ||
+                  error.message?.includes('network') ||
+                  error.message?.includes('ECONN') ||
+                  error.code === 'ECONNRESET' ||
+                  error.code === 'ETIMEDOUT'
 
                 if (!isRetryable || attempt >= maxRetries) {
                   // Non-retryable error or max retries reached
@@ -171,7 +195,9 @@ export const projects = (app: Application) => {
 
                 // Retry with exponential backoff
                 const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000)
-                console.warn(`Project ${projectId} generation failed, retrying in ${backoffDelay}ms (attempt ${attempt}/${maxRetries})`)
+                console.warn(
+                  `Project ${projectId} generation failed, retrying in ${backoffDelay}ms (attempt ${attempt}/${maxRetries})`
+                )
                 await new Promise(resolve => setTimeout(resolve, backoffDelay))
               }
             }

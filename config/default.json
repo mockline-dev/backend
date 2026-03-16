@@ -59,6 +59,29 @@
   "ollama": {
     "baseUrl": "http://localhost:11434",
     "model": "qwen2.5-coder:7b",
+    "models": {
+      "fast": "qwen2.5-coder:7b",
+      "smart": "phi3:mini"
+    },
+    "roleModels": {
+      "planner": "phi3:mini",
+      "generator": "qwen2.5-coder:7b",
+      "fixer": "deepseek-coder:6.7b",
+      "critic": "deepseek-coder:6.7b",
+      "utility": "qwen2.5:3b",
+      "intent": "qwen2.5:3b",
+      "reflection": "qwen2.5-coder:7b"
+    },
+    "fallbacks": {
+      "planner": ["phi3:mini", "qwen2.5:3b"],
+      "generator": ["qwen2.5-coder:7b", "deepseek-coder:6.7b"],
+      "fixer": ["deepseek-coder:6.7b", "qwen2.5-coder:7b"],
+      "critic": ["deepseek-coder:6.7b", "qwen2.5-coder:7b"],
+      "utility": ["qwen2.5:3b", "phi3:mini"],
+      "intent": ["qwen2.5:3b", "phi3:mini"],
+      "reflection": ["qwen2.5-coder:7b", "deepseek-coder:6.7b"]
+    },
+    "autoPullMissing": true,
     "numPredict": 16384,
     "numCtx": 32768,
     "temperature": 0.3,
@@ -93,6 +116,22 @@
             "delay": 0,
             "enabled": true
         }
+    },
+    "bullmq": {
+      "workers": {
+        "generation": {
+          "concurrency": 1,
+          "lockDurationMs": 300000,
+          "stalledIntervalMs": 60000,
+          "maxStalledCount": 2
+        },
+        "agent": {
+          "concurrency": 1,
+          "lockDurationMs": 300000,
+          "stalledIntervalMs": 60000,
+          "maxStalledCount": 2
+        }
+      }
     },
     "firebase": {
         "serviceAccountPath": "./config/firebase/mockline-1a0e0-firebase-adminsdk-fbsvc-3f81f63b5b.json"

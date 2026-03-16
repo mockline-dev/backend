@@ -1,11 +1,16 @@
+import { agents } from './agents/agents.service'
 import { architecture } from './architecture/architecture'
+import { deployments } from './deployments/deployments.service'
 import { files } from './files/files'
+import { generations } from './generations/generations.service'
 import { messages } from './messages/messages'
 import { models } from './models/models'
 import { projects } from './projects/projects'
+import { prompts } from './prompts/prompts.service'
 import { snapshots } from './snapshots/snapshots'
 import { uploads } from './uploads/uploads'
 import { users } from './users/users'
+import { versions } from './versions/versions.service'
 // For more information about this file see https://dove.feathersjs.com/guides/cli/application.html#configure-functions
 import type { Application } from '../declarations'
 import aiStreamService from './ai-service/ai-stream.service'
@@ -17,6 +22,11 @@ import fileStream from './files/file-stream.service'
 import serverMonitorService from './server-monitor/server-monitor.service'
 
 export const services = (app: Application) => {
+  app.configure(generations)
+  app.configure(agents)
+  app.configure(versions)
+  app.configure(prompts)
+  app.configure(deployments)
   app.configure(architecture)
   app.configure(snapshots)
   app.configure(files)

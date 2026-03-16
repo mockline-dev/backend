@@ -1,44 +1,75 @@
-import { ollamaClient, type OllamaMessage, type OllamaStreamChunk } from '../ollama.client'
-import type { ILLMProvider } from './base'
+import { Ollama } from 'ollama'
 
-/**
- * ILLMProvider implementation backed by the local OllamaClient.
- */
-export class OllamaProvider implements ILLMProvider {
-  async *chatStream(
-    messages: OllamaMessage[],
-    tools?: object[],
-    options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
-  ): AsyncGenerator<OllamaStreamChunk> {
-    yield* ollamaClient.chatStream(messages, tools, options)
+import type { LLMGenerateOptions, LLMMessage, LLMProvider, LLMStreamChunk } from './types'
+
+export class OllamaProvider implements LLMProvider {
+  id = 'ollama'
+
+  private readonly client: Ollama
+  private readonly defaultModel: string
+
+  constructor(baseUrl: string, model: string) {
+    this.client = new Ollama({ host: baseUrl })
+    this.defaultModel = model
   }
 
   async generate(
     systemPrompt: string,
     userPrompt: string,
-    options: { temperature?: number; num_predict?: number; num_ctx?: number; top_p?: number } = {}
+    options: LLMGenerateOptions = {}
   ): Promise<string> {
-    const messages: OllamaMessage[] = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ]
+    const response = await this.client.chat({
+      model: options.model || this.defaultModel,
+      messages: [
+        ...(systemPrompt?.trim() ? [{ role: 'system' as const, content: systemPrompt }] : []),
+        { role: 'user' as const, content: userPrompt }
+      ],
+      options: {
+        temperature: options.temperature,
+        top_p: options.top_p,
+        num_predict: options.num_predict,
+        num_ctx: options.num_ctx
+      },
+      stream: false
+    })
 
-    let result = ''
-    for await (const chunk of ollamaClient.chatStream(messages, undefined, {
-      temperature: options.temperature,
-      num_ctx: options.num_ctx ?? options.num_predict,
-      top_p: options.top_p
-    })) {
-      result += chunk.message.content
-    }
-    return result.trim()
+    return response.message.content
   }
 
-  async embed(text: string): Promise<number[]> {
-    return ollamaClient.embed(text)
+  async *chatStream(
+    messages: LLMMessage[],
+    model?: string,
+    options: LLMGenerateOptions = {}
+  ): AsyncGenerator<LLMStreamChunk> {
+    const stream = await this.client.chat({
+      model: model || options.model || this.defaultModel,
+      messages,
+      options: {
+        temperature: options.temperature,
+        top_p: options.top_p,
+        num_predict: options.num_predict,
+        num_ctx: options.num_ctx
+      },
+      stream: true
+    })
+
+    for await (const chunk of stream) {
+      yield {
+        message: {
+          role: 'assistant',
+          content: chunk.message.content || ''
+        },
+        done: Boolean(chunk.done)
+      }
+    }
   }
 
   async healthCheck(): Promise<boolean> {
-    return ollamaClient.healthCheck()
+    try {
+      await this.client.list()
+      return true
+    } catch {
+      return false
+    }
   }
 }

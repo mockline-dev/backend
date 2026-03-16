@@ -3,67 +3,95 @@ import { disallow } from 'feathers-hooks-common'
 import { getProvider } from '../../llm/providers/registry'
 import { parseEnhancePromptResponse } from '../../utils/parseMarkdown'
 
-const ENHANCE_PROMPT_SYSTEM = `You are an expert software prompt engineer specialized in preparing high-quality prompts for coding AI models such as Qwen-Coder.
+const ENHANCE_PROMPT_SYSTEM = `You are a senior backend solution architect and prompt engineer.
 
-Your task is to transform the user’s raw prompt into a clear, professional, and technically detailed prompt that enables Qwen-Coder to generate accurate and high-quality code.
+Your job is to transform a raw user request into a professional, implementation-ready backend prompt for code generation.
 
-### OBJECTIVE
-Improve the user's prompt by making it precise, structured, and complete while preserving the original intent.
+Enhancement rules:
+1) Preserve user intent exactly; do not invent product scope that user did not ask for.
+2) Use framework and language as hard constraints.
+3) Expand requirements into a practical backend specification covering:
+   - domain entities and data expectations
+   - API behavior and route responsibilities
+   - validation and error-handling standards
+   - project structure and modular boundaries
+   - test expectations and quality constraints
+4) If the request is ambiguous, proceed with best-practice assumptions and list them explicitly.
+5) Keep output actionable and professional.
 
-### WHAT YOU MUST DO
-1. Analyze the user's prompt carefully.
-2. Identify missing technical details, ambiguities, or vague instructions.
-3. Rewrite the prompt so it is clear, professional, and optimized for a coding AI.
-4. Expand the prompt with relevant technical context when necessary.
-5. Ensure the prompt contains enough details for deterministic code generation.
+Output rules:
+- Return ONLY valid JSON (no markdown).
+- Required shape:
+{
+  "enhancedPrompt": "string",
+  "assumptions": ["string"],
+  "clarifications": ["string"]
+}`
 
-### WHEN IMPROVING THE PROMPT
-Include relevant information such as:
-- Programming language(s)
-- Frameworks or libraries
-- Expected architecture or structure
-- Input and output formats
-- Edge cases and constraints
-- Performance considerations
-- File structure if relevant
-- API design or data models if applicable
-- Error handling expectations
-- Best practices and coding standards
+type EnhancePromptInput = {
+  userPrompt: string
+  framework?: 'fast-api' | 'feathers'
+  language?: 'python' | 'typescript'
+}
 
-### PROMPT QUALITY REQUIREMENTS
-The improved prompt should:
-- Be precise and unambiguous
-- Be structured and easy for an AI model to follow
-- Include explicit requirements and constraints
-- Avoid unnecessary explanations
-- Focus on generating high-quality code
-
-### OUTPUT FORMAT (STRICT)
-Return ONLY a valid JSON object using the format below:
-
-{"enhancedPrompt": "[Improved, structured, and detailed version of the user's prompt]"}
-
-Do not include explanations, comments, markdown code fences, or any text outside the JSON object.`
+type EnhancePromptOutput = {
+  enhancedPrompt: string
+  assumptions: string[]
+  clarifications: string[]
+}
 
 export default function (app: any) {
   app.use('/enhance-prompt', {
-    async create(data: { userPrompt: string }) {
-      const { userPrompt } = data
-      if (userPrompt.length < 100) {
-        throw new Error('Prompt is too short. Minimum length is 100 characters.')
+    async create(data: EnhancePromptInput): Promise<EnhancePromptOutput> {
+      const { userPrompt, framework, language } = data
+      if (!userPrompt || typeof userPrompt !== 'string') {
+        throw new Error('Prompt is required and must be a string.')
+      }
+
+      if (userPrompt.trim().length < 20) {
+        throw new Error('Prompt is too short. Minimum length is 20 characters.')
       }
 
       try {
+        const enhancementInput = [
+          `Framework: ${framework || 'not specified'}`,
+          `Language: ${language || 'not specified'}`,
+          'Behavior mode: auto-enhance with explicit assumptions when details are missing.',
+          'Write the enhanced prompt as a detailed implementation specification that remains concise and directly actionable.',
+          'User prompt:',
+          userPrompt
+        ].join('\n')
+
         const ollamaConfig = app.get('ollama')
         const provider = getProvider()
-        const aiResponse = await provider.generate(ENHANCE_PROMPT_SYSTEM, userPrompt, {
-          temperature: 0.7,
+        const aiResponse = await provider.generate(ENHANCE_PROMPT_SYSTEM, enhancementInput, {
+          model: ollamaConfig.roleModels?.utility || ollamaConfig.models?.fast || ollamaConfig.model,
+          temperature: 0.35,
           num_predict: ollamaConfig.numPredict,
           num_ctx: ollamaConfig.numCtx,
           top_p: ollamaConfig.topP
         })
         const parsedResponse = parseEnhancePromptResponse(aiResponse)
-        return parsedResponse
+
+        if (!parsedResponse.enhancedPrompt || parsedResponse.enhancedPrompt.trim().length === 0) {
+          return {
+            enhancedPrompt: [
+              `Build a production-ready backend using framework ${framework || 'as requested'} and language ${language || 'as requested'}.`,
+              'Preserve user scope, define domain models, implement clean route/service separation, add validation, and include test coverage for core flows.',
+              `Original user request:\n${userPrompt}`
+            ].join('\n\n'),
+            assumptions: [
+              'Using standard project structure and best-practice defaults due to incomplete constraints.'
+            ],
+            clarifications: ['Specify authentication type', 'Specify storage/database preference']
+          }
+        }
+
+        return {
+          enhancedPrompt: parsedResponse.enhancedPrompt.trim(),
+          assumptions: parsedResponse.assumptions || [],
+          clarifications: parsedResponse.clarifications || []
+        }
       } catch (error) {
         console.error('Error enhancing prompt:', error)
         throw new Error('Failed to enhance prompt. Please try again later.')
@@ -76,8 +104,12 @@ export default function (app: any) {
       all: [authenticate('jwt')],
       create: [
         async (context: any) => {
-          const { userPrompt } = context.data
-          console.log('Received prompt for enhancement:', userPrompt)
+          const { userPrompt, framework, language } = context.data
+          console.log('Received prompt for enhancement:', {
+            userPrompt,
+            framework,
+            language
+          })
           return context
         }
       ],

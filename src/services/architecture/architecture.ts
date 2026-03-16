@@ -1,4 +1,5 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.html
+import { BadRequest } from '@feathersjs/errors'
 
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
@@ -40,13 +41,44 @@ export const architecture = (app: Application) => {
     },
     before: {
       all: [
-        disallow('external'),
         schemaHooks.validateQuery(architectureQueryValidator),
         schemaHooks.resolveQuery(architectureQueryResolver)
       ],
-      find: [],
-      get: [],
+      find: [
+        async context => {
+          if (!context.params.provider) {
+            return context
+          }
+
+          const projectId = context.params.query?.projectId?.toString?.()
+          if (!projectId) {
+            throw new BadRequest('projectId query parameter is required')
+          }
+
+          context.params.query = {
+            ...context.params.query,
+            projectId
+          }
+
+          return context
+        }
+      ],
+      get: [
+        async context => {
+          if (!context.params.provider) {
+            return context
+          }
+
+          return context
+        }
+      ],
       create: [
+        async context => {
+          const { data } = context
+          console.log('====================================')
+          console.log(data)
+          console.log('====================================')
+        },
         schemaHooks.validateData(architectureDataValidator),
         schemaHooks.resolveData(architectureDataResolver)
       ],
@@ -54,7 +86,7 @@ export const architecture = (app: Application) => {
         schemaHooks.validateData(architecturePatchValidator),
         schemaHooks.resolveData(architecturePatchResolver)
       ],
-      remove: []
+      remove: [disallow('external')]
     },
     after: {
       all: []

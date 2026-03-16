@@ -1,140 +1,104 @@
 import config from 'config'
+import { Ollama } from 'ollama'
 
-export interface OllamaMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string
-  tool_calls?: OllamaToolCall[]
-  tool_call_id?: string
-  name?: string
-}
+import { logger } from '../logger'
+import { OllamaProvider } from './providers/ollama.provider'
 
-export interface OllamaToolCall {
-  id: string
-  type: 'function'
-  function: { name: string; arguments: string }
-}
+type OllamaRole = 'planner' | 'generator' | 'fixer' | 'critic' | 'utility' | 'intent' | 'reflection'
 
-export interface OllamaStreamChunk {
-  message: {
-    role: string
-    content: string
-    tool_calls?: OllamaToolCall[]
+class OllamaClient {
+  private provider: OllamaProvider
+  private client: Ollama
+  private readonly baseUrl: string
+  private readonly config: {
+    model: string
+    roleModels?: Partial<Record<OllamaRole, string>>
+    fallbacks?: Partial<Record<OllamaRole, string[]>>
+    autoPullMissing?: boolean
   }
-  done: boolean
-  eval_count?: number
-  prompt_eval_count?: number
-}
-
-export class OllamaClient {
-  private baseUrl: string
-  private model: string
-  private timeout: number
 
   constructor() {
-    const ollamaConfig = config.get<{ baseUrl: string; model: string; timeout: number }>('ollama')
-    this.baseUrl = ollamaConfig.baseUrl ?? 'http://localhost:11434'
-    this.model = ollamaConfig.model
-    this.timeout = ollamaConfig.timeout ?? 120000
-  }
+    const ollama = config.get<{
+      baseUrl?: string
+      model: string
+      roleModels?: Partial<Record<OllamaRole, string>>
+      fallbacks?: Partial<Record<OllamaRole, string[]>>
+      autoPullMissing?: boolean
+    }>('ollama')
 
-  async *chatStream(
-    messages: OllamaMessage[],
-    tools?: object[],
-    options: { temperature?: number; num_ctx?: number; num_predict?: number; top_p?: number } = {}
-  ): AsyncGenerator<OllamaStreamChunk> {
-    const controller = new AbortController()
-    const idleTimeout = this.timeout
-    let timer: NodeJS.Timeout | undefined
-    let lastChunkAt = Date.now()
-    let chunksReceived = 0
-
-    const refreshIdleTimer = () => {
-      if (!idleTimeout || idleTimeout <= 0) {
-        return
-      }
-      if (timer) {
-        clearTimeout(timer)
-      }
-      lastChunkAt = Date.now()
-      timer = setTimeout(() => controller.abort(), idleTimeout)
-    }
-
-    refreshIdleTimer()
-
-    try {
-      const response = await fetch(`${this.baseUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: this.model,
-          messages,
-          tools: tools || [],
-          stream: true,
-          options: {
-            temperature: options.temperature ?? 0.15,
-            num_ctx: options.num_ctx ?? 8192,
-            num_predict: options.num_predict,
-            top_p: options.top_p ?? 0.9,
-            repeat_penalty: 1.1,
-            stop: ['```\n\n```']
-          }
-        })
-      })
-
-      if (!response.ok) {
-        const body = await response.text()
-        throw new Error(`Ollama API error ${response.status}: ${body}`)
-      }
-
-      const reader = response.body!.getReader()
-      const decoder = new TextDecoder()
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        refreshIdleTimer()
-        chunksReceived += 1
-        const text = decoder.decode(value, { stream: true })
-        for (const line of text.split('\n').filter(l => l.trim())) {
-          try {
-            yield JSON.parse(line) as OllamaStreamChunk
-          } catch {
-            /* partial line — skip */
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        const idleDuration = Date.now() - lastChunkAt
-        throw new Error(
-          `Ollama request aborted after ${idleTimeout}ms inactivity (chunks=${chunksReceived}, idle=${idleDuration}ms). Increase ollama.timeout or use a faster model.`
-        )
-      }
-      throw err
-    } finally {
-      if (timer) {
-        clearTimeout(timer)
-      }
-    }
-  }
-
-  async embed(text: string): Promise<number[]> {
-    const res = await fetch(`${this.baseUrl}/api/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text', prompt: text })
-    })
-    if (!res.ok) throw new Error(`Embed error: ${res.statusText}`)
-    return (await res.json()).embedding
+    this.baseUrl = ollama.baseUrl || 'http://localhost:11434'
+    this.config = ollama
+    this.provider = new OllamaProvider(this.baseUrl, ollama.model)
+    this.client = new Ollama({ host: this.baseUrl })
   }
 
   async healthCheck(): Promise<boolean> {
+    return this.provider.healthCheck()
+  }
+
+  resolveRoleModel(role: OllamaRole): { primary: string; candidates: string[] } {
+    const roleModels = this.config.roleModels || {}
+    const fallbacks = this.config.fallbacks || {}
+
+    const primary = roleModels[role] || this.config.model
+    const candidates = [primary, ...(fallbacks[role] || []), this.config.model].filter(Boolean)
+
+    return {
+      primary,
+      candidates: Array.from(new Set(candidates))
+    }
+  }
+
+  async ensureModelAvailable(primary: string, fallbackCandidates: string[] = []): Promise<string> {
+    const candidates = Array.from(new Set([primary, ...fallbackCandidates].filter(Boolean)))
+
+    if (candidates.length === 0) {
+      throw new Error('No Ollama model candidates provided')
+    }
+
+    const installed = await this.getInstalledModels()
+    const installedSet = new Set(installed)
+
+    for (const candidate of candidates) {
+      if (installedSet.has(candidate)) {
+        return candidate
+      }
+    }
+
+    if (this.config.autoPullMissing === false) {
+      return primary
+    }
+
+    for (const candidate of candidates) {
+      try {
+        logger.info('Ollama pull started for model=%s', candidate)
+        await this.client.pull({ model: candidate, stream: false })
+        logger.info('Ollama pull completed for model=%s', candidate)
+        return candidate
+      } catch (error: any) {
+        logger.warn('Failed pulling Ollama model %s: %s', candidate, error?.message || 'unknown error')
+      }
+    }
+
+    throw new Error(`Unable to resolve any Ollama model from candidates: ${candidates.join(', ')}`)
+  }
+
+  async ensureRoleModelsAvailable(
+    roles: OllamaRole[] = ['planner', 'generator', 'fixer', 'critic', 'utility']
+  ) {
+    for (const role of roles) {
+      const resolved = this.resolveRoleModel(role)
+      await this.ensureModelAvailable(resolved.primary, resolved.candidates)
+    }
+  }
+
+  private async getInstalledModels(): Promise<string[]> {
     try {
-      const res = await fetch(`${this.baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) })
-      return res.ok
-    } catch {
-      return false
+      const list = await this.client.list()
+      return (list.models || []).map(item => item.model).filter(Boolean)
+    } catch (error: any) {
+      logger.warn('Unable to list Ollama models: %s', error?.message || 'unknown error')
+      return []
     }
   }
 }

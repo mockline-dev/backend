@@ -6,6 +6,9 @@ import { initBullBoard } from './monitor/monitor'
 
 let generationWorker: Worker | null = null
 let validationWorker: Worker | null = null
+let agentWorker: Worker | null = null
+let embeddingWorker: Worker | null = null
+let deploymentWorker: Worker | null = null
 let started = false
 
 export async function startWorkerService(app: any) {
@@ -17,8 +20,14 @@ export async function startWorkerService(app: any) {
 
     const generationModule = await import('./worker/generation.worker')
     const validationModule = await import('./worker/validation.worker')
+    const agentModule = await import('./worker/agent.worker')
+    const embeddingModule = await import('./worker/embedding.worker')
+    const deploymentModule = await import('./worker/deployment.worker')
     generationWorker = generationModule.generationWorker
     validationWorker = validationModule.validationWorker
+    agentWorker = agentModule.agentWorker
+    embeddingWorker = embeddingModule.embeddingWorker
+    deploymentWorker = deploymentModule.deploymentWorker
 
     await initBullBoard(app)
     started = true
@@ -40,6 +49,21 @@ export async function stopWorkerService() {
     if (validationWorker) {
       await validationWorker.close()
       validationWorker = null
+    }
+
+    if (agentWorker) {
+      await agentWorker.close()
+      agentWorker = null
+    }
+
+    if (embeddingWorker) {
+      await embeddingWorker.close()
+      embeddingWorker = null
+    }
+
+    if (deploymentWorker) {
+      await deploymentWorker.close()
+      deploymentWorker = null
     }
 
     await closeRedisClient()
