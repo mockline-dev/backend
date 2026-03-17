@@ -52,6 +52,7 @@ export const architectureSchema = Type.Object(
         type: Type.Union([
           Type.Literal('one-to-many'),
           Type.Literal('many-to-many'),
+          Type.Literal('many-to-one'),
           Type.Literal('one-to-one')
         ])
       })
@@ -84,7 +85,9 @@ export const architectureExternalResolver = resolve<Architecture, HookContext<Ar
 // Schema for creating new entries
 export const architectureDataSchema = Type.Pick(
   architectureSchema,
-  ['projectId', 'services', 'models', 'relations', 'routes', 'updatedAt'],
+  // serviceDependencies is optional but included so the pipeline spread does not
+  // trigger a validation error when the extractor populates it.
+  ['projectId', 'services', 'models', 'relations', 'routes', 'serviceDependencies', 'updatedAt'],
   {
     $id: 'ArchitectureData'
   }

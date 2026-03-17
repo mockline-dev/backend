@@ -1,6 +1,7 @@
-import { logger } from '../../logger'
-import { getProvider } from '../../llm/providers/registry'
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
+import { getProvider } from '../../llm/providers/registry'
+import { logger } from '../../logger'
+import { DependencyAnalyzer, type DependencyGraph } from './dependency-analyzer'
 import type { IntentSchema } from './intent-analyzer'
 
 export interface TaskPlan {
@@ -14,6 +15,8 @@ const REQUIRED_FASTAPI_FILES: TaskPlan[] = [
 ]
 
 export class TaskPlanner {
+  private dependencyAnalyzer = new DependencyAnalyzer()
+
   async plan(prompt: string, schema: IntentSchema): Promise<TaskPlan[]> {
     logger.debug('TaskPlanner: planning file structure for project "%s"', schema.projectName)
 
@@ -46,7 +49,16 @@ export class TaskPlanner {
       throw new Error('TaskPlanner: file plan is empty')
     }
 
-    return this.ensureRequiredFiles(normalized)
+    // Ensure required files
+    let plan = this.ensureRequiredFiles(normalized)
+
+    // Build dependency graph and order files
+    const graph = this.dependencyAnalyzer.analyzeDependencies(plan, schema)
+    const orderedPlan = this.dependencyAnalyzer.getOrderedFiles(graph, plan)
+
+    logger.debug('TaskPlanner: ordered %d files with dependency awareness', orderedPlan.length)
+
+    return orderedPlan
   }
 
   private ensureRequiredFiles(plan: TaskPlan[]): TaskPlan[] {
@@ -59,6 +71,13 @@ export class TaskPlanner {
       }
     }
     return result
+  }
+
+  /**
+   * Returns the dependency graph for external use (e.g., by file generator).
+   */
+  getDependencyGraph(plan: TaskPlan[], schema: IntentSchema): DependencyGraph {
+    return this.dependencyAnalyzer.analyzeDependencies(plan, schema)
   }
 }
 

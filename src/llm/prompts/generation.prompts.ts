@@ -244,6 +244,29 @@ Strict requirements:
 - Add robust error handling, clear exceptions, and practical logging.
 - Keep code concise but complete; avoid placeholders or TODOs.
 - If context files are provided, integrate with them and avoid duplicate/conflicting definitions.
+
+CRITICAL - Python Class Naming Rule:
+- Python filenames are snake_case (e.g. shopping_cart.py, order_item.py).
+- Python CLASS names in those files MUST be PascalCase matching the entity schema name exactly.
+- The conversion rule: remove underscores and capitalize each word segment.
+  ✓ shopping_cart.py   → class ShoppingCart(Base)     NOT class Shopping_cart
+  ✓ order_item.py      → class OrderItem(Base)         NOT class Order_item
+  ✓ user_profile.py    → class UserProfile(Base)       NOT class User_profile
+- This rule applies to SQLAlchemy models, Pydantic schemas, service classes, and all other classes.
+- Schema Pydantic classes follow the same pattern: ShoppingCartBase, ShoppingCartCreate, ShoppingCartUpdate, ShoppingCartResponse.
+
+CRITICAL - Python Import Guidelines:
+- Standard library imports (typing, datetime, os, sys, etc.) are NOT file references - they are Python built-in modules
+- Third-party imports (fastapi, pydantic, sqlalchemy, etc.) are NOT file references - they are installed packages
+- Type annotations like List, Dict, Optional, EmailStr, Session are from typing/pydantic, NOT files
+- Only project-local imports (app.models.*, app.services.*, app.schemas.*) reference actual project files
+- NEVER treat import statements as file references - imports are module names, not file paths
+- Examples:
+  ✓ from typing import List, Optional  (Correct - standard library)
+  ✓ from pydantic import BaseModel, EmailStr  (Correct - third-party package)
+  ✓ from app.models.user import User  (Correct - project file)
+  ✗ from List import ...  (WRONG - List is a type, not a module)
+  ✗ from EmailStr import ...  (WRONG - EmailStr is a type from pydantic, not a file)
 `,
 
   generateFileUserPrompt: (
@@ -253,7 +276,9 @@ Strict requirements:
     context: { path: string; content: string }[],
     existingFiles?: { path: string; content: string }[],
     memoryBlock?: string,
-    relationships?: any[]
+    relationships?: any[],
+    contextBlock?: string,
+    projectManifest?: string
   ): string => `
 Generate the complete content for file: ${file.path}
 Purpose: ${file.description}
@@ -261,7 +286,13 @@ Purpose: ${file.description}
 Project prompt:
 ${prompt}
 
-Schema JSON:
+${
+  projectManifest
+    ? `${projectManifest}
+
+`
+    : ''
+}Schema JSON:
 ${JSON.stringify(schema)}
 
 ${memoryBlock ? `Memory context:\n${memoryBlock}\n` : ''}
@@ -273,7 +304,32 @@ ${
 }
 ${
   context.length > 0
-    ? `Previously generated files:\n${context.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}\n`
+    ? `Dependency files:\n${context.map(c => `=== ${c.path} ===\n${c.content}`).join('\n\n')}\n`
+    : ''
+}
+${contextBlock ? `Context Block:\n${contextBlock}\n` : ''}
+
+CRITICAL - Python Import Guidelines:
+- Standard library imports (typing, datetime, os, sys, etc.) are NOT file references
+- Third-party imports (fastapi, pydantic, sqlalchemy, etc.) are NOT file references
+- Type annotations like List, Dict, Optional, EmailStr, Session are from typing/pydantic, NOT files
+- Only project-local imports (app.models.*, app.services.*, app.schemas.*) reference actual project files
+- NEVER treat import statements as file references - imports are module names, not file paths
+- Common imports you should use:
+  * from typing import List, Optional, Dict, Any
+  * from datetime import datetime, date, time, timedelta
+  * from pydantic import BaseModel, Field, EmailStr, validator
+  * from fastapi import APIRouter, Depends, HTTPException, status
+  * from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, relationship
+  * from sqlalchemy.orm import Session, declarative_base
+${
+  projectManifest
+    ? `
+IMPORT CONSISTENCY RULE:
+- When importing from any project file listed in the PROJECT FILE MANIFEST above, use ONLY the
+  exact names shown in its [exports] annotation.
+- If a file has no [exports] annotation, it has no public API conventions yet — use standard patterns.
+- This is MANDATORY. Inventing class or function names not in the manifest will break the project.`
     : ''
 }
 

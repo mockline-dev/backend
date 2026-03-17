@@ -2,6 +2,8 @@ import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
 import { getProvider } from '../../llm/providers/registry'
 import { logger } from '../../logger'
 import type { ContextRetriever } from '../rag/retriever'
+import type { ContextBuilder, FileContext } from './context-builder'
+import type { DependencyGraph } from './dependency-analyzer'
 import type { IntentSchema } from './intent-analyzer'
 import type { Relationship } from './schema-validator'
 import type { TaskPlan } from './task-planner'
@@ -23,14 +25,27 @@ export interface FileGeneratorOptions {
   memoryBlock?: string
   /** Validated relationships between entities for proper foreign key implementation */
   relationships?: Relationship[]
+  /** Pre-built global context for all files */
+  globalContext?: Map<string, FileContext>
+  /** Dependency graph for the project */
+  dependencyGraph?: DependencyGraph
+  /** Context builder for generating context blocks */
+  contextBuilder?: ContextBuilder
+  /**
+   * Full ordered task plan for all project files.
+   * Injected into every prompt as a manifest so generators know the complete
+   * file list and avoid inventing imports that don't exist.
+   */
+  plan?: TaskPlan[]
 }
 
 export class FileGenerator {
   /**
-   * Generates all files sequentially.
-   * - Rolling context: last 3 files generated in this session.
-   * - RAG context: up to 3 existing project files relevant to the current task (when retriever provided).
-   * - Memory block: project stack/style/history injected into every prompt.
+   * Generates all files with dependency-aware context.
+   * - Full dependency context: all files this file depends on
+   * - RAG context: up to 3 existing project files relevant to the current task (when retriever provided)
+   * - Memory block: project stack/style/history injected into every prompt
+   * - Architecture hints: pre-built context about file types and relationships
    */
   async generateAll(
     prompt: string,
@@ -56,12 +71,6 @@ export class FileGenerator {
         parallelismForStage(stage)
       )
 
-      const stableContext = [...generatedByIndex.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([, file]) => file)
-        .slice(-3)
-      const compactStableContext = compactGeneratedContext(stableContext)
-
       let nextTaskCursor = 0
       const workerCount = Math.min(parallelismForStage(stage), stageTasks.length)
       const stageWorkers = Array.from({ length: workerCount }, async () => {
@@ -80,31 +89,10 @@ export class FileGenerator {
 
           await onProgress(progressIndex, plan.length, task.path)
 
-          // Fetch semantically relevant existing project files (RAG)
-          let existingFiles: { path: string; content: string }[] = []
-          if (options.retriever && options.projectId) {
-            try {
-              existingFiles = await options.retriever.getRelevantFiles(
-                options.projectId,
-                `${task.path}: ${task.description}`,
-                3
-              )
-            } catch (err: any) {
-              logger.warn('FileGenerator: RAG retrieval failed for %s: %s', task.path, err.message)
-            }
-          }
+          // Build comprehensive context for this file
+          const generationContext = await this.buildGenerationContext(task, generatedByIndex, options)
 
-          const compactExistingFiles = compactExternalContext(existingFiles)
-
-          const content = await this.generateOne(
-            prompt,
-            schema,
-            task,
-            compactStableContext,
-            compactExistingFiles,
-            compactMemoryBlock(options.memoryBlock),
-            options.relationships
-          )
+          const content = await this.generateOne(prompt, schema, task, generationContext)
 
           generatedByIndex.set(index, { path: task.path, content })
 
@@ -125,14 +113,81 @@ export class FileGenerator {
     return [...generatedByIndex.entries()].sort((a, b) => a[0] - b[0]).map(([, file]) => file)
   }
 
+  /**
+   * Builds comprehensive generation context for a file.
+   * Combines dependency context, RAG context, memory, architecture hints, and
+   * a full project manifest so each generator knows ALL files being created.
+   */
+  private async buildGenerationContext(
+    task: TaskPlan,
+    generatedFiles: Map<number, GeneratedFile>,
+    options: FileGeneratorOptions
+  ): Promise<{
+    dependencies: GeneratedFile[]
+    existingFiles: { path: string; content: string }[]
+    memoryBlock?: string
+    contextBlock?: string
+    relationships?: Relationship[]
+    projectManifest?: string
+  }> {
+    // Get dependency context (all files this file depends on)
+    const dependencyPaths = options.dependencyGraph?.nodes.get(task.path)?.dependencies || []
+    const dependencies = dependencyPaths
+      .map(path => {
+        const generatedFile = Array.from(generatedFiles.values()).find(f => f.path === path)
+        return generatedFile ? { path, content: generatedFile.content } : null
+      })
+      .filter((f): f is { path: string; content: string } => f !== null)
+
+    // Fetch semantically relevant existing project files (RAG)
+    let existingFiles: { path: string; content: string }[] = []
+    if (options.retriever && options.projectId) {
+      try {
+        existingFiles = await options.retriever.getRelevantFiles(
+          options.projectId,
+          `${task.path}: ${task.description}`,
+          3
+        )
+      } catch (err: any) {
+        logger.warn('FileGenerator: RAG retrieval failed for %s: %s', task.path, err.message)
+      }
+    }
+
+    // Get context block for this file (dependency API surface + relationships)
+    let contextBlock: string | undefined
+    if (options.globalContext && options.contextBuilder) {
+      const fileContext = options.globalContext.get(task.path)
+      if (fileContext) {
+        contextBlock = options.contextBuilder.getContextBlock(fileContext, options.globalContext)
+      }
+    }
+
+    // Build compact project manifest (all planned files with one-line descriptions)
+    // This lets every generator know the FULL set of files and avoid inventing imports.
+    const projectManifest = options.plan ? buildProjectManifest(options.plan, options.globalContext) : undefined
+
+    return {
+      dependencies,
+      existingFiles,
+      memoryBlock: options.memoryBlock,
+      contextBlock,
+      relationships: options.relationships,
+      projectManifest
+    }
+  }
+
   private async generateOne(
     prompt: string,
     schema: IntentSchema,
     task: TaskPlan,
-    context: GeneratedFile[],
-    existingFiles: { path: string; content: string }[] = [],
-    memoryBlock?: string,
-    relationships?: Relationship[]
+    context: {
+      dependencies: GeneratedFile[]
+      existingFiles: { path: string; content: string }[]
+      memoryBlock?: string
+      contextBlock?: string
+      relationships?: Relationship[]
+      projectManifest?: string
+    }
   ): Promise<string> {
     const provider = getProvider()
     const maxAttempts = 4
@@ -154,10 +209,12 @@ export class FileGenerator {
                 prompt,
                 schema,
                 task,
-                context,
-                existingFiles,
-                memoryBlock,
-                relationships
+                context.dependencies,
+                context.existingFiles,
+                context.memoryBlock,
+                context.relationships,
+                context.contextBlock,
+                context.projectManifest
               )
             }
           ],
@@ -342,4 +399,37 @@ function stripFences(text: string): string {
     .replace(/^```[\w]*\n/, '')
     .replace(/\n```$/, '')
     .trim()
+}
+
+/**
+ * Builds a compact project manifest string listing every planned file's path,
+ * one-line description, and expected exports (derived from the global context).
+ * Injected into every generation prompt so the LLM knows about the full project
+ * without having to see every file's content — keeps token cost low.
+ *
+ * Format:
+ *   app/models/user.py — SQLAlchemy model for User  [exports: User]
+ *   app/schemas/user.py — Pydantic schemas for User  [exports: UserBase, UserCreate, UserUpdate, UserResponse]
+ *   ...
+ */
+function buildProjectManifest(
+  plan: TaskPlan[],
+  globalContext?: Map<string, import('./context-builder').FileContext>
+): string {
+  const lines: string[] = ['PROJECT FILE MANIFEST (all files in this project):']
+
+  for (const task of plan) {
+    const ctx = globalContext?.get(task.path)
+    const exportsStr =
+      ctx && ctx.exportsProvided.length > 0 ? `  [exports: ${ctx.exportsProvided.join(', ')}]` : ''
+    lines.push(`  ${task.path} — ${task.description}${exportsStr}`)
+  }
+
+  lines.push(
+    '',
+    'CRITICAL: When importing from any file in this manifest, use ONLY the names listed in its [exports] annotation.',
+    'Do NOT invent class or function names that are not in the manifest.'
+  )
+
+  return lines.join('\n')
 }

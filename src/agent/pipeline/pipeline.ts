@@ -5,6 +5,7 @@ import { ProjectMemory } from '../memory/project-memory'
 import { ContextRetriever } from '../rag/retriever'
 import { validateGeneratedFiles } from '../validation/validator'
 import { ArchitectureExtractor } from './architecture-extractor'
+import { ContextBuilder } from './context-builder'
 import { CrossFileValidator } from './cross-file-validator'
 import { FileGenerator, type GeneratedFile } from './file-generator'
 import { IntentAnalyzer } from './intent-analyzer'
@@ -32,6 +33,7 @@ export class GenerationPipeline {
   private taskPlanner = new TaskPlanner()
   private fileGenerator = new FileGenerator()
   private crossFileValidator = new CrossFileValidator()
+  private contextBuilder = new ContextBuilder()
   private memory: ProjectMemory
   private retriever: ContextRetriever
 
@@ -146,6 +148,17 @@ export class GenerationPipeline {
       projectId
     )
 
+    // Build dependency graph and global context
+    const dependencyGraph = this.taskPlanner.getDependencyGraph(plan, schema)
+    const globalContext = this.contextBuilder.buildGlobalContext(
+      plan,
+      schema,
+      validationResult.relationships,
+      dependencyGraph
+    )
+
+    logger.debug('Pipeline: built global context for %d files', globalContext.size)
+
     await this.app.service('projects').patch(projectId, {
       generationProgress: {
         totalFiles: plan.length,
@@ -171,7 +184,17 @@ export class GenerationPipeline {
           jobTracker.trackGeneratedFile(jobId, { path: filePath })
         }
       },
-      { projectId, retriever: this.retriever, memoryBlock, relationships: validationResult.relationships }
+      {
+        projectId,
+        retriever: this.retriever,
+        memoryBlock,
+        relationships: validationResult.relationships,
+        globalContext,
+        dependencyGraph,
+        contextBuilder: this.contextBuilder,
+        // Full file manifest so every generator phase knows the complete project structure
+        plan
+      }
     )
     logger.info(
       'Pipeline: file generation completed in %dms for project %s (%d files)',

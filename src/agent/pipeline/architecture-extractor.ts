@@ -147,12 +147,13 @@ export class ArchitectureExtractor {
   }
 
   private convertRelationships(relationships: Relationship[]): ArchRelation[] {
+    // NOTE: Only copy fields that exist in the persisted architectureSchema.
+    // foreignKey and bidirectional exist on runtime Relationship objects but are
+    // NOT part of ArchRelation (additionalProperties: false) and cause Feathers 400 errors.
     return relationships.map(rel => ({
       from: rel.from,
       to: rel.to,
-      type: rel.type,
-      foreignKey: rel.foreignKey,
-      bidirectional: rel.bidirectional
+      type: rel.type
     }))
   }
 

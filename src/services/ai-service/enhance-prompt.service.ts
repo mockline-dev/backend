@@ -29,6 +29,7 @@ Include relevant information such as:
 - API design or data models if applicable
 - Error handling expectations
 - Best practices and coding standards
+- The Stack is only Python with FastAPI
 
 ### PROMPT QUALITY REQUIREMENTS
 The improved prompt should:

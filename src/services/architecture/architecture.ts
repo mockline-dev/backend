@@ -1,22 +1,21 @@
 // For more information about this file see https://dove.feathersjs.com/guides/cli/service.html
-import { authenticate } from '@feathersjs/authentication'
 
 import { hooks as schemaHooks } from '@feathersjs/schema'
 
 import {
-  architectureDataValidator,
-  architecturePatchValidator,
-  architectureQueryValidator,
-  architectureResolver,
-  architectureExternalResolver,
   architectureDataResolver,
+  architectureDataValidator,
+  architectureExternalResolver,
   architecturePatchResolver,
-  architectureQueryResolver
+  architecturePatchValidator,
+  architectureQueryResolver,
+  architectureQueryValidator,
+  architectureResolver
 } from './architecture.schema'
 
 import type { Application } from '../../declarations'
 import { ArchitectureService, getOptions } from './architecture.class'
-import { architecturePath, architectureMethods } from './architecture.shared'
+import { architectureMethods, architecturePath } from './architecture.shared'
 
 export * from './architecture.class'
 export * from './architecture.schema'
@@ -34,7 +33,6 @@ export const architecture = (app: Application) => {
   app.service(architecturePath).hooks({
     around: {
       all: [
-        authenticate('jwt'),
         schemaHooks.resolveExternal(architectureExternalResolver),
         schemaHooks.resolveResult(architectureResolver)
       ]

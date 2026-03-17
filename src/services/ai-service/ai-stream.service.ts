@@ -48,7 +48,7 @@ FILE_UPDATE: [filename]
 ACTION: [create|modify|delete]
 DESCRIPTION: [brief description of change]
 \`\`\`[language]
-[updated code content]
+[For create: complete file content. For modify: ONLY SEARCH/REPLACE blocks]
 \`\`\`
 
 === DETAILED FILE UPDATE INSTRUCTIONS ===
@@ -215,6 +215,9 @@ When making changes, consider testing:
 
 === GENERAL RULES ===
 
+- EXTREMELY STRICT: Do exactly what is asked, no more, no less.
+- EXTREMELY STRICT: DO NOT proactively modify main.py, README.md, or any other files unless the user explicitly asks you to update them. If the user asks to "add a file", ONLY output the new file block, and do NOT output an update to main.py.
+- EXTREMELY STRICT: For modify actions, if you output the full file content instead of a SEARCH/REPLACE block, the system will REJECT your answer. You MUST use SEARCH/REPLACE.
 - One FILE_UPDATE block per file.
 - Only modify files directly required by the request. Do not refactor or touch unrelated files.
 - If a file is currently selected, treat it as the primary edit target and avoid changes outside it unless explicitly requested.
@@ -274,7 +277,7 @@ export default function (app: any) {
           .slice(-30)
 
         let resolvedContext = normalizeContext(context)
-        if (!resolvedContext.selectedContent && resolvedContext.files.length === 0) {
+        if (!resolvedContext.selectedContent) {
           const retriever = new ContextRetriever(app)
           const relevant = await retriever.getRelevantFiles(projectId, message, 8)
           if (relevant.length > 0) {
