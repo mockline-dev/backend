@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { getProvider } from './providers/registry'
 
 /**
@@ -7,7 +8,7 @@ import { getProvider } from './providers/registry'
 const cache = new Map<string, number[]>()
 
 export async function embed(text: string): Promise<number[]> {
-  const key = text.slice(0, 256) // Use prefix as cache key
+  const key = createHash('sha256').update(text).digest('hex')
   const cached = cache.get(key)
   if (cached) return cached
 

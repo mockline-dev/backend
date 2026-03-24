@@ -19,7 +19,7 @@ export interface FileContext {
  * Builds comprehensive context for each file before generation starts.
  * Provides global context that can be reused across all file generations.
  */
-export class ContextBuilder implements ContextBuilder {
+export class ContextBuilder {
   /**
    * Builds global context for all files in the plan.
    * Returns a map of file path to context.
@@ -336,10 +336,14 @@ export class ContextBuilder implements ContextBuilder {
   }
 
   /**
-   * Capitalizes the first letter of a string.
+   * Converts a snake_case or plain string to PascalCase.
+   * e.g. "user_profile" → "UserProfile", "user" → "User"
    */
   private capitalize(str: string): string {
-    return str.charAt(0).toUpperCase() + str.slice(1)
+    return str
+      .split('_')
+      .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join('')
   }
 
   /**

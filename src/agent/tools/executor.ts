@@ -90,7 +90,7 @@ export async function executeToolCall(
         if ((existing as any).total > 0) {
           await app.service('files').remove((existing as any).data[0]._id)
         }
-        embeddingStore.clear(projectId) // Re-index on next query
+        embeddingStore.remove(projectId, path) // Remove only the deleted file from the index
         return { success: true, data: { deleted: path } }
       }
 

@@ -17,6 +17,7 @@ export const architectureSchema = Type.Object(
         name: Type.String(),
         description: Type.Optional(Type.String()),
         routes: Type.Array(Type.String()),
+        modelName: Type.Optional(Type.String()),
         methods: Type.Optional(
           Type.Array(
             Type.Object({
@@ -34,13 +35,16 @@ export const architectureSchema = Type.Object(
     models: Type.Array(
       Type.Object({
         name: Type.String(),
+        tableName: Type.Optional(Type.String()),
         fields: Type.Array(
           Type.Object({
             name: Type.String(),
             type: Type.String(),
             required: Type.Boolean(),
             indexed: Type.Optional(Type.Boolean()),
-            unique: Type.Optional(Type.Boolean())
+            unique: Type.Optional(Type.Boolean()),
+            /** If this field is a foreign key, name of the entity it references */
+            foreignKeyRef: Type.Optional(Type.String())
           })
         )
       })
@@ -54,14 +58,18 @@ export const architectureSchema = Type.Object(
           Type.Literal('many-to-many'),
           Type.Literal('many-to-one'),
           Type.Literal('one-to-one')
-        ])
+        ]),
+        foreignKey: Type.Optional(Type.String()),
+        label: Type.Optional(Type.String())
       })
     ),
     routes: Type.Array(
       Type.Object({
         method: Type.String(),
         path: Type.String(),
-        service: Type.String()
+        service: Type.String(),
+        authRequired: Type.Optional(Type.Boolean()),
+        description: Type.Optional(Type.String())
       })
     ),
     serviceDependencies: Type.Optional(
@@ -69,6 +77,55 @@ export const architectureSchema = Type.Object(
         Type.Object({
           from: Type.String(),
           to: Type.String()
+        })
+      )
+    ),
+    /** Tech stack detected from the project schema */
+    techStack: Type.Optional(
+      Type.Object({
+        framework: Type.String(),
+        language: Type.String(),
+        database: Type.String(),
+        auth: Type.String(),
+        orm: Type.Optional(Type.String())
+      })
+    ),
+    /** Architectural layers — for layered diagram rendering */
+    layers: Type.Optional(
+      Type.Array(
+        Type.Object({
+          name: Type.String(),
+          role: Type.String(),
+          description: Type.String(),
+          files: Type.Array(Type.String())
+        })
+      )
+    ),
+    /** Quick-glance statistics */
+    summary: Type.Optional(
+      Type.Object({
+        totalEndpoints: Type.Number(),
+        totalModels: Type.Number(),
+        totalRelations: Type.Number(),
+        authEnabled: Type.Boolean()
+      })
+    ),
+    /**
+     * Explicit request-processing chains for interactive data-flow diagrams.
+     * Each entry traces one endpoint from HTTP entry to database.
+     */
+    dataFlow: Type.Optional(
+      Type.Array(
+        Type.Object({
+          endpoint: Type.String(),
+          method: Type.String(),
+          steps: Type.Array(
+            Type.Object({
+              layer: Type.String(),
+              component: Type.String(),
+              action: Type.String()
+            })
+          )
         })
       )
     ),
@@ -85,9 +142,19 @@ export const architectureExternalResolver = resolve<Architecture, HookContext<Ar
 // Schema for creating new entries
 export const architectureDataSchema = Type.Pick(
   architectureSchema,
-  // serviceDependencies is optional but included so the pipeline spread does not
-  // trigger a validation error when the extractor populates it.
-  ['projectId', 'services', 'models', 'relations', 'routes', 'serviceDependencies', 'updatedAt'],
+  [
+    'projectId',
+    'services',
+    'models',
+    'relations',
+    'routes',
+    'serviceDependencies',
+    'techStack',
+    'layers',
+    'summary',
+    'dataFlow',
+    'updatedAt'
+  ],
   {
     $id: 'ArchitectureData'
   }

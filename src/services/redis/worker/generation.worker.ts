@@ -67,7 +67,7 @@ export const generationWorker = new Worker<GenerationJobData>(
       })
 
       // Check if there are warnings from the pipeline
-      const warnings = (result as any).warnings || []
+      const warnings = result.warnings ?? []
 
       // Enqueue validation as a separate async job — does not block project completion
       await validationQueue.add(
@@ -84,8 +84,8 @@ export const generationWorker = new Worker<GenerationJobData>(
         label: `Initial generation: ${prompt.slice(0, 100)}`
       } as any)
 
-      // Determine status based on warnings
-      const status = warnings.length > 0 ? 'ready' : 'ready'
+      // Determine status and stage based on warnings
+      const status = 'ready'
       const currentStage = warnings.length > 0 ? 'complete_with_warnings' : 'complete'
 
       await flushProgressPatch()

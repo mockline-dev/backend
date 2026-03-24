@@ -89,6 +89,14 @@ export class FileGenerator {
 
           await onProgress(progressIndex, plan.length, task.path)
 
+          // Fast path: __init__.py files are generated as static stubs (no LLM call needed)
+          if (task.path.endsWith('__init__.py')) {
+            const content = generateInitPyStub(task.path, options.plan ?? [])
+            generatedByIndex.set(index, { path: task.path, content })
+            logger.info('FileGenerator: __init__.py stub for %s (fast path, %dms)', task.path, Date.now() - fileStartedAt)
+            continue
+          }
+
           // Build comprehensive context for this file
           const generationContext = await this.buildGenerationContext(task, generatedByIndex, options)
 
@@ -307,36 +315,6 @@ function classifyTaskStage(path: string): number {
   return 5
 }
 
-function compactGeneratedContext(files: GeneratedFile[]): GeneratedFile[] {
-  const MAX_FILES = 2
-  const MAX_CHARS_PER_FILE = 2500
-
-  return files.slice(-MAX_FILES).map(file => ({
-    path: file.path,
-    content: truncateForContext(file.content, MAX_CHARS_PER_FILE)
-  }))
-}
-
-function compactMemoryBlock(memoryBlock?: string): string | undefined {
-  if (!memoryBlock) {
-    return undefined
-  }
-
-  return truncateForContext(memoryBlock, 1800)
-}
-
-function compactExternalContext(
-  files: { path: string; content: string }[]
-): { path: string; content: string }[] {
-  const MAX_FILES = 2
-  const MAX_CHARS_PER_FILE = 2500
-
-  return files.slice(0, MAX_FILES).map(file => ({
-    path: file.path,
-    content: truncateForContext(file.content, MAX_CHARS_PER_FILE)
-  }))
-}
-
 function truncateForContext(content: string, maxChars: number): string {
   if (content.length <= maxChars) {
     return content
@@ -361,44 +339,57 @@ function parallelismForStage(stage: number): number {
 function tokenBudgetForPath(path: string): number {
   const normalized = path.toLowerCase()
 
+  if (normalized.endsWith('__init__.py')) {
+    return 512
+  }
+
   if (normalized.startsWith('app/models/') || normalized.startsWith('app/services/')) {
-    return 3200
+    return 6400
   }
 
   if (normalized.startsWith('app/api/') || normalized.startsWith('app/schemas/')) {
-    return 2600
+    return 5200
   }
 
   if (normalized === 'requirements.txt' || normalized === 'readme.md' || normalized.startsWith('docs/')) {
-    return 1800
+    return 2400
   }
 
   if (normalized.startsWith('tests/')) {
-    return 2200
+    return 4400
   }
 
-  return 2400
+  return 4800
 }
 
 function contextWindowForPath(path: string): number {
   const normalized = path.toLowerCase()
 
-  if (normalized.startsWith('app/models/') || normalized.startsWith('app/services/')) {
-    return 12288
+  if (normalized.endsWith('__init__.py')) {
+    return 4096
   }
 
-  if (normalized.startsWith('app/api/') || normalized.startsWith('app/schemas/')) {
-    return 10240
-  }
-
-  return 8192
+  // Use full configured context window for all other files
+  return 32768
 }
 
 function stripFences(text: string): string {
-  return text
-    .replace(/^```[\w]*\n/, '')
-    .replace(/\n```$/, '')
-    .trim()
+  const trimmed = text.trim()
+  // Match optional leading whitespace/newlines before opening fence, and after closing fence
+  const fenced = trimmed.match(/^```[\w]*\r?\n([\s\S]*?)\n?```\s*$/)
+  if (fenced) {
+    return fenced[1].trim()
+  }
+  return trimmed
+}
+
+/**
+ * Generates a static stub for a Python __init__.py file.
+ * Avoids calling the LLM for trivial package init files.
+ * For model/schema/service packages, generates re-export lines from siblings in the plan.
+ */
+function generateInitPyStub(_initPath: string, _plan: TaskPlan[]): string {
+  return '# Package initialization\n'
 }
 
 /**

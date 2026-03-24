@@ -186,11 +186,12 @@ export const snapshots = (app: Application) => {
           })
 
           // 1. Create a safety snapshot of current state before rollback
+          //    Use 'manual' trigger so it is never auto-pruned.
           try {
             await context.app.service('snapshots').create({
               projectId,
               label: `Before rollback to v${snapshot.version}`,
-              trigger: 'auto-ai-edit'
+              trigger: 'manual'
             } as any)
           } catch (err: any) {
             logger.error('Failed to create safety snapshot before rollback', { error: err.message })
@@ -370,6 +371,13 @@ export const snapshots = (app: Application) => {
                 restoreErrors
               }
             )
+          }
+
+          // Reset project status to ready after successful rollback
+          try {
+            await context.app.service('projects').patch(projectId, { status: 'ready' } as any)
+          } catch (err: any) {
+            logger.warn('Failed to reset project status after rollback: %s', err.message)
           }
 
           // Short-circuit the patch — return rollback result directly

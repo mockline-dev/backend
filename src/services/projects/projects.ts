@@ -69,9 +69,17 @@ export const projects = (app: Application) => {
       ],
       patch: [
         async (context: HookContext) => {
-          // Validate status transitions
-          if (context.data.status && context.result?.status) {
-            assertValidTransition(context.result.status, context.data.status)
+          // Validate status transitions — fetch current project to get actual current status
+          if (context.data.status && context.id) {
+            try {
+              const current = await context.app.service('projects').get(context.id as string)
+              assertValidTransition(current.status, context.data.status)
+            } catch (err: any) {
+              // Only rethrow transition errors, not fetch errors
+              if (err.name === 'BadRequest' || err.message?.includes('Invalid transition')) {
+                throw err
+              }
+            }
           }
           return context
         },

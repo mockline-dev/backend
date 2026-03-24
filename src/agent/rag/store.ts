@@ -53,6 +53,16 @@ class EmbeddingStore {
     return scored.slice(0, topK).map(e => e.path)
   }
 
+  remove(projectId: string, path: string): void {
+    const entries = this.projects.get(projectId)
+    if (!entries) return
+    const idx = entries.findIndex(e => e.path === path)
+    if (idx >= 0) {
+      entries.splice(idx, 1)
+      this.projects.set(projectId, entries)
+    }
+  }
+
   clear(projectId: string): void {
     this.projects.delete(projectId)
   }

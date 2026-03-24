@@ -3,9 +3,26 @@ import { BadRequest, Forbidden, NotFound } from '@feathersjs/errors'
 import { ProjectMemory } from '../../agent/memory/project-memory'
 import { ContextRetriever } from '../../agent/rag/retriever'
 import { getProvider } from '../../llm/providers/registry'
+import { r2Client } from '../../storage/r2.client'
+import { applySearchReplace } from './diff-utils'
 
 const MAX_CONTEXT_FILE_TREE_ENTRIES = 300
 const MAX_ALLOWED_EDIT_FILES = 40
+const PENDING_UPDATES_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+interface PendingUpdate {
+  filename: string
+  action: 'create' | 'modify' | 'delete'
+  content: string
+  description: string
+  language: string
+  /** Full new content after applying SEARCH/REPLACE (for modify) or raw content (for create) */
+  preview?: string
+}
+
+// In-memory pending updates per project: projectId → Map<filename, update>
+const pendingUpdates = new Map<string, Map<string, PendingUpdate>>()
+const pendingTimers = new Map<string, NodeJS.Timeout>()
 
 type ContextSource = 'user-selected' | 'user-tree' | 'retrieved' | 'architecture'
 
@@ -389,20 +406,85 @@ export default function (app: any) {
             console.error('Failed to create pre-edit snapshot:', snapErr.message)
           }
 
+          // Emit batch summary
           aiStreamService.emit('file-updates', {
             projectId,
-            updates: fileUpdates
+            updates: fileUpdates.map(u => ({ filename: u.filename, action: u.action, description: u.description }))
           })
 
+          // Build pending map for this project and emit per-file diff events
+          const projectPending = new Map<string, PendingUpdate>()
+
           for (const update of fileUpdates) {
-            aiStreamService.emit('write-preview', {
-              projectId,
+            const pending: PendingUpdate = {
               filename: update.filename,
               action: update.action,
-              newContent: update.content,
-              description: update.description
-            })
+              content: update.content,
+              description: update.description,
+              language: update.language
+            }
+
+            if (update.action === 'create') {
+              pending.preview = update.content
+              aiStreamService.emit('file-diff', {
+                projectId,
+                action: 'create',
+                filename: update.filename,
+                newContent: update.content,
+                description: update.description
+              })
+            } else if (update.action === 'modify') {
+              // Read current file from R2 and apply SEARCH/REPLACE to build preview
+              try {
+                const r2Key = `projects/${projectId}/${update.filename}`
+                const originalContent = await r2Client.getObject(r2Key)
+                const { newContent, hunks, unapplied } = applySearchReplace(originalContent, update.content)
+                pending.preview = newContent
+                aiStreamService.emit('file-diff', {
+                  projectId,
+                  action: 'modify',
+                  filename: update.filename,
+                  hunks,
+                  unapplied,
+                  preview: newContent,
+                  description: update.description
+                })
+              } catch {
+                // File not in R2 yet — emit raw SEARCH/REPLACE content
+                pending.preview = update.content
+                aiStreamService.emit('file-diff', {
+                  projectId,
+                  action: 'modify',
+                  filename: update.filename,
+                  hunks: [],
+                  unapplied: [],
+                  preview: update.content,
+                  description: update.description
+                })
+              }
+            } else if (update.action === 'delete') {
+              aiStreamService.emit('file-diff', {
+                projectId,
+                action: 'delete',
+                filename: update.filename,
+                description: update.description
+              })
+            }
+
+            projectPending.set(update.filename, pending)
           }
+
+          // Store pending updates with TTL
+          pendingUpdates.set(projectId, projectPending)
+          const existingTimer = pendingTimers.get(projectId)
+          if (existingTimer) clearTimeout(existingTimer)
+          pendingTimers.set(
+            projectId,
+            setTimeout(() => {
+              pendingUpdates.delete(projectId)
+              pendingTimers.delete(projectId)
+            }, PENDING_UPDATES_TTL_MS)
+          )
         }
 
         aiStreamService.emit('agent-step', {
@@ -420,17 +502,86 @@ export default function (app: any) {
           success: true,
           messageId: assistantMessage?._id?.toString?.() ?? assistantMessage?._id
         }
+      },
+
+      // patch handles apply / accept / reject / accept-all actions
+      async patch(
+        _id: null,
+        data: {
+          action: 'apply' | 'accept' | 'reject' | 'accept-all'
+          projectId: string
+          filename?: string
+          updates?: Array<{ filename: string; action: 'create' | 'modify' | 'delete'; content: string; description?: string; language?: string }>
+        },
+        params: any
+      ) {
+        const { action, projectId } = data
+        if (!projectId) throw new BadRequest('projectId is required')
+
+        const userId = params.user?._id?.toString?.()
+        let project: any
+        try {
+          project = await app.service('projects').get(projectId)
+        } catch {
+          throw new NotFound('Project not found')
+        }
+        if (project.userId?.toString?.() !== userId) throw new Forbidden('Not your project')
+
+        const aiStreamService = app.service('ai-stream')
+
+        if (action === 'apply') {
+          if (!Array.isArray(data.updates) || data.updates.length === 0) {
+            throw new BadRequest('updates array is required for apply action')
+          }
+          for (const upd of data.updates) {
+            await applyUpdateToProject(app, projectId, upd, aiStreamService)
+          }
+          return { success: true, applied: data.updates.length }
+        }
+
+        if (action === 'accept') {
+          const { filename } = data
+          if (!filename) throw new BadRequest('filename is required for accept action')
+          const pending = pendingUpdates.get(projectId)?.get(filename)
+          if (!pending) throw new NotFound(`No pending update for file: ${filename}`)
+          await applyUpdateToProject(app, projectId, pending, aiStreamService)
+          pendingUpdates.get(projectId)?.delete(filename)
+          return { success: true, filename }
+        }
+
+        if (action === 'reject') {
+          const { filename } = data
+          if (!filename) throw new BadRequest('filename is required for reject action')
+          pendingUpdates.get(projectId)?.delete(filename)
+          aiStreamService.emit('file-rejected', { projectId, filename })
+          return { success: true, filename }
+        }
+
+        if (action === 'accept-all') {
+          const pending = pendingUpdates.get(projectId)
+          if (!pending || pending.size === 0) return { success: true, applied: 0 }
+          const filenames = Array.from(pending.keys())
+          for (const filename of filenames) {
+            const upd = pending.get(filename)!
+            await applyUpdateToProject(app, projectId, upd, aiStreamService)
+            pending.delete(filename)
+          }
+          return { success: true, applied: filenames.length }
+        }
+
+        throw new BadRequest(`Unknown action: ${action}`)
       }
     },
     {
-      methods: ['create'],
-      events: ['chunk', 'file-updates', 'agent-step', 'write-preview']
+      methods: ['create', 'patch'],
+      events: ['chunk', 'file-updates', 'agent-step', 'write-preview', 'file-diff', 'file-applied', 'file-rejected']
     }
   )
 
   app.service('ai-stream').hooks({
     before: {
-      create: [authenticate('jwt')]
+      create: [authenticate('jwt')],
+      patch: [authenticate('jwt')]
     }
   })
 }
@@ -710,3 +861,72 @@ function parseFileUpdates(content: string): Array<{
 
 const SEARCH_REPLACE_BLOCK_PATTERN =
   /<<<<<<<\s*SEARCH\s*\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>>\s*REPLACE/g
+
+/**
+ * Applies a single pending update to the project:
+ * - Writes/overwrites the file in R2
+ * - Upserts the file record in MongoDB
+ * - Emits 'file-applied' event
+ */
+async function applyUpdateToProject(
+  app: any,
+  projectId: string,
+  update: { filename: string; action: 'create' | 'modify' | 'delete'; content: string; preview?: string; description?: string },
+  aiStreamService: any
+): Promise<void> {
+  const { filename, action } = update
+  const r2Key = `projects/${projectId}/${filename}`
+
+  try {
+    if (action === 'delete') {
+      await r2Client.deleteObject(r2Key)
+      // Remove file record from MongoDB
+      const existing = await app.service('files').find({ query: { projectId, key: r2Key, $limit: 1 } }) as any
+      if (existing.total > 0) {
+        await app.service('files').remove(existing.data[0]._id)
+      }
+      aiStreamService.emit('file-applied', { projectId, filename, action, success: true })
+      return
+    }
+
+    // For create: use raw content. For modify: prefer the pre-computed preview.
+    let finalContent: string
+    if (action === 'modify') {
+      if (update.preview) {
+        finalContent = update.preview
+      } else {
+        // Apply SEARCH/REPLACE live if no preview was pre-computed
+        try {
+          const original = await r2Client.getObject(r2Key)
+          finalContent = applySearchReplace(original, update.content).newContent
+        } catch {
+          finalContent = update.content
+        }
+      }
+    } else {
+      finalContent = update.content
+    }
+
+    await r2Client.putObject(r2Key, finalContent)
+    const size = Buffer.byteLength(finalContent)
+
+    // Upsert file record
+    const existing = await app.service('files').find({ query: { projectId, key: r2Key, $limit: 1 } }) as any
+    if (existing.total > 0) {
+      await app.service('files').patch(existing.data[0]._id, { size, updatedAt: Date.now() })
+    } else {
+      await app.service('files').create({
+        projectId,
+        name: filename,
+        key: r2Key,
+        fileType: filename.split('.').pop() || 'text',
+        size
+      })
+    }
+
+    aiStreamService.emit('file-applied', { projectId, filename, action, success: true })
+  } catch (err: any) {
+    aiStreamService.emit('file-applied', { projectId, filename, action, success: false, error: err.message })
+    throw err
+  }
+}

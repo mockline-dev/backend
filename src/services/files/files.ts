@@ -69,13 +69,7 @@ export const files = (app: Application) => {
       ]
     },
     after: {
-      all: [],
-      create: [
-        async (context: HookContext) => {
-          const result = context.result
-          console.log(result)
-        }
-      ]
+      all: []
     },
     error: {
       all: []

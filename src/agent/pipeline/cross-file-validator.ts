@@ -89,12 +89,31 @@ export class CrossFileValidator {
         // Check if the imported file exists
         const importedPath = this.resolveImportPath(file.path, imp)
         if (importedPath && !filePaths.has(importedPath)) {
-          errors.push({
-            file: file.path,
-            message: `Import "${imp}" references non-existent file: ${importedPath}`,
-            severity: 'error',
-            type: 'import'
-          })
+          // Also check if this is a package import (app.api → app/api/__init__.py)
+          const packageInitPath = importedPath.replace(/\.py$/, '/__init__.py')
+          if (!filePaths.has(packageInitPath)) {
+            errors.push({
+              file: file.path,
+              message: `Import "${imp}" references non-existent file: ${importedPath}`,
+              severity: 'error',
+              type: 'import'
+            })
+          }
+        } else if (importedPath && filePaths.has(importedPath)) {
+          // Check that parent package directories have __init__.py files
+          const parts = importedPath.split('/')
+          for (let i = 1; i < parts.length - 1; i++) {
+            const parentDir = parts.slice(0, i + 1).join('/')
+            const initPath = `${parentDir}/__init__.py`
+            if (!filePaths.has(initPath)) {
+              warnings.push({
+                file: file.path,
+                message: `Import "${imp}" requires package init file: ${initPath}`,
+                severity: 'warning',
+                type: 'import'
+              })
+            }
+          }
         }
       }
     }
@@ -309,7 +328,10 @@ export class CrossFileValidator {
 
         const importedPath = this.resolveImportPath(file.path, imp)
         if (importedPath) {
-          dependencies.add(importedPath)
+          // Prefer the __init__.py path when it's a package import
+          const packageInitPath = importedPath.replace(/\.py$/, '/__init__.py')
+          const filePaths = new Set(files.map(f => f.path))
+          dependencies.add(filePaths.has(packageInitPath) ? packageInitPath : importedPath)
         }
       }
 
@@ -439,11 +461,22 @@ export class CrossFileValidator {
       models.push(match[1])
     }
 
-    // Fallback: any PascalCase class definition — catches SQLModel, db.Model, etc.
-    // Only add if not already captured above to avoid duplicates.
     const existing = new Set(models)
+
+    // Fallback: any PascalCase class with explicit base(s) — catches SQLModel, db.Model, etc.
     const fallbackPattern = /class\s+([A-Z][a-zA-Z0-9]*)\s*\([^)]+\)/g
     while ((match = fallbackPattern.exec(content)) !== null) {
+      if (!existing.has(match[1])) {
+        models.push(match[1])
+        existing.add(match[1])
+      }
+    }
+
+    // Also capture bare class definitions without explicit base (e.g., class UserService:)
+    // These are service/helper classes — they must be registered so references to them
+    // don't generate false-positive "undefined model" errors.
+    const barePattern = /^class\s+([A-Z][a-zA-Z0-9]*)\s*:/gm
+    while ((match = barePattern.exec(content)) !== null) {
       if (!existing.has(match[1])) {
         models.push(match[1])
         existing.add(match[1])
@@ -471,9 +504,12 @@ export class CrossFileValidator {
       while ((match = pattern.exec(content)) !== null) {
         const ref = match[1]
         // Skip built-in types and common Python types
-        if (!this.isBuiltInType(ref)) {
-          references.push(ref)
-        }
+        if (this.isBuiltInType(ref)) continue
+        // Skip SCREAMING_SNAKE_CASE constants (e.g., DATABASE_URL, SECRET_KEY)
+        if (/^[A-Z][A-Z0-9_]*$/.test(ref)) continue
+        // Skip short linter/noqa codes (e.g., F401, E501)
+        if (/^[A-Z]\d+$/.test(ref)) continue
+        references.push(ref)
       }
     }
 

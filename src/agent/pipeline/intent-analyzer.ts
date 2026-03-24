@@ -1,6 +1,7 @@
 import { logger } from '../../logger'
 import { getProvider } from '../../llm/providers/registry'
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
+import { parseJson, withRetry } from './utils'
 
 export interface IntentSchema {
   projectName: string
@@ -24,11 +25,26 @@ export class IntentAnalyzer {
   async analyze(prompt: string): Promise<IntentSchema> {
     logger.debug('IntentAnalyzer: analyzing prompt (%d chars)', prompt.length)
 
+    const schema = await withRetry(
+      () => this.callLLM(prompt),
+      2,
+      [1000, 2000],
+      'IntentAnalyzer'
+    )
+
+    logger.debug('IntentAnalyzer: extracted schema with %d entities', schema.entities?.length ?? 0)
+    return schema as IntentSchema
+  }
+
+  private async callLLM(prompt: string): Promise<IntentSchema> {
     const provider = getProvider()
     let responseText = ''
 
     for await (const chunk of provider.chatStream(
-      [{ role: 'user', content: buildGenerationPrompts.extractSchema(prompt) }],
+      [
+        { role: 'system', content: 'You are a backend architecture expert. Always respond with valid JSON.' },
+        { role: 'user', content: buildGenerationPrompts.extractSchema(prompt) }
+      ],
       undefined,
       { temperature: 0.1 }
     )) {
@@ -37,19 +53,19 @@ export class IntentAnalyzer {
 
     const schema = parseJson(responseText, 'intent schema')
 
-    logger.debug('IntentAnalyzer: extracted schema with %d entities', schema.entities?.length ?? 0)
-    return schema as IntentSchema
-  }
-}
+    // Runtime validation
+    if (!Array.isArray(schema.entities) || schema.entities.length === 0) {
+      throw new Error('IntentAnalyzer: schema.entities must be a non-empty array')
+    }
+    for (const entity of schema.entities) {
+      if (typeof entity.name !== 'string' || !entity.name) {
+        throw new Error('IntentAnalyzer: each entity must have a name field')
+      }
+      if (!Array.isArray(entity.fields)) {
+        throw new Error(`IntentAnalyzer: entity ${entity.name} must have a fields array`)
+      }
+    }
 
-function parseJson(text: string, context: string): any {
-  const match = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
-  try {
-    return JSON.parse((match?.[1] || text).trim())
-  } catch (err) {
-    logger.error('IntentAnalyzer: failed to parse %s JSON: %s', context, text.slice(0, 300))
-    throw new Error(
-      `IntentAnalyzer: failed to parse ${context}: ${err instanceof Error ? err.message : String(err)}`
-    )
+    return schema as IntentSchema
   }
 }

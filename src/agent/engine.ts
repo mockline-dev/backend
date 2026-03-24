@@ -1,6 +1,6 @@
 import type { Application } from '../declarations'
 import { getProvider } from '../llm/providers/registry'
-import type { OllamaMessage } from '../llm/ollama.client'
+import type { OllamaMessage, OllamaToolCall } from '../llm/ollama.client'
 import { ContextRetriever } from './rag/retriever'
 import { AGENT_TOOLS } from './tools/definitions'
 import { executeToolCall, ToolResult } from './tools/executor'
@@ -20,6 +20,9 @@ export interface AgentRunOptions {
   maxIterations?: number
   onEvent: (event: AgentEvent) => void
 }
+
+const TOOL_EXECUTION_TIMEOUT_MS = 30_000
+const CONTEXT_CHAR_LIMIT = 24_000 * 4 // ~24k tokens estimated at 4 chars/token
 
 export class AgentEngine {
   private app: Application
@@ -46,8 +49,11 @@ export class AgentEngine {
     ]
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
+      // Trim messages to stay within context window before each LLM call
+      this.trimMessages(messages)
+
       let responseContent = ''
-      let pendingToolCalls: any[] = []
+      const pendingToolCalls = new Map<string, OllamaToolCall>()
 
       try {
         for await (const chunk of getProvider().chatStream(messages, AGENT_TOOLS, {
@@ -57,8 +63,18 @@ export class AgentEngine {
             responseContent += chunk.message.content
             onEvent({ type: 'token', payload: chunk.message.content })
           }
+          // Accumulate tool calls by id to handle streaming chunks
           if (chunk.message.tool_calls?.length) {
-            pendingToolCalls = chunk.message.tool_calls
+            for (const toolCall of chunk.message.tool_calls) {
+              const id = toolCall.id || `tc-${pendingToolCalls.size}`
+              const existing = pendingToolCalls.get(id)
+              if (existing) {
+                // Merge streamed argument chunks
+                existing.function.arguments += toolCall.function.arguments
+              } else {
+                pendingToolCalls.set(id, { ...toolCall })
+              }
+            }
           }
         }
       } catch (err: any) {
@@ -66,21 +82,20 @@ export class AgentEngine {
         return
       }
 
+      const toolCallsArr = Array.from(pendingToolCalls.values())
       const assistantMsg: OllamaMessage = {
         role: 'assistant',
-        content: responseContent
-      }
-      if (pendingToolCalls.length) {
-        ;(assistantMsg as any).tool_calls = pendingToolCalls
+        content: responseContent,
+        tool_calls: toolCallsArr.length > 0 ? toolCallsArr : undefined
       }
       messages.push(assistantMsg)
 
-      if (!pendingToolCalls.length) {
+      if (toolCallsArr.length === 0) {
         onEvent({ type: 'done', payload: { summary: responseContent } })
         return
       }
 
-      for (const toolCall of pendingToolCalls) {
+      for (const toolCall of toolCallsArr) {
         const name = toolCall.function.name
         let args: any = {}
         try {
@@ -96,7 +111,19 @@ export class AgentEngine {
           return
         }
 
-        const result: ToolResult = await executeToolCall(name, args, projectId, this.app)
+        // Execute tool with timeout
+        let result: ToolResult
+        try {
+          result = await Promise.race([
+            executeToolCall(name, args, projectId, this.app),
+            new Promise<ToolResult>((_, reject) =>
+              setTimeout(() => reject(new Error(`Tool ${name} timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`)), TOOL_EXECUTION_TIMEOUT_MS)
+            )
+          ])
+        } catch (err: any) {
+          result = { success: false, error: err.message }
+        }
+
         onEvent({ type: 'tool_result', payload: { name, result } })
 
         messages.push({
@@ -112,5 +139,23 @@ export class AgentEngine {
       type: 'error',
       payload: { message: 'Max agent iterations reached without completion' }
     })
+  }
+
+  /**
+   * Trims the messages array in-place to stay within the estimated context window.
+   * Always preserves the system prompt (index 0). Removes oldest non-system messages first.
+   */
+  private trimMessages(messages: OllamaMessage[]): void {
+    const totalChars = messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0)
+    if (totalChars <= CONTEXT_CHAR_LIMIT) return
+
+    // Keep system prompt (index 0) and trim from oldest non-system messages
+    let i = 1
+    let chars = totalChars
+    while (chars > CONTEXT_CHAR_LIMIT && i < messages.length - 1) {
+      chars -= messages[i].content?.length ?? 0
+      messages.splice(i, 1)
+      // Don't increment i — next element shifts down
+    }
   }
 }

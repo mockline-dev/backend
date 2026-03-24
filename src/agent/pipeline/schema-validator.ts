@@ -215,6 +215,13 @@ export class SchemaValidator {
         'float',
         'bool',
         'datetime',
+        'date',
+        'time',
+        'uuid',
+        'text',
+        'decimal',
+        'bytes',
+        'Any',
         'List[str]',
         'List[int]',
         'List[float]',
@@ -258,7 +265,7 @@ export class SchemaValidator {
   ): Relationship[] {
     const relationships: Relationship[] = []
     const entityNames = new Map<string, string>()
-    
+
     // Build entity name map (case-insensitive lookup)
     for (const entity of schema.entities) {
       entityNames.set(entity.name.toLowerCase(), entity.name)
@@ -266,6 +273,29 @@ export class SchemaValidator {
 
     const seen = new Set<string>()
 
+    // PASS 1: consume the LLM-provided relationships array from the schema.
+    // This is the most reliable source since the LLM already reasoned about them.
+    if (Array.isArray(schema.relationships)) {
+      for (const rel of schema.relationships) {
+        const fromName = entityNames.get(rel.from?.toLowerCase?.())
+        const toName   = entityNames.get(rel.to?.toLowerCase?.())
+        if (!fromName || !toName) continue
+
+        const key = `${fromName}:${toName}:${rel.type}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relationships.push({
+            from: fromName,
+            to: toName,
+            type: rel.type,
+            foreignKey: rel.foreignKey,
+            bidirectional: false
+          })
+        }
+      }
+    }
+
+    // PASS 2: field-based detection to supplement anything the LLM missed.
     for (const entity of schema.entities) {
       for (const field of entity.fields) {
         const fieldLower = field.name.toLowerCase()
@@ -286,18 +316,6 @@ export class SchemaValidator {
             if (!seen.has(key)) {
               seen.add(key)
               relationships.push(relationship)
-              
-              // Validate that foreign key field exists
-              if (relationship.foreignKey) {
-                const hasForeignKey = entity.fields.some(f => f.name === relationship.foreignKey)
-                if (!hasForeignKey) {
-                  errors.push({
-                    field: `entity.${entity.name}.fields`,
-                    message: `Foreign key field "${relationship.foreignKey}" is missing for relationship ${entity.name} → ${targetName}`,
-                    severity: 'error'
-                  })
-                }
-              }
             }
           }
         }

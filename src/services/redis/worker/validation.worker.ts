@@ -25,7 +25,7 @@ export const validationWorker = new Worker<ValidationJobData>(
 
     try {
       await app.service('projects').patch(projectId, {
-        generationProgress: { currentStage: 'validating', percentage: 90 }
+        generationProgress: { currentStage: 'validating' }
       } as any)
 
       const noop = async () => {}

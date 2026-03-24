@@ -1,4 +1,5 @@
 import { architecture } from './architecture/architecture'
+import apiTestsService from './api-tests/api-tests.service'
 import { files } from './files/files'
 import { messages } from './messages/messages'
 import { models } from './models/models'
@@ -18,6 +19,7 @@ import serverMonitorService from './server-monitor/server-monitor.service'
 
 export const services = (app: Application) => {
   app.configure(architecture)
+  app.configure(apiTestsService)
   app.configure(snapshots)
   app.configure(files)
   app.configure(messages)

@@ -72,6 +72,12 @@ Audit Trail Detection:
    * updated_by (str, optional, indexed) - foreign key to User
 - Add "audit-trail" to features array
 
+Foreign Key Naming Convention:
+- ALL foreign key fields MUST end with "_id" suffix (e.g., user_id, project_id, category_id)
+- For alias references (e.g., "assignee" referencing User), name the field "assignee_id" and include the relationship
+- For self-referential fields (e.g., "parent task"), name the field "parent_id"
+- Include the relationship entry for EVERY foreign key field
+
 Entity Validation Rules:
 - Entity names must be PascalCase (e.g., User, UserProfile, OrderItem)
 - Field names must be snake_case (e.g., user_id, created_at, first_name)
@@ -105,6 +111,12 @@ Return ONLY a JSON array. No markdown. No explanation.
 
 Project: "${prompt}"
 Schema: ${JSON.stringify(schema)}
+
+DATABASE DEFAULT RULE:
+- Always default to SQLite for local development.
+- Use DATABASE_URL=sqlite:///./app.db in .env and .env.example
+- SQLite requires no external dependencies (built-in driver)
+- The .env file MUST be included in the file plan
 
 CRITICAL - Email Validation Requirement:
 - If ANY entity has an email field (type: "str", name contains "email"), you MUST include "email-validator" in requirements.txt
@@ -157,6 +169,7 @@ Directory Structure Rules:
 
 Configuration Files Required:
 - requirements.txt: All Python dependencies with version pinning
+- .env: Local environment variables (DATABASE_URL=sqlite:///./app.db, SECRET_KEY, etc.)
 - .env.example: Template for environment variables with comments
 - README.md: Project documentation with setup instructions
 - app/core/config.py: Configuration management using Pydantic Settings
@@ -220,6 +233,7 @@ Additional Files Based on Features:
 Return:
 [
   { "path": "requirements.txt", "description": "Python dependencies with version pinning" },
+  { "path": ".env", "description": "Local environment variables (DATABASE_URL=sqlite:///./app.db)" },
   { "path": ".env.example", "description": "Environment variables template" },
   { "path": "app/core/config.py", "description": "Configuration management using Pydantic Settings" },
   { "path": "app/core/security.py", "description": "Security utilities (password hashing, JWT)" },
@@ -236,7 +250,7 @@ Return:
 You are a senior backend engineer generating production-ready files.
 
 Strict requirements:
-- Return only raw file content for ${'${filePath}'}.
+- Return only raw file content for ${filePath}.
 - No markdown fences, no explanations.
 - Preserve architectural consistency with provided schema and relationships.
 - Include complete imports and deterministic, executable code.
@@ -244,6 +258,12 @@ Strict requirements:
 - Add robust error handling, clear exceptions, and practical logging.
 - Keep code concise but complete; avoid placeholders or TODOs.
 - If context files are provided, integrate with them and avoid duplicate/conflicting definitions.
+
+DATABASE DEFAULT:
+- Default to SQLite for local development: DATABASE_URL=sqlite:///./app.db
+- For app/core/database.py: use SQLite with check_same_thread=False connect args
+- For .env and .env.example: include DATABASE_URL=sqlite:///./app.db as the default
+- Do NOT add psycopg2, pymysql, or other DB drivers unless explicitly specified in the schema
 
 CRITICAL - Python Class Naming Rule:
 - Python filenames are snake_case (e.g. shopping_cart.py, order_item.py).
@@ -267,6 +287,40 @@ CRITICAL - Python Import Guidelines:
   ✓ from app.models.user import User  (Correct - project file)
   ✗ from List import ...  (WRONG - List is a type, not a module)
   ✗ from EmailStr import ...  (WRONG - EmailStr is a type from pydantic, not a file)
+
+CRITICAL - Project Import Paths (use exact paths, no shortcuts):
+- SQLAlchemy Base:     from app.core.database import Base  (NOT from app.models.base, NOT from app.database)
+- Database session:    from app.core.database import get_db, SessionLocal  (NOT from app.database)
+- Security utilities:  from app.core.security import ...   (NOT from app.security)
+- Configuration:       from app.core.config import ...     (NOT from app.config)
+- Dependencies:        from app.core.deps import ...       (NOT from app.deps)
+- Models:              from app.models.<name> import ...   (NOT from app.models directly, NOT from app.models.base)
+- Schemas:             from app.schemas.<name> import ...  (NOT from app.schemas directly)
+- Services:            from app.services.<name> import ... (NOT from app.services directly)
+- API routers:         from app.api.<name> import ...      (NOT from app.api directly)
+
+${filePath === 'main.py' ? `CRITICAL for main.py — you MUST include ALL of these:
+1. Import and include_router() for EVERY router in app/api/ listed in the PROJECT FILE MANIFEST
+2. Import Base and engine from app.core.database, then call Base.metadata.create_all(bind=engine) on startup
+3. Add CORS middleware (allow_origins=["*"] for development)
+4. Mount routers with app.include_router(router, prefix="/api/v1", tags=["..."])
+5. Add a root health-check endpoint GET /
+Example startup block:
+  from app.core.database import Base, engine
+  Base.metadata.create_all(bind=engine)
+DO NOT skip any router — if the manifest lists app/api/user.py, app/api/task.py and app/api/project.py you MUST include all three.` : ''}
+${filePath.startsWith('app/models/') && !filePath.endsWith('__init__.py') ? `CRITICAL for SQLAlchemy models:
+- Import Base from app.core.database: from app.core.database import Base
+- Use string references for relationships: relationship("TargetModel", back_populates="field_name")
+- ForeignKey must use the PLURAL snake_case table name: ForeignKey("users.id"), ForeignKey("tasks.id"), ForeignKey("projects.id")
+- Always add back_populates on BOTH sides of a relationship
+- Never import other model files directly (avoids circular imports) — SQLAlchemy resolves string refs at runtime
+- Each model MUST define __tablename__ as plural snake_case of the class name` : ''}
+${filePath.startsWith('alembic/') ? `CRITICAL for Alembic files:
+- alembic/env.py MUST import all models before target_metadata: import app.models.user, app.models.task, etc.
+- Set target_metadata = Base.metadata (import Base from app.core.database)
+- For offline migrations use Base.metadata
+- For online migrations use engine from app.core.database` : ''}
 `,
 
   generateFileUserPrompt: (

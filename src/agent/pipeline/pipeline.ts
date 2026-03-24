@@ -3,7 +3,7 @@ import { logger } from '../../logger'
 import { r2Client } from '../../storage/r2.client'
 import { ProjectMemory } from '../memory/project-memory'
 import { ContextRetriever } from '../rag/retriever'
-import { validateGeneratedFiles } from '../validation/validator'
+import { ApiTestGenerator } from './api-test-generator'
 import { ArchitectureExtractor } from './architecture-extractor'
 import { ContextBuilder } from './context-builder'
 import { CrossFileValidator } from './cross-file-validator'
@@ -24,6 +24,7 @@ export interface PipelineResult {
   files: GeneratedFile[]
   fileCount: number
   totalSize: number
+  warnings?: string[]
 }
 
 export class GenerationPipeline {
@@ -65,18 +66,19 @@ export class GenerationPipeline {
 
     // Index any pre-existing project files into the RAG store so generators have context
     const ragIndexStartedAt = Date.now()
-    void this.retriever
-      .indexProject(projectId)
-      .then(() => {
-        logger.info(
-          'Pipeline: RAG indexing completed in %dms for project %s',
-          Date.now() - ragIndexStartedAt,
-          projectId
-        )
-      })
-      .catch((err: any) => {
-        logger.warn('Pipeline: RAG indexing failed (non-fatal): %s', err.message)
-      })
+    try {
+      await Promise.race([
+        this.retriever.indexProject(projectId),
+        new Promise<void>((_, reject) => setTimeout(() => reject(new Error('RAG indexing timeout')), 15000))
+      ])
+      logger.info(
+        'Pipeline: RAG indexing completed in %dms for project %s',
+        Date.now() - ragIndexStartedAt,
+        projectId
+      )
+    } catch (err: any) {
+      logger.warn('Pipeline: RAG indexing failed (non-fatal): %s', err.message)
+    }
 
     // Stage 1 — Intent analysis (schema extraction)
     await onProgress('Analyzing prompt', 5)
@@ -226,17 +228,14 @@ export class GenerationPipeline {
 
     // Only throw on critical cross-file errors
     if (!crossFileValidation.isValid && crossFileValidation.errors.length > 0) {
-      // Check if errors are critical or can be treated as warnings
       const criticalErrors = crossFileValidation.errors.filter(e => {
-        // Treat missing references as warnings
-        if (e.message.includes('not found') || e.message.includes('undefined')) {
-          return false
-        }
-        // Treat import issues as warnings
-        if (e.message.includes('import') || e.message.includes('Import')) {
-          return false
-        }
-        // All other errors are critical
+        // Missing references → non-critical
+        if (e.message.includes('not found') || e.message.includes('undefined')) return false
+        // Import errors in __init__.py are expected (empty stubs) — silently skip
+        const isImportError = e.message.includes('import') || e.message.includes('Import')
+        if (isImportError && e.file.endsWith('__init__.py')) return false
+        // Import errors in non-__init__.py files are visible but non-blocking
+        if (isImportError) return false
         return true
       })
 
@@ -245,10 +244,16 @@ export class GenerationPipeline {
         logger.error('Pipeline: Cross-file validation failed with critical errors:\n%s', errorMessages)
         throw new Error(`Cross-file validation failed:\n${errorMessages}`)
       } else {
-        // Treat non-critical errors as warnings
-        const warningMessages = crossFileValidation.errors.map(e => `- ${e.file}: ${e.message}`).join('\n')
-        logger.warn('Pipeline: Cross-file validation errors treated as warnings:\n%s', warningMessages)
-        allWarnings.push(...crossFileValidation.errors.map(e => `Cross-file: ${e.file} - ${e.message}`))
+        // Add non-__init__.py import errors and other non-critical errors to warnings
+        const visibleErrors = crossFileValidation.errors.filter(e => {
+          const isImportError = e.message.includes('import') || e.message.includes('Import')
+          return !(isImportError && e.file.endsWith('__init__.py'))
+        })
+        if (visibleErrors.length > 0) {
+          const warningMessages = visibleErrors.map(e => `- ${e.file}: ${e.message}`).join('\n')
+          logger.warn('Pipeline: Cross-file validation errors (non-blocking):\n%s', warningMessages)
+          allWarnings.push(...visibleErrors.map(e => `Cross-file: ${e.file} - ${e.message}`))
+        }
       }
     }
 
@@ -262,37 +267,29 @@ export class GenerationPipeline {
       projectId
     )
 
-    // Stage 5 — Validate generated files
-    await onProgress('Validating', 90)
-    const fileValidationStartedAt = Date.now()
-    const validationResults = await validateGeneratedFiles(generatedFiles, projectId, this.app, onProgress)
-    logger.info(
-      'Pipeline: file validation completed in %dms for project %s',
-      Date.now() - fileValidationStartedAt,
-      projectId
-    )
-    if (validationResults.failCount > 0) {
-      logger.warn(
-        'Pipeline: %d/%d files failed validation for project %s',
-        validationResults.failCount,
-        generatedFiles.length,
-        projectId
-      )
-      // Don't throw - allow generation to complete even with validation failures
-      allWarnings.push(`${validationResults.failCount} files failed validation`)
-    }
-
-    // Stage 6 — Extract architecture metadata
+    // Stage 6 — Extract architecture metadata (Stage 5 validation runs as separate async BullMQ job)
     try {
       await onProgress('Building architecture graph', 95)
       const architectureStartedAt = Date.now()
       const extractor = new ArchitectureExtractor()
       const architectureData = extractor.extract(schema, generatedFiles, validationResult.relationships)
-      await this.app.service('architecture').create({
-        projectId,
-        ...architectureData,
-        updatedAt: Date.now()
-      } as any)
+
+      // Upsert architecture: patch if exists, create if not
+      const existingArch = (await this.app.service('architecture').find({
+        query: { projectId, $limit: 1 }
+      })) as any
+      if (existingArch.total > 0) {
+        await this.app.service('architecture').patch(existingArch.data[0]._id, {
+          ...architectureData,
+          updatedAt: Date.now()
+        } as any)
+      } else {
+        await this.app.service('architecture').create({
+          projectId,
+          ...architectureData,
+          updatedAt: Date.now()
+        } as any)
+      }
       logger.info(
         'Pipeline: architecture extraction completed in %dms for project %s',
         Date.now() - architectureStartedAt,
@@ -309,6 +306,39 @@ export class GenerationPipeline {
       if (decisions.length) {
         await this.memory.recordDecisions(projectId, decisions)
       }
+
+      // Stage 7 — Generate API test collection (~97% progress)
+      try {
+        await onProgress('Generating API tests', 97)
+        const testGenerator = new ApiTestGenerator()
+        const testCollection = testGenerator.generate(schema, architectureData, validationResult.relationships)
+        const testJson = JSON.stringify(testCollection, null, 2)
+        const testKey = `projects/${projectId}/api-tests.json`
+        await r2Client.putObject(testKey, testJson)
+
+        // Upsert api-tests.json file record in MongoDB
+        const existingTestFile = (await this.app.service('files').find({
+          query: { projectId, key: testKey, $limit: 1 }
+        })) as any
+        if (existingTestFile.total > 0) {
+          await this.app.service('files').patch(existingTestFile.data[0]._id, {
+            size: Buffer.byteLength(testJson),
+            updatedAt: Date.now()
+          })
+        } else {
+          await this.app.service('files').create({
+            projectId,
+            name: 'api-tests.json',
+            key: testKey,
+            fileType: 'json',
+            size: Buffer.byteLength(testJson)
+          })
+        }
+
+        logger.info('Pipeline: API test collection generated for project %s (%d groups)', projectId, testCollection.groups.length)
+      } catch (testErr: any) {
+        logger.warn('Pipeline: API test generation failed (non-fatal): %s', testErr.message)
+      }
     } catch (err: any) {
       logger.warn('Pipeline: architecture extraction failed (non-fatal): %s', err.message)
     }
@@ -321,12 +351,8 @@ export class GenerationPipeline {
     const result: PipelineResult = {
       files: generatedFiles,
       fileCount: persistedFiles.length,
-      totalSize
-    }
-
-    // Attach warnings to the result if any
-    if (allWarnings.length > 0) {
-      ;(result as any).warnings = allWarnings
+      totalSize,
+      warnings: allWarnings.length > 0 ? allWarnings : undefined
     }
 
     logger.info(
