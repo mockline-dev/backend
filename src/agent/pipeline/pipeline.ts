@@ -1,5 +1,6 @@
 import type { Application } from '../../declarations'
 import { logger } from '../../logger'
+import { createPipelineLogger } from '../../pipeline-logger'
 import { r2Client } from '../../storage/r2.client'
 import { ProjectMemory } from '../memory/project-memory'
 import { ContextRetriever } from '../rag/retriever'
@@ -48,6 +49,12 @@ export class GenerationPipeline {
   async run(options: PipelineOptions): Promise<PipelineResult> {
     const { projectId, prompt, onProgress, jobId } = options
     const pipelineStartedAt = Date.now()
+    const runId = String(pipelineStartedAt)
+
+    const loggers = createPipelineLogger(projectId, runId)
+    const plog = loggers.pipeline
+
+    try {
 
     // Stage 0 — Load project info, initialize memory, index existing files
     let project: any
@@ -72,20 +79,20 @@ export class GenerationPipeline {
         this.retriever.indexProject(projectId),
         new Promise<void>((_, reject) => setTimeout(() => reject(new Error('RAG indexing timeout')), 15000))
       ])
-      logger.info(
+      plog.info(
         'Pipeline: RAG indexing completed in %dms for project %s',
         Date.now() - ragIndexStartedAt,
         projectId
       )
     } catch (err: any) {
-      logger.warn('Pipeline: RAG indexing failed (non-fatal): %s', err.message)
+      plog.warn('Pipeline: RAG indexing failed (non-fatal): %s', err.message)
     }
 
     // Stage 1 — Intent analysis (schema extraction)
     await onProgress('Analyzing prompt', 5)
     const intentStartedAt = Date.now()
-    const schema = await this.intentAnalyzer.analyze(prompt)
-    logger.info(
+    const schema = await this.intentAnalyzer.analyze(prompt, loggers.intent)
+    plog.info(
       'Pipeline: intent analysis completed in %dms for project %s',
       Date.now() - intentStartedAt,
       projectId
@@ -95,7 +102,7 @@ export class GenerationPipeline {
     await onProgress('Validating schema', 10)
     const schemaValidationStartedAt = Date.now()
     const validationResult = this.schemaValidator.validate(schema)
-    logger.info(
+    plog.info(
       'Pipeline: schema validation completed in %dms for project %s',
       Date.now() - schemaValidationStartedAt,
       projectId
@@ -107,7 +114,7 @@ export class GenerationPipeline {
     // Log warnings if any
     if (validationResult.warnings.length > 0) {
       const warningMessages = validationResult.warnings.map(w => `- ${w.field}: ${w.message}`).join('\n')
-      logger.warn('Pipeline: Schema validation warnings:\n%s', warningMessages)
+      plog.warn('Pipeline: Schema validation warnings:\n%s', warningMessages)
       allWarnings.push(...validationResult.warnings.map(w => `Schema: ${w.field} - ${w.message}`))
     }
 
@@ -129,23 +136,23 @@ export class GenerationPipeline {
 
       if (criticalErrors.length > 0) {
         const errorMessages = criticalErrors.map(e => `- ${e.field}: ${e.message}`).join('\n')
-        logger.error('Pipeline: Schema validation failed with critical errors:\n%s', errorMessages)
+        plog.error('Pipeline: Schema validation failed with critical errors:\n%s', errorMessages)
         throw new Error(`Schema validation failed:\n${errorMessages}`)
       } else {
         // Treat non-critical errors as warnings
         const warningMessages = validationResult.errors.map(e => `- ${e.field}: ${e.message}`).join('\n')
-        logger.warn('Pipeline: Schema validation errors treated as warnings:\n%s', warningMessages)
+        plog.warn('Pipeline: Schema validation errors treated as warnings:\n%s', warningMessages)
         allWarnings.push(...validationResult.errors.map(e => `Schema: ${e.field} - ${e.message}`))
       }
     }
 
-    logger.info('Pipeline: Schema validated with %d relationships', validationResult.relationships.length)
+    plog.info('Pipeline: Schema validated with %d relationships', validationResult.relationships.length)
 
     // Stage 2 — Task planning (file structure)
     await onProgress('Planning files', 15)
     const planningStartedAt = Date.now()
-    const plan = await this.taskPlanner.plan(prompt, schema)
-    logger.info(
+    const plan = await this.taskPlanner.plan(prompt, schema, loggers.planning)
+    plog.info(
       'Pipeline: task planning completed in %dms for project %s',
       Date.now() - planningStartedAt,
       projectId
@@ -160,7 +167,7 @@ export class GenerationPipeline {
       dependencyGraph
     )
 
-    logger.debug('Pipeline: built global context for %d files', globalContext.size)
+    plog.debug('Pipeline: built global context for %d files', globalContext.size)
 
     await this.app.service('projects').patch(projectId, {
       generationProgress: {
@@ -178,7 +185,7 @@ export class GenerationPipeline {
     try {
       const scaffoldFiles = renderScaffold(schema)
       preScaffolded = new Map(scaffoldFiles.map(f => [f.path, f.content]))
-      logger.info(
+      plog.info(
         'Pipeline: scaffold completed in %dms — %d template files for project %s',
         Date.now() - scaffoldStartedAt,
         preScaffolded.size,
@@ -186,7 +193,7 @@ export class GenerationPipeline {
       )
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      logger.warn('Pipeline: scaffold failed (non-fatal, falling back to LLM for all files): %s', msg)
+      plog.warn('Pipeline: scaffold failed (non-fatal, falling back to LLM for all files): %s', msg)
     }
 
     // Stage 3 — File generation (LLM for non-scaffold files only)
@@ -214,10 +221,11 @@ export class GenerationPipeline {
         dependencyGraph,
         contextBuilder: this.contextBuilder,
         plan,
-        preScaffolded
+        preScaffolded,
+        log: loggers.generation
       }
     )
-    logger.info(
+    plog.info(
       'Pipeline: file generation completed in %dms for project %s (%d files)',
       Date.now() - generationStartedAt,
       projectId,
@@ -232,7 +240,7 @@ export class GenerationPipeline {
       schema,
       validationResult.relationships
     )
-    logger.info(
+    plog.info(
       'Pipeline: cross-file validation completed in %dms for project %s',
       Date.now() - crossFileValidationStartedAt,
       projectId
@@ -241,7 +249,7 @@ export class GenerationPipeline {
     // Log warnings if any
     if (crossFileValidation.warnings.length > 0) {
       const warningMessages = crossFileValidation.warnings.map(w => `- ${w.file}: ${w.message}`).join('\n')
-      logger.warn('Pipeline: Cross-file validation warnings:\n%s', warningMessages)
+      plog.warn('Pipeline: Cross-file validation warnings:\n%s', warningMessages)
       allWarnings.push(...crossFileValidation.warnings.map(w => `Cross-file: ${w.file} - ${w.message}`))
     }
 
@@ -260,7 +268,7 @@ export class GenerationPipeline {
 
       if (criticalErrors.length > 0) {
         const errorMessages = criticalErrors.map(e => `- ${e.file}: ${e.message}`).join('\n')
-        logger.error('Pipeline: Cross-file validation failed with critical errors:\n%s', errorMessages)
+        plog.error('Pipeline: Cross-file validation failed with critical errors:\n%s', errorMessages)
         throw new Error(`Cross-file validation failed:\n${errorMessages}`)
       } else {
         // Add non-__init__.py import errors and other non-critical errors to warnings
@@ -270,7 +278,7 @@ export class GenerationPipeline {
         })
         if (visibleErrors.length > 0) {
           const warningMessages = visibleErrors.map(e => `- ${e.file}: ${e.message}`).join('\n')
-          logger.warn('Pipeline: Cross-file validation errors (non-blocking):\n%s', warningMessages)
+          plog.warn('Pipeline: Cross-file validation errors (non-blocking):\n%s', warningMessages)
           allWarnings.push(...visibleErrors.map(e => `Cross-file: ${e.file} - ${e.message}`))
         }
       }
@@ -280,7 +288,7 @@ export class GenerationPipeline {
     await onProgress('Saving files', 82)
     const persistenceStartedAt = Date.now()
     const persistedFiles = await this.persistFiles(projectId, generatedFiles, jobId)
-    logger.info(
+    plog.info(
       'Pipeline: persistence completed in %dms for project %s',
       Date.now() - persistenceStartedAt,
       projectId
@@ -309,7 +317,7 @@ export class GenerationPipeline {
           updatedAt: Date.now()
         } as any)
       }
-      logger.info(
+      plog.info(
         'Pipeline: architecture extraction completed in %dms for project %s',
         Date.now() - architectureStartedAt,
         projectId
@@ -354,12 +362,12 @@ export class GenerationPipeline {
           })
         }
 
-        logger.info('Pipeline: API test collection generated for project %s (%d groups)', projectId, testCollection.groups.length)
+        plog.info('Pipeline: API test collection generated for project %s (%d groups)', projectId, testCollection.groups.length)
       } catch (testErr: any) {
-        logger.warn('Pipeline: API test generation failed (non-fatal): %s', testErr.message)
+        plog.warn('Pipeline: API test generation failed (non-fatal): %s', testErr.message)
       }
     } catch (err: any) {
-      logger.warn('Pipeline: architecture extraction failed (non-fatal): %s', err.message)
+      plog.warn('Pipeline: architecture extraction failed (non-fatal): %s', err.message)
     }
 
     await onProgress('Complete', 100)
@@ -374,7 +382,7 @@ export class GenerationPipeline {
       warnings: allWarnings.length > 0 ? allWarnings : undefined
     }
 
-    logger.info(
+    plog.info(
       'Pipeline: completed in %dms for project %s (files=%d, warnings=%d)',
       Date.now() - pipelineStartedAt,
       projectId,
@@ -383,6 +391,9 @@ export class GenerationPipeline {
     )
 
     return result
+    } finally {
+      loggers.close()
+    }
   }
 
   private async persistFiles(

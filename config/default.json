@@ -161,5 +161,13 @@
         "concurrency": 1,
         "retryAttempts": 3,
         "backoffDelay": 1000
+    },
+    "logging": {
+        "pipeline": {
+            "enabled": true,
+            "directory": "./logs",
+            "level": "debug",
+            "maxAgeDays": 7
+        }
     }
 }

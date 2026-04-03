@@ -1,3 +1,5 @@
+import type { Logger } from 'winston'
+
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
 import { getProvider } from '../../llm/providers/registry'
 import { logger } from '../../logger'
@@ -43,6 +45,8 @@ export interface FileGeneratorOptions {
    * These skip LLM generation entirely — content is used as-is.
    */
   preScaffolded?: Map<string, string>
+  /** Optional stage logger for debug output to file logs. */
+  log?: Logger
 }
 
 export class FileGenerator {
@@ -65,6 +69,7 @@ export class FileGenerator {
     options: FileGeneratorOptions = {}
   ): Promise<GeneratedFile[]> {
     const preScaffolded = options.preScaffolded ?? new Map<string, string>()
+    const log = options.log ?? logger
 
     // Reset registry for each generation run
     this.importRegistry = new ImportRegistry()
@@ -103,12 +108,12 @@ export class FileGenerator {
       for (const { task } of scaffoldTasks) {
         const progressIndex = startedCount++
         await onProgress(progressIndex, plan.length, task.path)
-        logger.info('FileGenerator: scaffold (template) %s (%d/%d)', task.path, progressIndex + 1, plan.length)
+        log.info('FileGenerator: scaffold (template) %s (%d/%d)', task.path, progressIndex + 1, plan.length)
       }
 
       if (llmTasks.length === 0) continue
 
-      logger.info(
+      log.info(
         'FileGenerator: stage %d — %d LLM files (parallelism=%d)',
         stage,
         llmTasks.length,
@@ -134,19 +139,19 @@ export class FileGenerator {
             const content = generateInitPyStub(task.path, options.plan ?? [])
             generatedByIndex.set(index, { path: task.path, content })
             this.importRegistry.register(task.path, content)
-            logger.info('FileGenerator: __init__.py stub %s (fast path, %dms)', task.path, Date.now() - fileStartedAt)
+            log.info('FileGenerator: __init__.py stub %s (fast path, %dms)', task.path, Date.now() - fileStartedAt)
             continue
           }
 
           // Build context including import hints from already-generated files
           const generationContext = await this.buildGenerationContext(task, generatedByIndex, options)
 
-          const content = await this.generateOne(prompt, schema, task, generationContext)
+          const content = await this.generateOne(prompt, schema, task, generationContext, log)
 
           generatedByIndex.set(index, { path: task.path, content })
           this.importRegistry.register(task.path, content)
 
-          logger.info(
+          log.info(
             'FileGenerator: LLM generated %s in %dms (%d/%d)',
             task.path,
             Date.now() - fileStartedAt,
@@ -157,7 +162,7 @@ export class FileGenerator {
       })
 
       await Promise.all(stageWorkers)
-      logger.info('FileGenerator: completed stage %d', stage)
+      log.info('FileGenerator: completed stage %d', stage)
     }
 
     return [...generatedByIndex.entries()].sort((a, b) => a[0] - b[0]).map(([, file]) => file)
@@ -201,7 +206,7 @@ export class FileGenerator {
         )
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
-        logger.warn('FileGenerator: RAG retrieval failed for %s: %s', task.path, msg)
+        ;(options.log ?? logger).warn('FileGenerator: RAG retrieval failed for %s: %s', task.path, msg)
       }
     }
 
@@ -245,7 +250,8 @@ export class FileGenerator {
       relationships?: Relationship[]
       projectManifest?: string
       availableImports?: string
-    }
+    },
+    log: Logger = logger
   ): Promise<string> {
     const provider = getProvider()
     const maxAttempts = 4
@@ -255,27 +261,25 @@ export class FileGenerator {
       const attemptStartedAt = Date.now()
       try {
         let raw = ''
+        const systemPrompt = buildGenerationPrompts.generateFileSystemPrompt(task.path)
+        const userPrompt = buildGenerationPrompts.generateFileUserPrompt(
+          prompt,
+          schema,
+          task,
+          context.dependencies,
+          context.existingFiles,
+          context.memoryBlock,
+          context.relationships,
+          context.contextBlock,
+          context.projectManifest,
+          context.availableImports
+        )
+        log.debug('FileGenerator: LLM call for %s — system=%d chars, user=%d chars', task.path, systemPrompt.length, userPrompt.length)
+
         for await (const chunk of provider.chatStream(
           [
-            {
-              role: 'system',
-              content: buildGenerationPrompts.generateFileSystemPrompt(task.path)
-            },
-            {
-              role: 'user',
-              content: buildGenerationPrompts.generateFileUserPrompt(
-                prompt,
-                schema,
-                task,
-                context.dependencies,
-                context.existingFiles,
-                context.memoryBlock,
-                context.relationships,
-                context.contextBlock,
-                context.projectManifest,
-                context.availableImports
-              )
-            }
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
           ],
           undefined,
           {
@@ -289,17 +293,18 @@ export class FileGenerator {
 
         const clean = stripFences(raw)
         if (!clean) throw new Error('Generated file content is empty')
-        logger.debug(
-          'FileGenerator: attempt %d/%d succeeded for %s in %dms',
+        log.debug(
+          'FileGenerator: attempt %d/%d succeeded for %s in %dms (%d chars)',
           attempt,
           maxAttempts,
           task.path,
-          Date.now() - attemptStartedAt
+          Date.now() - attemptStartedAt,
+          clean.length
         )
         return clean
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        logger.warn(
+        log.warn(
           'FileGenerator: attempt %d/%d failed for %s after %dms: %s',
           attempt,
           maxAttempts,
@@ -311,7 +316,7 @@ export class FileGenerator {
         if (attempt < maxAttempts) {
           // Add progressive delay before retry
           const delay = retryDelays[attempt - 1] || 1000
-          logger.debug('FileGenerator: waiting %dms before retry', delay)
+          log.debug('FileGenerator: waiting %dms before retry', delay)
           await new Promise(resolve => setTimeout(resolve, delay))
         } else {
           throw new Error(

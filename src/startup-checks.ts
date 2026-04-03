@@ -238,6 +238,8 @@ export async function runStartupChecks(app: Application): Promise<void> {
   // Start ChromaDB if not already running, then check it
   const chromaConfig = config.get<{ host: string; port: number }>('chromadb')
   await startChromaIfNeeded(chromaConfig.host, chromaConfig.port)
+  // Reset client so any previous failure latch is cleared after (re)spawn
+  chromaClient.reset()
 
   const chromaResult = await checkChromaDB()
 

@@ -42,7 +42,7 @@ type ChromaCollection = {
 
 type ChromaBaseClient = {
   heartbeat(): Promise<number>
-  getOrCreateCollection(args: { name: string; embeddingFunction: null }): Promise<ChromaCollection>
+  getOrCreateCollection(args: { name: string }): Promise<ChromaCollection>
   deleteCollection(args: { name: string }): Promise<unknown>
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -131,19 +131,22 @@ function splitByDoubleNewlines(filepath: string, content: string): Chunk[] {
 
 // ─── ChromaClient ─────────────────────────────────────────────────────────────
 
+const RETRY_INTERVAL_MS = 30_000
+
 /**
  * Thin wrapper around the ChromaDB JavaScript client.
  *
  * Handles ChromaDB being unavailable gracefully:
  * - Connection failures are logged as warnings, not errors
  * - All methods return empty results when ChromaDB is unavailable
+ * - Retries connection after 30s cooldown (not a permanent one-way latch)
  * - The system works perfectly without ChromaDB (it's an enhancement)
  */
 export class ChromaClient {
   private readonly host: string
   private readonly port: number
   private client: ChromaBaseClient | null = null
-  private available = true
+  private lastFailureAt = 0
 
   constructor() {
     const cfg = config.get<ChromaDbConfig>('chromadb')
@@ -151,35 +154,46 @@ export class ChromaClient {
     this.port = cfg.port ?? 8001
   }
 
+  /** Reset connection state — call after spawning a new ChromaDB process. */
+  reset(): void {
+    this.client = null
+    this.lastFailureAt = 0
+  }
+
+  private invalidateClient(): void {
+    this.client = null
+    this.lastFailureAt = Date.now()
+  }
+
   private collectionName(projectId: string): string {
     return `mockline-${projectId}`
   }
 
   private async getClient(): Promise<ChromaBaseClient | null> {
-    if (!this.available) return null
+    // Back off if failed recently
+    if (this.lastFailureAt > 0 && Date.now() - this.lastFailureAt < RETRY_INTERVAL_MS) {
+      return null
+    }
+
     if (this.client) return this.client
 
     try {
       // Dynamic import to avoid crash if chromadb package is not installed
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore — chromadb may not be installed; handled at runtime
       const chromaModule = await import('chromadb')
-      const BaseClient = chromaModule.ChromaClient as unknown as new (config: {
-        ssl: boolean
-        host: string
-        port: number
-      }) => ChromaBaseClient
-      const c = new BaseClient({
-        ssl: false,
-        host: this.host,
-        port: this.port
-      })
+      const BaseClient = chromaModule.ChromaClient as unknown as new (cfg: { path: string }) => ChromaBaseClient
+      const path = `http://${this.host}:${this.port}`
+      const c = new BaseClient({ path })
       await c.heartbeat()
       this.client = c
-      logger.info('ChromaClient: connected to ChromaDB at %s:%d', this.host, this.port)
+      this.lastFailureAt = 0
+      logger.info('ChromaClient: connected to ChromaDB at %s', path)
       return this.client
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      logger.warn('ChromaClient: ChromaDB unavailable (%s) — semantic search disabled', msg)
-      this.available = false
+      logger.warn('ChromaClient: ChromaDB unavailable (%s) — semantic search disabled (retry in %ds)', msg, RETRY_INTERVAL_MS / 1000)
+      this.invalidateClient()
       return null
     }
   }
@@ -188,11 +202,11 @@ export class ChromaClient {
     const client = await this.getClient()
     if (!client) return null
     try {
-      // embeddingFunction: null — we supply embeddings manually via llmClient.embed()
-      return await client.getOrCreateCollection({ name: this.collectionName(projectId), embeddingFunction: null })
+      return await client.getOrCreateCollection({ name: this.collectionName(projectId) })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn('ChromaClient: getOrCreateCollection failed: %s', msg)
+      this.invalidateClient()
       return null
     }
   }
@@ -229,6 +243,8 @@ export class ChromaClient {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         logger.warn('ChromaClient: failed to index %s: %s', file.path, msg)
+        this.invalidateClient()
+        return
       }
     }
 
@@ -262,6 +278,7 @@ export class ChromaClient {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn('ChromaClient: search failed: %s', msg)
+      this.invalidateClient()
       return []
     }
   }
@@ -274,6 +291,7 @@ export class ChromaClient {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn('ChromaClient: deleteProject failed: %s', msg)
+      this.invalidateClient()
     }
   }
 
@@ -285,6 +303,7 @@ export class ChromaClient {
       await client.heartbeat()
       return true
     } catch {
+      this.invalidateClient()
       return false
     }
   }

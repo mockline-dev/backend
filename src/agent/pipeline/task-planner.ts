@@ -1,3 +1,5 @@
+import type { Logger } from 'winston'
+
 import { llmClient, getModelConfig } from '../../llm/client'
 import { stripThinkTags } from '../../llm/structured-output'
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
@@ -27,11 +29,11 @@ const REQUIRED_FASTAPI_FILES: TaskPlan[] = [
 export class TaskPlanner {
   private dependencyAnalyzer = new DependencyAnalyzer()
 
-  async plan(prompt: string, schema: IntentSchema): Promise<TaskPlan[]> {
-    logger.debug('TaskPlanner: planning file structure for project "%s"', schema.projectName)
+  async plan(prompt: string, schema: IntentSchema, log: Logger = logger): Promise<TaskPlan[]> {
+    log.debug('TaskPlanner: planning file structure for project "%s"', schema.projectName)
 
     const plan = await withRetry(
-      () => this.callLLM(prompt, schema),
+      () => this.callLLM(prompt, schema, log),
       2,
       [1000, 2000],
       'TaskPlanner'
@@ -41,19 +43,23 @@ export class TaskPlanner {
     const graph = this.dependencyAnalyzer.analyzeDependencies(plan, schema)
     const orderedPlan = this.dependencyAnalyzer.getOrderedFiles(graph, plan)
 
-    logger.debug('TaskPlanner: ordered %d files with dependency awareness', orderedPlan.length)
+    log.debug('TaskPlanner: ordered %d files with dependency awareness', orderedPlan.length)
 
     return orderedPlan
   }
 
-  private async callLLM(prompt: string, schema: IntentSchema): Promise<TaskPlan[]> {
+  private async callLLM(prompt: string, schema: IntentSchema, log: Logger): Promise<TaskPlan[]> {
     const modelCfg = getModelConfig('planning')
+    const systemPrompt = 'You are a FastAPI expert. Always respond with a valid JSON array of file objects only. No markdown, no explanation.'
+    const userPrompt = buildGenerationPrompts.filePlan(prompt, schema)
+
+    log.debug('TaskPlanner: LLM call — model=%s, system=%d chars, user=%d chars', modelCfg.name, systemPrompt.length, userPrompt.length)
 
     const response = await llmClient.chat({
       model: modelCfg.name,
       messages: [
-        { role: 'system', content: 'You are a FastAPI expert. Always respond with a valid JSON array of file objects only. No markdown, no explanation.' },
-        { role: 'user', content: buildGenerationPrompts.filePlan(prompt, schema) }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
       ],
       temperature: modelCfg.temperature,
       think: modelCfg.think,
@@ -61,6 +67,7 @@ export class TaskPlanner {
     })
 
     const raw = stripThinkTags(response.content)
+    log.debug('TaskPlanner: LLM response — %d chars (first 200: %s)', raw.length, raw.slice(0, 200))
     const rawParsed = parseJson(raw, 'file plan')
 
     if (!Array.isArray(rawParsed)) {

@@ -1,3 +1,5 @@
+import type { Logger } from 'winston'
+
 import { logger } from '../../logger'
 import { llmClient, getModelConfig } from '../../llm/client'
 import { stripThinkTags } from '../../llm/structured-output'
@@ -23,28 +25,32 @@ export interface IntentSchema {
 }
 
 export class IntentAnalyzer {
-  async analyze(prompt: string): Promise<IntentSchema> {
-    logger.debug('IntentAnalyzer: analyzing prompt (%d chars)', prompt.length)
+  async analyze(prompt: string, log: Logger = logger): Promise<IntentSchema> {
+    log.debug('IntentAnalyzer: analyzing prompt (%d chars)', prompt.length)
 
     const schema = await withRetry(
-      () => this.callLLM(prompt),
+      () => this.callLLM(prompt, log),
       2,
       [1000, 2000],
       'IntentAnalyzer'
     )
 
-    logger.debug('IntentAnalyzer: extracted schema with %d entities', schema.entities?.length ?? 0)
+    log.debug('IntentAnalyzer: extracted schema with %d entities', schema.entities?.length ?? 0)
     return schema as IntentSchema
   }
 
-  private async callLLM(prompt: string): Promise<IntentSchema> {
+  private async callLLM(prompt: string, log: Logger): Promise<IntentSchema> {
     const modelCfg = getModelConfig('planning')
+    const systemPrompt = 'You are a backend architecture expert. Always respond with valid JSON only. No markdown, no explanation.'
+    const userPrompt = buildGenerationPrompts.extractSchema(prompt)
+
+    log.debug('IntentAnalyzer: LLM call — model=%s, system=%d chars, user=%d chars', modelCfg.name, systemPrompt.length, userPrompt.length)
 
     const response = await llmClient.chat({
       model: modelCfg.name,
       messages: [
-        { role: 'system', content: 'You are a backend architecture expert. Always respond with valid JSON only. No markdown, no explanation.' },
-        { role: 'user', content: buildGenerationPrompts.extractSchema(prompt) }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
       ],
       temperature: modelCfg.temperature,
       think: modelCfg.think,
@@ -52,6 +58,7 @@ export class IntentAnalyzer {
     })
 
     const raw = stripThinkTags(response.content)
+    log.debug('IntentAnalyzer: LLM response — %d chars (first 200: %s)', raw.length, raw.slice(0, 200))
     const schema = parseJson(raw, 'intent schema')
 
     // Runtime validation

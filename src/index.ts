@@ -5,6 +5,7 @@ import { createServer as createNetServer } from 'net'
 import { app } from './app'
 import { validateConfig } from './config.validator'
 import { logger } from './logger'
+import { cleanupOldLogs } from './pipeline-logger'
 import { runStartupChecks, stopChromaProcess } from './startup-checks'
 
 // Validate configuration before starting
@@ -73,6 +74,7 @@ async function freePort(port: number): Promise<void> {
 ;(async () => {
   try {
     await runStartupChecks(app)
+    cleanupOldLogs()
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     logger.error('Startup checks failed: %s', msg)
