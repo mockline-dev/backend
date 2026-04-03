@@ -1,5 +1,6 @@
+import { llmClient, getModelConfig } from '../../llm/client'
+import { stripThinkTags } from '../../llm/structured-output'
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
-import { getProvider } from '../../llm/providers/registry'
 import { logger } from '../../logger'
 import { DependencyAnalyzer, type DependencyGraph } from './dependency-analyzer'
 import type { IntentSchema } from './intent-analyzer'
@@ -46,27 +47,27 @@ export class TaskPlanner {
   }
 
   private async callLLM(prompt: string, schema: IntentSchema): Promise<TaskPlan[]> {
-    const provider = getProvider()
-    let responseText = ''
+    const modelCfg = getModelConfig('planning')
 
-    for await (const chunk of provider.chatStream(
-      [
-        { role: 'system', content: 'You are a FastAPI expert. Always respond with a valid JSON array of file objects.' },
+    const response = await llmClient.chat({
+      model: modelCfg.name,
+      messages: [
+        { role: 'system', content: 'You are a FastAPI expert. Always respond with a valid JSON array of file objects only. No markdown, no explanation.' },
         { role: 'user', content: buildGenerationPrompts.filePlan(prompt, schema) }
       ],
-      undefined,
-      { temperature: 0.1 }
-    )) {
-      responseText += chunk.message.content
-    }
+      temperature: modelCfg.temperature,
+      think: modelCfg.think,
+      format: 'json'
+    })
 
-    const raw = parseJson(responseText, 'file plan')
+    const raw = stripThinkTags(response.content)
+    const rawParsed = parseJson(raw, 'file plan')
 
-    if (!Array.isArray(raw)) {
+    if (!Array.isArray(rawParsed)) {
       throw new Error('TaskPlanner: file plan is not an array')
     }
 
-    const normalized: TaskPlan[] = raw
+    const normalized: TaskPlan[] = rawParsed
       .filter((item: any) => typeof item === 'object' && item !== null)
       .map((item: any) => ({
         path: String(item.path ?? '').trim(),

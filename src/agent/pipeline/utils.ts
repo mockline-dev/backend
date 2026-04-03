@@ -1,15 +1,20 @@
 import { logger } from '../../logger'
 
 /**
- * Parses JSON from LLM response text, handling markdown code fences.
- * Throws with a descriptive error if parsing fails.
+ * Parses JSON from LLM response text, handling <think> tags, markdown code fences,
+ * and raw JSON objects/arrays. Safe to call on any LLM response.
  */
 export function parseJson(text: string, context: string): any {
-  const match = text.match(/```json\n?([\s\S]*?)\n?```/) || text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
+  // Strip <think>...</think> blocks (qwen3:8b emits these before JSON)
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '')
+  // Strip unclosed/truncated think block
+  cleaned = cleaned.replace(/<think>[\s\S]*/g, '').trim()
+
+  const match = cleaned.match(/```json\n?([\s\S]*?)\n?```/) || cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
   try {
-    return JSON.parse((match?.[1] || text).trim())
+    return JSON.parse((match?.[1] || cleaned).trim())
   } catch (err) {
-    logger.error('parseJson: failed to parse %s JSON: %s', context, text.slice(0, 300))
+    logger.error('parseJson: failed to parse %s JSON: %s', context, cleaned.slice(0, 300))
     throw new Error(
       `parseJson: failed to parse ${context}: ${err instanceof Error ? err.message : String(err)}`
     )

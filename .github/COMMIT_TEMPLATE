@@ -1,0 +1,24 @@
+# Commit Message Template
+#
+# <type>(<scope>): <short summary> (max 72 chars)
+#
+# Types:
+#   feat     — new feature
+#   fix      — bug fix
+#   refactor — code change that neither fixes a bug nor adds a feature
+#   test     — adding or updating tests
+#   docs     — documentation only
+#   chore    — build process, dependencies, tooling
+#   perf     — performance improvement
+#
+# Scopes (optional): pipeline, llm, worker, template, service, config, auth
+#
+# Short summary: imperative mood, no period at the end
+#   Good: "add think-tag stripping to parseJson"
+#   Bad:  "Added think-tag stripping to parseJson."
+#
+# Body (optional, wrap at 72 chars):
+#   - Explain WHY the change is needed, not what it does
+#   - Reference failing behaviour or root cause
+#
+# ─────────────────────────────────────────────────────────────────────

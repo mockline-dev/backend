@@ -1,5 +1,6 @@
 import { logger } from '../../logger'
-import { getProvider } from '../../llm/providers/registry'
+import { llmClient, getModelConfig } from '../../llm/client'
+import { stripThinkTags } from '../../llm/structured-output'
 import { buildGenerationPrompts } from '../../llm/prompts/generation.prompts'
 import { parseJson, withRetry } from './utils'
 
@@ -37,21 +38,21 @@ export class IntentAnalyzer {
   }
 
   private async callLLM(prompt: string): Promise<IntentSchema> {
-    const provider = getProvider()
-    let responseText = ''
+    const modelCfg = getModelConfig('planning')
 
-    for await (const chunk of provider.chatStream(
-      [
-        { role: 'system', content: 'You are a backend architecture expert. Always respond with valid JSON.' },
+    const response = await llmClient.chat({
+      model: modelCfg.name,
+      messages: [
+        { role: 'system', content: 'You are a backend architecture expert. Always respond with valid JSON only. No markdown, no explanation.' },
         { role: 'user', content: buildGenerationPrompts.extractSchema(prompt) }
       ],
-      undefined,
-      { temperature: 0.1 }
-    )) {
-      responseText += chunk.message.content
-    }
+      temperature: modelCfg.temperature,
+      think: modelCfg.think,
+      format: 'json'
+    })
 
-    const schema = parseJson(responseText, 'intent schema')
+    const raw = stripThinkTags(response.content)
+    const schema = parseJson(raw, 'intent schema')
 
     // Runtime validation
     if (!Array.isArray(schema.entities) || schema.entities.length === 0) {

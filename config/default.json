@@ -61,7 +61,7 @@
     "model": "qwen2.5-coder:7b",
     "embedModel": "nomic-embed-text",
     "numPredict": 16384,
-    "numCtx": 32768,
+    "numCtx": 16384,
     "temperature": 0.3,
     "topP": 0.9,
     "repeatPenalty": 1.1,
