@@ -1,9 +1,9 @@
 import config from 'config'
 
-import { llmClient } from '../../llm/client'
 import { logger } from '../../logger'
 import type { GeneratedFile } from '../../types'
-import type { TreeSitterIndexer } from './tree-sitter-indexer'
+import { chunkFile } from './code-chunker'
+import { OllamaEmbeddingFunction } from './embedding-provider'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -21,9 +21,8 @@ export interface ChromaSearchResult {
   score: number
 }
 
-// ─── Minimal shapes for chromadb v3 API (compatible with actual library) ──────
+// ─── Minimal shapes for chromadb v3 API ──────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 type ChromaCollection = {
   upsert(args: {
     ids: string[]
@@ -31,7 +30,11 @@ type ChromaCollection = {
     documents: string[]
     metadatas: Record<string, string | number | boolean>[]
   }): Promise<unknown>
-  query(args: { queryEmbeddings: number[][]; nResults: number; include?: string[] }): Promise<{
+  query(args: {
+    queryEmbeddings: number[][]
+    nResults: number
+    include?: string[]
+  }): Promise<{
     ids: string[][]
     documents: (string | null)[][] | null
     distances: number[][] | null
@@ -42,96 +45,19 @@ type ChromaCollection = {
 
 type ChromaBaseClient = {
   heartbeat(): Promise<number>
-  getOrCreateCollection(args: { name: string }): Promise<ChromaCollection>
+  getOrCreateCollection(args: {
+    name: string
+    embeddingFunction?: unknown
+  }): Promise<ChromaCollection>
   deleteCollection(args: { name: string }): Promise<unknown>
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
-// ─── Chunk splitting ──────────────────────────────────────────────────────────
-
-interface Chunk {
-  id: string
-  content: string
-  filepath: string
-  startLine: number
-  endLine: number
-}
-
-function splitByBoundaries(filepath: string, content: string, indexer: TreeSitterIndexer | null): Chunk[] {
-  const lines = content.split('\n')
-  const chunks: Chunk[] = []
-
-  if (indexer && filepath.endsWith('.py')) {
-    const index = indexer.indexFile('__chunking__', filepath, content)
-    const boundaries = [...index.functions.map(f => f.line), ...index.classes.map(c => c.line)].sort(
-      (a, b) => a - b
-    )
-
-    if (boundaries.length === 0) {
-      return splitByDoubleNewlines(filepath, content)
-    }
-
-    let prev = 0
-    for (const boundary of boundaries) {
-      const end = boundary - 1
-      if (end > prev) {
-        const slice = lines.slice(prev, end).join('\n').trim()
-        if (slice.length > 20) {
-          chunks.push({
-            id: `${filepath}::${prev}`,
-            content: slice,
-            filepath,
-            startLine: prev + 1,
-            endLine: end
-          })
-        }
-      }
-      prev = boundary - 1
-    }
-    // Remainder
-    if (prev < lines.length) {
-      const slice = lines.slice(prev).join('\n').trim()
-      if (slice.length > 20) {
-        chunks.push({
-          id: `${filepath}::${prev}`,
-          content: slice,
-          filepath,
-          startLine: prev + 1,
-          endLine: lines.length
-        })
-      }
-    }
-    return chunks.length > 0 ? chunks : splitByDoubleNewlines(filepath, content)
-  }
-
-  return splitByDoubleNewlines(filepath, content)
-}
-
-function splitByDoubleNewlines(filepath: string, content: string): Chunk[] {
-  const blocks = content.split(/\n{2,}/)
-  const chunks: Chunk[] = []
-  let lineOffset = 0
-
-  for (const block of blocks) {
-    const trimmed = block.trim()
-    if (trimmed.length > 20) {
-      const blockLines = block.split('\n').length
-      chunks.push({
-        id: `${filepath}::${lineOffset}`,
-        content: trimmed,
-        filepath,
-        startLine: lineOffset + 1,
-        endLine: lineOffset + blockLines
-      })
-    }
-    lineOffset += block.split('\n').length + 2
-  }
-  return chunks
-}
-
-// ─── ChromaClient ─────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const RETRY_INTERVAL_MS = 30_000
+const HEARTBEAT_CACHE_MS = 60_000
+
+// ─── MocklineChromaClient ─────────────────────────────────────────────────────
 
 /**
  * Thin wrapper around the ChromaDB JavaScript client.
@@ -140,29 +66,43 @@ const RETRY_INTERVAL_MS = 30_000
  * - Connection failures are logged as warnings, not errors
  * - All methods return empty results when ChromaDB is unavailable
  * - Retries connection after 30s cooldown (not a permanent one-way latch)
+ * - Heartbeat check is cached for 60s to avoid redundant pings
  * - The system works perfectly without ChromaDB (it's an enhancement)
  */
-export class ChromaClient {
+export class MocklineChromaClient {
   private readonly host: string
   private readonly port: number
+  private readonly embedFn: OllamaEmbeddingFunction
   private client: ChromaBaseClient | null = null
   private lastFailureAt = 0
+  private lastHeartbeatAt = 0
 
   constructor() {
     const cfg = config.get<ChromaDbConfig>('chromadb')
     this.host = cfg.host ?? 'localhost'
     this.port = cfg.port ?? 8001
+    this.embedFn = new OllamaEmbeddingFunction()
   }
 
   /** Reset connection state — call after spawning a new ChromaDB process. */
   reset(): void {
     this.client = null
     this.lastFailureAt = 0
+    this.lastHeartbeatAt = 0
+  }
+
+  /** Returns true when ChromaDB is connected or not yet attempted. */
+  isAvailable(): boolean {
+    if (this.lastFailureAt > 0 && Date.now() - this.lastFailureAt < RETRY_INTERVAL_MS) {
+      return false
+    }
+    return this.client !== null || this.lastFailureAt === 0
   }
 
   private invalidateClient(): void {
     this.client = null
     this.lastFailureAt = Date.now()
+    this.lastHeartbeatAt = 0
   }
 
   private collectionName(projectId: string): string {
@@ -170,29 +110,48 @@ export class ChromaClient {
   }
 
   private async getClient(): Promise<ChromaBaseClient | null> {
-    // Back off if failed recently
     if (this.lastFailureAt > 0 && Date.now() - this.lastFailureAt < RETRY_INTERVAL_MS) {
       return null
     }
 
-    if (this.client) return this.client
+    if (this.client) {
+      // Use cached heartbeat to avoid redundant pings
+      if (Date.now() - this.lastHeartbeatAt < HEARTBEAT_CACHE_MS) {
+        return this.client
+      }
+      try {
+        await this.client.heartbeat()
+        this.lastHeartbeatAt = Date.now()
+        return this.client
+      } catch {
+        this.invalidateClient()
+        return null
+      }
+    }
 
     try {
       // Dynamic import to avoid crash if chromadb package is not installed
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore — chromadb may not be installed; handled at runtime
       const chromaModule = await import('chromadb')
-      const BaseClient = chromaModule.ChromaClient as unknown as new (cfg: { path: string }) => ChromaBaseClient
-      const path = `http://${this.host}:${this.port}`
-      const c = new BaseClient({ path })
+      const BaseClient = chromaModule.ChromaClient as unknown as new (cfg: {
+        ssl: boolean
+        host: string
+        port: number
+      }) => ChromaBaseClient
+      const c = new BaseClient({ ssl: false, host: this.host, port: this.port })
       await c.heartbeat()
       this.client = c
       this.lastFailureAt = 0
-      logger.info('ChromaClient: connected to ChromaDB at %s', path)
+      this.lastHeartbeatAt = Date.now()
+      logger.info('ChromaClient: connected to ChromaDB at %s:%d', this.host, this.port)
       return this.client
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      logger.warn('ChromaClient: ChromaDB unavailable (%s) — semantic search disabled (retry in %ds)', msg, RETRY_INTERVAL_MS / 1000)
+      logger.warn(
+        'ChromaClient: ChromaDB unavailable (%s) — semantic search disabled (retry in %ds)',
+        msg,
+        RETRY_INTERVAL_MS / 1000
+      )
       this.invalidateClient()
       return null
     }
@@ -202,7 +161,10 @@ export class ChromaClient {
     const client = await this.getClient()
     if (!client) return null
     try {
-      return await client.getOrCreateCollection({ name: this.collectionName(projectId) })
+      return await client.getOrCreateCollection({
+        name: this.collectionName(projectId),
+        embeddingFunction: this.embedFn
+      })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn('ChromaClient: getOrCreateCollection failed: %s', msg)
@@ -213,42 +175,28 @@ export class ChromaClient {
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
-  async indexProject(
-    projectId: string,
-    files: GeneratedFile[],
-    indexer: TreeSitterIndexer | null = null
-  ): Promise<void> {
+  /** Index all .py files from a generated project. */
+  async indexProject(projectId: string, files: GeneratedFile[]): Promise<void> {
     const collection = await this.getOrCreateCollection(projectId)
     if (!collection) return
 
     const pyFiles = files.filter(f => f.path.endsWith('.py'))
 
     for (const file of pyFiles) {
-      const chunks = splitByBoundaries(file.path, file.content, indexer)
-      if (chunks.length === 0) continue
-
-      try {
-        const embeddings = await Promise.all(chunks.map(c => llmClient.embed(c.content)))
-
-        await collection.upsert({
-          ids: chunks.map(c => c.id),
-          embeddings,
-          documents: chunks.map(c => c.content),
-          metadatas: chunks.map(c => ({
-            filepath: c.filepath,
-            startLine: c.startLine,
-            endLine: c.endLine
-          }))
-        })
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err)
-        logger.warn('ChromaClient: failed to index %s: %s', file.path, msg)
-        this.invalidateClient()
-        return
-      }
+      await this.upsertFileChunks(collection, file.path, file.content)
     }
 
     logger.info('ChromaClient: indexed %d Python files for project %s', pyFiles.length, projectId)
+  }
+
+  /** Re-index a single file (deletes old chunks then upserts new ones). */
+  async indexFile(projectId: string, filepath: string, content: string): Promise<void> {
+    const collection = await this.getOrCreateCollection(projectId)
+    if (!collection) return
+
+    await this.deleteFileChunks(collection, filepath)
+    await this.upsertFileChunks(collection, filepath, content)
+    logger.debug('ChromaClient: re-indexed file %s for project %s', filepath, projectId)
   }
 
   async search(projectId: string, query: string, limit = 5): Promise<ChromaSearchResult[]> {
@@ -256,9 +204,11 @@ export class ChromaClient {
     if (!collection) return []
 
     try {
-      const embedding = await llmClient.embed(query)
+      const embeddings = await this.embedFn.generate([query])
+      const queryEmbedding = embeddings[0]
+
       const results = await collection.query({
-        queryEmbeddings: [embedding],
+        queryEmbeddings: [queryEmbedding],
         nResults: limit,
         include: ['documents', 'distances', 'metadatas']
       })
@@ -307,6 +257,74 @@ export class ChromaClient {
       return false
     }
   }
+
+  // ── Private helpers ─────────────────────────────────────────────────────────
+
+  private async upsertFileChunks(
+    collection: ChromaCollection,
+    filepath: string,
+    content: string
+  ): Promise<void> {
+    const chunks = chunkFile(filepath, content)
+    if (chunks.length === 0) return
+
+    try {
+      const embeddings = await this.embedFn.generate(chunks.map(c => c.content))
+
+      await collection.upsert({
+        ids: chunks.map(c => c.id),
+        embeddings,
+        documents: chunks.map(c => c.content),
+        metadatas: chunks.map(c => ({
+          filepath: c.filepath,
+          startLine: c.startLine,
+          endLine: c.endLine,
+          type: c.type,
+          name: c.name
+        }))
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logger.warn('ChromaClient: failed to index %s: %s', filepath, msg)
+      this.invalidateClient()
+      throw err
+    }
+  }
+
+  private async deleteFileChunks(collection: ChromaCollection, filepath: string): Promise<void> {
+    try {
+      // ChromaDB delete by where filter — but our API shape uses ids.
+      // We prefix ids with filepath so we can reconstruct them; however,
+      // ChromaDB v3 supports where filter on metadata. Use a workaround:
+      // query for existing ids then delete by id.
+      const existing = await collection.query({
+        queryEmbeddings: [new Array(768).fill(0) as number[]],
+        nResults: 500,
+        include: ['metadatas']
+      })
+
+      const ids: string[] = []
+      const metaRows = existing.metadatas?.[0] ?? []
+      const idRows = existing.ids?.[0] ?? []
+
+      for (let i = 0; i < metaRows.length; i++) {
+        const meta = metaRows[i]
+        if (meta && typeof meta.filepath === 'string' && meta.filepath === filepath) {
+          ids.push(idRows[i])
+        }
+      }
+
+      if (ids.length > 0) {
+        await collection.delete({ ids })
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logger.debug('ChromaClient: deleteFileChunks for %s: %s', filepath, msg)
+    }
+  }
 }
 
-export const chromaClient = new ChromaClient()
+// Backward-compat alias
+export type ChromaClient = MocklineChromaClient
+
+export const chromaClient = new MocklineChromaClient()

@@ -8,6 +8,7 @@ import { embeddingStore } from '../rag/store'
 import { symbolIndexer } from '../rag/symbol-indexer'
 import { treeSitterIndexer } from '../context/tree-sitter-indexer'
 import { chromaClient } from '../context/chroma-client'
+import { CodeSearchService } from '../context/search'
 
 export interface ToolResult {
   success: boolean
@@ -94,8 +95,11 @@ export async function executeToolCall(
         await upsertFileRecord(app, projectId, path, key, Buffer.byteLength(result.content))
         await embeddingStore.add(projectId, path, result.content)
 
-        // Re-index modified file into tree-sitter index
+        // Re-index modified file into tree-sitter and ChromaDB
         treeSitterIndexer.indexFile(projectId, path, result.content)
+        chromaClient.indexFile(projectId, path, result.content).catch(() => {
+          // ChromaDB re-index is best-effort
+        })
 
         return { success: true, data: { path, changed: true } }
       }
@@ -132,35 +136,24 @@ export async function executeToolCall(
           return { success: false, error: 'query must be a non-empty string' }
         }
 
-        // Try ChromaDB first (semantic search with chunked content)
-        const chromaResults = await chromaClient.search(projectId, args.query, 5)
-        if (chromaResults.length > 0) {
-          const results = chromaResults.map(r => ({
-            path: r.filepath,
-            preview: r.content.slice(0, 600),
-            score: r.score
-          }))
-          return { success: true, data: { results, source: 'chromadb' } }
-        }
+        const searchService = new CodeSearchService(chromaClient, app)
+        const results = await searchService.search(projectId, args.query, 5)
 
-        // Fallback to embedding store
-        const paths = await embeddingStore.query(projectId, args.query, 5)
-        if (paths.length === 0) {
+        if (results.length === 0) {
           return { success: true, data: { results: [], message: 'No indexed files found for this project' } }
         }
 
-        const results = await Promise.all(
-          paths.map(async path => {
-            try {
-              const content = await r2Client.getObject(`${prefix}${path}`)
-              return { path, preview: content.slice(0, 600) }
-            } catch {
-              return { path, preview: '' }
-            }
-          })
-        )
-
-        return { success: true, data: { results, source: 'embeddings' } }
+        return {
+          success: true,
+          data: {
+            results: results.map(r => ({
+              path: r.filepath,
+              preview: r.content.slice(0, 600),
+              score: r.score
+            })),
+            source: results[0].source
+          }
+        }
       }
 
       case 'get_symbols': {

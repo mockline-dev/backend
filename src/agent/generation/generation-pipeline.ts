@@ -146,7 +146,7 @@ export async function executeGenerationPipeline(
     indexer.indexProject(projectId, allFiles)
   }
   if (projectId && chromaClient) {
-    chromaClient.indexProject(projectId, allFiles, indexer ?? null).catch((err: unknown) => {
+    chromaClient.indexProject(projectId, allFiles).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn('GenerationPipeline: ChromaDB indexing failed: %s', msg)
     })
