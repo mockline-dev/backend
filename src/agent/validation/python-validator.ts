@@ -74,6 +74,18 @@ export async function validatePython(
   return { path, valid: true, errors: [], tiersRun }
 }
 
+/**
+ * Lightweight Tier-1-only syntax check via py_compile.
+ * Used as a fast pre-persistence gate in the pipeline.
+ * Does NOT run ruff or pyflakes.
+ */
+export async function validateSyntaxOnly(
+  path: string,
+  content: string
+): Promise<ValidationError[]> {
+  return runPyCompile(path, content)
+}
+
 // ---------------------------------------------------------------------------
 // Tier 1 — py_compile (syntax only, no imports needed)
 // ---------------------------------------------------------------------------

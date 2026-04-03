@@ -1,16 +1,14 @@
 import type { Worker } from 'bullmq'
 
+import type { Application } from '../../declarations'
 import { logger } from '../../logger'
 import { closeRedisClient, configureRedisClientFromApp, getRedisClient } from './client'
 import { initBullBoard } from './monitor/monitor'
+import { jobTracker } from './queues/job-tracker'
 
 let planningWorker: Worker | null = null
 let generationWorker: Worker | null = null
 let validationWorker: Worker | null = null
-let editWorker: Worker | null = null
-// Legacy workers (old queue names — kept for backward compatibility)
-let legacyGenerationWorker: Worker | null = null
-let legacyValidationWorker: Worker | null = null
 let legacyEditWorker: Worker | null = null
 let started = false
 
@@ -21,24 +19,20 @@ export async function startWorkerService(app: unknown) {
     configureRedisClientFromApp(app)
     await getRedisClient()
 
+    // Wire app into job tracker so cleanup can remove MongoDB records
+    jobTracker.setApp(app as Application)
+
     // New pipeline workers (planning → generation → validation)
     const planningModule = await import('./workers/planning.worker')
     const generationModule = await import('./workers/generation.worker')
     const validationModule = await import('./workers/validation.worker')
-    const editModule = await import('./workers/edit.worker')
 
     planningWorker = planningModule.planningWorker
     generationWorker = generationModule.generationWorker
     validationWorker = validationModule.validationWorker
-    editWorker = editModule.editWorker
 
-    // Legacy workers (old queue names — kept for in-flight jobs)
-    const legacyGenerationModule = await import('./worker/generation.worker')
-    const legacyValidationModule = await import('./worker/validation.worker')
+    // Legacy edit worker (handles code-edit queue — still used by /ai-edit endpoint)
     const legacyEditModule = await import('./worker/edit.worker')
-
-    legacyGenerationWorker = legacyGenerationModule.generationWorker
-    legacyValidationWorker = legacyValidationModule.validationWorker
     legacyEditWorker = legacyEditModule.editWorker
 
     await initBullBoard(app)
@@ -55,9 +49,6 @@ export async function stopWorkerService() {
       planningWorker,
       generationWorker,
       validationWorker,
-      editWorker,
-      legacyGenerationWorker,
-      legacyValidationWorker,
       legacyEditWorker
     ]
 
@@ -70,9 +61,6 @@ export async function stopWorkerService() {
     planningWorker = null
     generationWorker = null
     validationWorker = null
-    editWorker = null
-    legacyGenerationWorker = null
-    legacyValidationWorker = null
     legacyEditWorker = null
 
     await closeRedisClient()
@@ -82,3 +70,4 @@ export async function stopWorkerService() {
     logger.error('Failed to stop worker service', err)
   }
 }
+

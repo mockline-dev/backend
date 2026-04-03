@@ -3,6 +3,7 @@
  * Ensures proper cleanup of resources when jobs fail or are cancelled
  */
 
+import type { Application } from '../../../declarations'
 import { logger } from '../../../logger'
 import { r2Client } from '../../../storage/r2.client'
 
@@ -11,6 +12,7 @@ export interface JobCleanupContext {
   jobId?: string | number
   generatedFiles?: Array<{ path: string; content?: string }>
   r2Keys?: string[]
+  app?: Application
 }
 
 /**
@@ -18,11 +20,12 @@ export interface JobCleanupContext {
  * Called when a generation job fails or is cancelled
  */
 export async function cleanupFailedJob(context: JobCleanupContext): Promise<void> {
-  const { projectId, jobId, generatedFiles, r2Keys } = context
+  const { projectId, jobId, generatedFiles, r2Keys, app } = context
 
   logger.info('JobTracker: Starting cleanup for job %s, project %s', jobId, projectId)
 
   const cleanupErrors: string[] = []
+  const deletedKeys: string[] = []
 
   // Cleanup R2 files if keys were provided
   if (r2Keys && r2Keys.length > 0) {
@@ -31,24 +34,34 @@ export async function cleanupFailedJob(context: JobCleanupContext): Promise<void
       for (const key of r2Keys) {
         try {
           await r2Client.deleteObject(key)
-        } catch (err: any) {
-          cleanupErrors.push(`Failed to delete R2 object ${key}: ${err.message}`)
+          deletedKeys.push(key)
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err)
+          cleanupErrors.push(`Failed to delete R2 object ${key}: ${msg}`)
         }
       }
-    } catch (err: any) {
-      cleanupErrors.push(`R2 cleanup failed: ${err.message}`)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      cleanupErrors.push(`R2 cleanup failed: ${msg}`)
     }
   }
 
-  // Cleanup generated files if provided
-  if (generatedFiles && generatedFiles.length > 0) {
+  // Cleanup MongoDB file records for deleted R2 keys
+  if (app && deletedKeys.length > 0) {
     try {
-      logger.info('JobTracker: Cleaning up %d generated file references', generatedFiles.length)
-      // Note: File records in MongoDB are cleaned up by the projects service
-      // This is just for tracking purposes
-    } catch (err: any) {
-      cleanupErrors.push(`Generated files cleanup failed: ${err.message}`)
+      await app.service('files').remove(null, {
+        query: { projectId, key: { $in: deletedKeys } }
+      })
+      logger.info('JobTracker: Removed %d MongoDB file records for project %s', deletedKeys.length, projectId)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      cleanupErrors.push(`MongoDB files cleanup failed: ${msg}`)
     }
+  }
+
+  // Log generated file references (actual cleanup is via R2 keys above)
+  if (generatedFiles && generatedFiles.length > 0) {
+    logger.info('JobTracker: %d generated file references tracked for project %s', generatedFiles.length, projectId)
   }
 
   if (cleanupErrors.length > 0) {
@@ -59,6 +72,31 @@ export async function cleanupFailedJob(context: JobCleanupContext): Promise<void
     )
   } else {
     logger.info('JobTracker: Cleanup completed successfully for job %s', jobId)
+  }
+}
+
+/**
+ * Delete all R2 files under a project prefix and remove their MongoDB records.
+ * Used for initial-generation failures where the entire project output must be wiped.
+ */
+export async function cleanupProjectFiles(projectId: string, app?: Application): Promise<void> {
+  logger.info('JobTracker: Wiping all R2 files for project %s', projectId)
+  try {
+    await r2Client.deletePrefix(`projects/${projectId}/`)
+    logger.info('JobTracker: Deleted R2 prefix projects/%s/', projectId)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.warn('JobTracker: R2 prefix delete failed for project %s: %s', projectId, msg)
+  }
+
+  if (app) {
+    try {
+      await app.service('files').remove(null, { query: { projectId } })
+      logger.info('JobTracker: Removed all MongoDB file records for project %s', projectId)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logger.warn('JobTracker: MongoDB files cleanup failed for project %s: %s', projectId, msg)
+    }
   }
 }
 
@@ -76,6 +114,15 @@ class JobTracker {
       generatedFiles: Array<{ path: string; content?: string }>
     }
   >()
+
+  private app?: Application
+
+  /**
+   * Attach the Feathers application (called once at startup).
+   */
+  setApp(app: Application): void {
+    this.app = app
+  }
 
   /**
    * Register a job as active
@@ -156,7 +203,8 @@ class JobTracker {
       projectId: job.projectId,
       jobId,
       generatedFiles: job.generatedFiles,
-      r2Keys: job.r2Keys
+      r2Keys: job.r2Keys,
+      app: this.app
     })
 
     // Remove from tracking

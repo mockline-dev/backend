@@ -1,10 +1,15 @@
 import type { Application } from '../../declarations'
 import { logger } from '../../logger'
-import type { GeneratedFile } from '../pipeline/file-generator'
-import { runFixLoop, type FixTarget } from './fix-loop'
+import { runFixLoop, runLastResortFix, type FixTarget } from './fix-loop'
 import { validatePython } from './python-validator'
 import { validateTypeScript } from './ts-validator'
 import type { VenvManager } from './venv-manager'
+
+/** Minimal file descriptor needed by the validator (path + mutable content). */
+export interface GeneratedFile {
+  path: string
+  content: string
+}
 
 export interface FileValidationResult {
   path: string
@@ -87,36 +92,55 @@ export async function validateGeneratedFiles(
   )
   await onProgress('Running AI fix loop', 95)
 
-  const { fixed } = await runFixLoop(failTargets, {
-    validate: async (path, content) => {
-      const ext = path.split('.').pop()?.toLowerCase() ?? ''
-      if (ext === 'py') {
-        const r = await validatePython(path, content, venv, projectId)
-        return r.errors
-      }
-      if (ext === 'ts' || ext === 'tsx') {
-        const r = await validateTypeScript(path, content)
-        return r.errors
-      }
-      return []
-    },
+  const validateFn = async (path: string, content: string): Promise<Array<{ line?: number; code?: string; message: string }>> => {
+    const ext = path.split('.').pop()?.toLowerCase() ?? ''
+    if (ext === 'py') {
+      const r = await validatePython(path, content, venv, projectId)
+      return r.errors
+    }
+    if (ext === 'ts' || ext === 'tsx') {
+      const r = await validateTypeScript(path, content)
+      return r.errors
+    }
+    return []
+  }
+
+  const { fixed, failed } = await runFixLoop(failTargets, {
+    validate: validateFn,
     maxAttempts: 3
   })
 
-  // Apply fixes into the in-memory files array and update results
-  for (const fix of fixed) {
-    const file = files.find(f => f.path === fix.path)
-    if (file) file.content = fix.content
+  // Apply SEARCH/REPLACE fixes into in-memory files and update results
+  const applyFixes = (fixList: typeof fixed) => {
+    for (const fix of fixList) {
+      const file = files.find(f => f.path === fix.path)
+      if (file) file.content = fix.content
 
-    const idx = results.findIndex(r => r.path === fix.path)
-    if (idx >= 0) {
-      results[idx] = { path: fix.path, valid: true, errors: [], wasFixed: true }
+      const idx = results.findIndex(r => r.path === fix.path)
+      if (idx >= 0) {
+        results[idx] = { path: fix.path, valid: true, errors: [], wasFixed: true }
+      }
+
+      logger.info('Validator: fixed %s after %d attempt(s)', fix.path, fix.attempts)
     }
-
-    logger.info('Validator: fixed %s after %d attempt(s)', fix.path, fix.attempts)
   }
 
-  return buildSummary(results, fixed.length)
+  applyFixes(fixed)
+
+  // ── Phase 3: Last-resort full-file replacement for still-failing files ───
+  if (failed.length > 0) {
+    logger.info(
+      'Validator: running last-resort full-file rewrite for %d file(s) (project %s)',
+      failed.length,
+      projectId
+    )
+    await onProgress('Last-resort file rewrite', 97)
+
+    const lastResortFixed = await runLastResortFix(failed, validateFn)
+    applyFixes(lastResortFixed)
+  }
+
+  return buildSummary(results, results.filter(r => r.wasFixed).length)
 }
 
 function buildSummary(results: FileValidationResult[], fixedCount: number): ValidationSummary {

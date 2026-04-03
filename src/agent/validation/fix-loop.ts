@@ -1,11 +1,26 @@
+import { getModelConfig } from '../../llm/client'
 import { getProvider } from '../../llm/providers/registry'
 import { logger } from '../../logger'
 import { applySearchReplace } from '../../services/ai-service/diff-utils'
 import type { ValidationError } from './python-validator'
 
-const MAX_FILE_CHARS = 8_000      // ~2K tokens — keep prompt under 6K total
+const MAX_FILE_CHARS = 12_000     // ~3K tokens — keep prompt under 6K total with system prompt
 const MAX_ERRORS_SHOWN = 8
-const FIX_TEMPERATURE = 0.05
+
+const FIX_SYSTEM_PROMPT = `You are an expert Python debugger. Your task is to fix errors in Python files.
+
+Output Format Rules:
+- Return ONLY SEARCH/REPLACE blocks in this exact format:
+<<<<<<< SEARCH
+<exact lines from the file, matching whitespace exactly>
+=======
+<corrected lines>
+>>>>>>> REPLACE
+- One block per distinct error location
+- The SEARCH text MUST match the file exactly (same indentation, same whitespace)
+- Fix ONLY what the errors require — do not rewrite unrelated code
+- If an import is missing, insert it after the last existing import
+- NEVER output the full file — only the change blocks`
 
 export interface FixTarget {
   file: { path: string; content: string }
@@ -66,6 +81,72 @@ export async function runFixLoop(
   return { fixed, failed }
 }
 
+/**
+ * Last-resort fix: ask the LLM to output the entire corrected file.
+ * Called when the SEARCH/REPLACE fix loop exhausted all attempts.
+ */
+export async function runLastResortFix(
+  targets: FixTarget[],
+  validate: (path: string, content: string) => Promise<ValidationError[]>
+): Promise<FixResult[]> {
+  const fixed: FixResult[] = []
+  const modelCfg = getModelConfig('fixing')
+  const provider = getProvider()
+
+  for (const target of targets) {
+    const { path, content } = target.file
+    const errorBlock = target.errors
+      .slice(0, MAX_ERRORS_SHOWN)
+      .map(e => `  Line ${e.line ?? '?'}${e.code ? ` [${e.code}]` : ''}: ${e.message}`)
+      .join('\n')
+
+    const truncated = content.length > MAX_FILE_CHARS
+      ? content.slice(0, MAX_FILE_CHARS) + '\n# ... (truncated)'
+      : content
+
+    logger.info('FixLoop: last-resort full-file rewrite for %s (%d errors)', path, target.errors.length)
+
+    try {
+      let raw = ''
+      for await (const chunk of provider.chatStream(
+        [
+          {
+            role: 'system',
+            content: 'You are an expert Python developer. Output ONLY the complete corrected Python file — no explanations, no markdown fences, just the raw Python code.'
+          },
+          {
+            role: 'user',
+            content: `Fix ALL the following errors in this Python file and return the complete corrected file.\n\nFILE: ${path}\n\nERRORS:\n${errorBlock}\n\nFILE CONTENT:\n${truncated}`
+          }
+        ],
+        undefined,
+        { temperature: modelCfg.temperature, num_predict: 4096 }
+      )) {
+        raw += chunk.message.content
+      }
+
+      const newContent = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
+      if (!newContent) {
+        logger.warn('FixLoop: last-resort LLM returned empty for %s', path)
+        continue
+      }
+
+      const remaining = await validate(path, newContent)
+      if (remaining.length === 0) {
+        logger.info('FixLoop: last-resort fixed %s', path)
+        fixed.push({ path, content: newContent, attempts: 1 })
+      } else {
+        logger.warn('FixLoop: last-resort could not fix %s (%d errors remain)', path, remaining.length)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logger.warn('FixLoop: last-resort LLM call failed for %s: %s', path, msg)
+    }
+  }
+
+  return fixed
+}
+
 // ---------------------------------------------------------------------------
 // Internal
 // ---------------------------------------------------------------------------
@@ -116,6 +197,8 @@ async function callLLM(
   content: string,
   errors: ValidationError[]
 ): Promise<string | null> {
+  const modelCfg = getModelConfig('fixing')
+
   const errorBlock = errors
     .slice(0, MAX_ERRORS_SHOWN)
     .map(e => `  Line ${e.line ?? '?'}${e.code ? ` [${e.code}]` : ''}: ${e.message}`)
@@ -125,44 +208,37 @@ async function callLLM(
     ? content.slice(0, MAX_FILE_CHARS) + '\n# ... (truncated)'
     : content
 
-  const prompt = `You are an expert Python debugger. Fix the errors in the file below.
+  const userPrompt = `FILE: ${path}
 
-FILE: ${path}
-ERRORS:
+ERRORS TO FIX:
 ${errorBlock}
 
 FILE CONTENT:
+\`\`\`python
 ${truncated}
-
-OUTPUT FORMAT — return only SEARCH/REPLACE blocks, nothing else:
-<<<<<<< SEARCH
-<exact lines to replace>
-=======
-<corrected lines>
->>>>>>> REPLACE
-
-Rules:
-- One block per distinct error location.
-- The SEARCH text must match the file exactly (same whitespace).
-- Fix ONLY what the errors require — do not rewrite unrelated code.
-- If an import is missing, add a SEARCH/REPLACE that inserts it after the last existing import.
-- Never output the full file — only the change blocks.`
+\`\`\``
 
   try {
     const provider = getProvider()
     let raw = ''
 
     for await (const chunk of provider.chatStream(
-      [{ role: 'user', content: prompt }],
+      [
+        { role: 'system', content: FIX_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt }
+      ],
       undefined,
-      { temperature: FIX_TEMPERATURE, num_predict: 1024 }
+      { temperature: modelCfg.temperature, num_predict: 4096 }
     )) {
       raw += chunk.message.content
     }
 
+    const totalBlocks = raw.match(/<<<<<<< SEARCH/g)?.length ?? 0
+
     if (!raw.includes('<<<<<<< SEARCH')) {
       // LLM returned a full file instead of blocks — accept it as fallback
       const stripped = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
+      logger.debug('FixLoop: no SEARCH/REPLACE blocks in response for %s — using full-file fallback', path)
       return stripped || null
     }
 
@@ -173,7 +249,7 @@ Rules:
       logger.debug(
         'FixLoop: %d/%d blocks could not be applied for %s',
         unapplied.length,
-        unapplied.length + (raw.match(/<<<<<<< SEARCH/g)?.length ?? 0) - unapplied.length,
+        totalBlocks,
         path
       )
     }

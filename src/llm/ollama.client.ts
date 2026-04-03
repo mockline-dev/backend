@@ -70,7 +70,7 @@ export class OllamaClient {
           stream: true,
           options: {
             temperature: options.temperature ?? 0.15,
-            num_ctx: options.num_ctx ?? 8192,
+            num_ctx: options.num_ctx ?? config.get<number>('ollama.numCtx'),
             num_predict: options.num_predict,
             top_p: options.top_p ?? 0.9,
             repeat_penalty: 1.1,

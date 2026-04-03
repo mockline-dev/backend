@@ -27,6 +27,7 @@ export class OllamaProvider implements ILLMProvider {
     for await (const chunk of ollamaClient.chatStream(messages, undefined, {
       temperature: options.temperature,
       num_ctx: options.num_ctx,
+      num_predict: options.num_predict,
       top_p: options.top_p
     })) {
       result += chunk.message.content

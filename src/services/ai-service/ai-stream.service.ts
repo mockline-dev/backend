@@ -1,5 +1,6 @@
 import { authenticate } from '@feathersjs/authentication'
 import { BadRequest, Forbidden, NotFound } from '@feathersjs/errors'
+import config from 'config'
 import { ProjectMemory } from '../../agent/memory/project-memory'
 import { ContextRetriever } from '../../agent/rag/retriever'
 import { getProvider } from '../../llm/providers/registry'
@@ -350,7 +351,7 @@ export default function (app: any) {
 
         for await (const chunk of provider.chatStream(messages as any, undefined, {
           temperature: 0.4,
-          num_ctx: 32768
+          num_ctx: config.get<number>('ollama.numCtx')
         })) {
           fullContent += chunk.message.content
 

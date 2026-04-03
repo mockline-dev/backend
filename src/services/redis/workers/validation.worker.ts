@@ -100,12 +100,12 @@ export const validationWorker = new Worker<ValidationJobData>(
 
       // ── 3. Execute validation pipeline (includes fix loop) ────────────────
       await job.updateProgress(20)
-      const noop = async () => {}
+      const noop = async (_stage: string, _pct: number): Promise<void> => {}
       const summary = await validateGeneratedFiles(
         files,
         projectId,
         app,
-        noop as never,
+        noop,
         venvManager.has(projectId) ? venvManager : undefined
       )
 

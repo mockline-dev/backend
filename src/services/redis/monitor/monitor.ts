@@ -2,7 +2,10 @@ import { createBullBoard } from '@bull-board/api'
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter'
 import { KoaAdapter } from '@bull-board/koa'
 import { logger } from '../../../logger'
-import { generationQueue, validationQueue } from '../queues/queues'
+import { generationQueue as newGenerationQueue } from '../queues/generation.queue'
+import { planningQueue } from '../queues/planning.queue'
+import { validationQueue as newValidationQueue } from '../queues/validation.queue'
+import { editQueue } from '../queues/queues'
 
 function basicAuth(ctx: any, next: any) {
   const auth = ctx.get('Authorization')
@@ -34,13 +37,18 @@ function basicAuth(ctx: any, next: any) {
 }
 
 export async function initBullBoard(app: any) {
-  if (!generationQueue && !validationQueue) throw new Error('Queue not initialized')
-
   const serverAdapter = new KoaAdapter()
   serverAdapter.setBasePath('/admin/queues')
 
   createBullBoard({
-    queues: [new BullMQAdapter(generationQueue), new BullMQAdapter(validationQueue)],
+    queues: [
+      // New pipeline queues (planning → generation → validation)
+      new BullMQAdapter(planningQueue),
+      new BullMQAdapter(newGenerationQueue),
+      new BullMQAdapter(newValidationQueue),
+      // Legacy edit queue (still active — /ai-edit endpoint)
+      new BullMQAdapter(editQueue)
+    ],
     serverAdapter
   })
 

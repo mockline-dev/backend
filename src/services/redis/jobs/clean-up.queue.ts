@@ -2,7 +2,7 @@ import { Queue } from 'bullmq'
 import 'reflect-metadata'
 import { closeRedisClient, getRedisClient } from '../client'
 
-const QUEUE_NAMES = ['code-generation', 'code-validation']
+const QUEUE_NAMES = ['planning', 'generation', 'validation', 'code-edit']
 const CLEAN_BATCH_SIZE = 10_000
 
 async function cleanByType(queue: Queue, type: 'completed' | 'failed' | 'active' | 'waiting' | 'delayed') {
