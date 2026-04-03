@@ -1,0 +1,111 @@
+[nodemon] starting `ts-node src/index.ts`
+info: Initializing Redis client... {"db":0,"host":"127.0.0.1","port":6379}
+Configuration validated
+info: Running startup checks...
+info: Redis connected successfully
+info: Redis ready to accept commands
+info: Redis client initialized successfully
+info: Bull Board integrated at http://localhost:3030/admin/queues
+info: Worker service started successfully (planning + generation + validation + edit)
+info: ChromaDB: starting on port 8001...
+warn: ChromaDB: did not become ready within 20s — semantic search may be unavailable
+The 'path' argument is deprecated. Please use 'ssl', 'host', and 'port' instead
+info: ChromaClient: connected to ChromaDB at http://localhost:8001
+info:   ✓ MongoDB: ping OK
+info:   ✓ Redis: ping OK
+info:   ✓ Ollama: Models ready: qwen2.5-coder:7b (107ms), qwen3:8b (84ms)
+info:   ✓ Python 3: Python 3.14.3
+info:   ✓ pyflakes: available
+info:   ✓ R2 Storage: listObjects OK
+info:   ✓ ChromaDB: heartbeat OK
+info:   ✓ nomic-embed-text: available
+info: All critical startup checks passed.
+warn: Port 3030 already in use — killing stale process...
+warn: PipelineLogger: log cleanup failed: ENOENT: no such file or directory, scandir './logs'
+info: Feathers app listening on http://localhost:3030
+Received prompt for enhancement: Build a backend for a task management application with projects and tasks. Include user authentication, task CRUD operations, project organization, task assignment, due dates, status tracking, and pagination.
+Received enhanced prompt for project metadata inference: Develop a backend API using Python and FastAPI for a task management application. The backend should include features such as user authentication with JWT, task creation (CRUD operations), project organization with nested projects, task assignment to users, due dates, status tracking (e.g., pending, in progress, completed), and pagination for listing tasks. Ensure the API follows best practices and includes error handling for all endpoints.
+info: Planning job 11 started — project 69cffc3065904dcd0e816621
+info: Planning job enqueued {
+  projectId: new ObjectId('69cffc3065904dcd0e816621'),
+  userId: '69b6afc50c0af9bb788722cb',
+  jobId: '11'
+}
+info: PlanningPipeline: requirements extracted — 3 entities, authRequired=true
+info: extractEntities: "User" extracted (3 fields)
+info: extractEntities: "Project" extracted (3 fields)
+info: extractEntities: "Task" extracted (7 fields)
+info: PlanningPipeline: 3 entities extracted
+info: PlanningPipeline: 3 relationships mapped
+info: PlanningPipeline: 8 endpoints planned
+info: PlanningPipeline: plan validated — "task-management"
+info: Planning job 11 completed for project 69cffc3065904dcd0e816621
+info: Generation job 10 started — project 69cffc3065904dcd0e816621
+info: Planning job 11 completed
+info: GenerationPipeline: 35 template files, 10 LLM files
+info: TemplateEngine: rendered 34 scaffold files for "task-management"
+info: GenerationPipeline: scaffolded 34 template files
+info: GenerationPipeline: generation order: app/services/user_service.py, app/services/project_service.py, app/services/task_service.py, app/api/routes/user.py, app/api/routes/auth.py, app/api/routes/project.py, app/api/routes/task.py, tests/test_user.py, tests/test_project.py, tests/test_task.py
+info: generateFile: app/services/user_service.py generated successfully (attempt 1)
+info: GenerationPipeline: generated app/services/user_service.py
+info: generateFile: app/services/project_service.py generated successfully (attempt 1)
+info: GenerationPipeline: generated app/services/project_service.py
+info: generateFile: app/services/task_service.py generated successfully (attempt 1)
+info: GenerationPipeline: generated app/services/task_service.py
+info: generateFile: app/api/routes/user.py generated successfully (attempt 1)
+info: GenerationPipeline: generated app/api/routes/user.py
+info: generateFile: app/api/routes/auth.py generated successfully (attempt 1)
+info: GenerationPipeline: generated app/api/routes/auth.py
+info: generateFile: app/api/routes/project.py generated successfully (attempt 1)
+info: GenerationPipeline: generated app/api/routes/project.py
+info: generateFile: app/api/routes/task.py generated successfully (attempt 1)
+info: GenerationPipeline: generated app/api/routes/task.py
+info: generateFile: tests/test_user.py generated successfully (attempt 1)
+info: GenerationPipeline: generated tests/test_user.py
+info: generateFile: tests/test_project.py generated successfully (attempt 1)
+info: GenerationPipeline: generated tests/test_project.py
+info: generateFile: tests/test_task.py generated successfully (attempt 1)
+info: GenerationPipeline: generated tests/test_task.py
+info: GenerationPipeline: complete — 44 total files (34 template, 10 LLM)
+info: TreeSitterIndexer: indexed 40 Python files for project 69cffc3065904dcd0e816621
+Cannot instantiate a collection with the DefaultEmbeddingFunction. Please install @chroma-core/default-embed, or provide a different embedding function
+Cannot instantiate a collection with the DefaultEmbeddingFunction. Please install @chroma-core/default-embed, or provide a different embedding function
+Cannot instantiate a collection with the DefaultEmbeddingFunction. Please install @chroma-core/default-embed, or provide a different embedding function
+Cannot instantiate a collection with the DefaultEmbeddingFunction. Please install @chroma-core/default-embed, or provide a different embedding function
+info: ChromaClient: indexed 40 Python files for project 69cffc3065904dcd0e816621
+info: Generation job 10: uploaded 44 files to R2 for project 69cffc3065904dcd0e816621
+info: Validation job 8 started — project 69cffc3065904dcd0e816621
+info: Generation job 10 completed — 44 files for project 69cffc3065904dcd0e816621
+info: Generation job 10 completed
+info: Validation job 8: found 40 Python files in R2 for project 69cffc3065904dcd0e816621
+info: VenvManager: (re)creating venv for project 69cffc3065904dcd0e816621
+warn: VenvManager: pip install partially failed for project 69cffc3065904dcd0e816621 (non-fatal): Command failed: /tmp/mockline/venvs/69cffc3065904dcd0e816621/bin/pip install -q --no-cache-dir --disable-pip-version-check -r /tmp/mockline/venvs/69cffc3065904dcd0e816621-req.txt
+  error: subprocess-exited-with-error
+
+  × Building wheel for pydantic-core (pyproject.toml) did not run successfully.
+
+info: Validation job 8: venv ready for project 69cffc3065904dcd0e816621
+warn: Validator: app/api/routes/project.py has 2 error(s) — queued for fix loop: L17[F821]: Undefined name `List` | L22[F821]: Undefined name `List`
+warn: Validator: app/api/routes/user.py has 5 error(s) — queued for fix loop: L21[F821]: Undefined name `Session` | L30[F821]: Undefined name `Session` | L39[F821]: Undefined name `Session` | L49[F821]: Undefined name `Session` | L58[F821]: Undefined name `Session`
+warn: Validator: app/models/project.py has 1 error(s) — queued for fix loop: L33[E999]: invalid syntax
+warn: Validator: app/models/user.py has 1 error(s) — queued for fix loop: L26[E999]: invalid syntax
+info: Validator: running fix loop for 4 failed file(s) (project 69cffc3065904dcd0e816621)
+warn: FixLoop: LLM returned no content for app/api/routes/project.py on attempt 1
+warn: FixLoop: LLM returned no content for app/api/routes/project.py on attempt 2
+warn: FixLoop: LLM returned no content for app/api/routes/project.py on attempt 3
+warn: FixLoop: could not fix app/api/routes/project.py after 3 attempts
+warn: FixLoop: LLM returned no content for app/api/routes/user.py on attempt 1
+warn: FixLoop: LLM returned no content for app/api/routes/user.py on attempt 2
+warn: FixLoop: LLM returned no content for app/api/routes/user.py on attempt 3
+warn: FixLoop: could not fix app/api/routes/user.py after 3 attempts
+warn: FixLoop: LLM returned no content for app/models/project.py on attempt 1
+warn: FixLoop: LLM returned no content for app/models/project.py on attempt 2
+warn: FixLoop: LLM returned no content for app/models/project.py on attempt 3
+warn: FixLoop: could not fix app/models/project.py after 3 attempts
+warn: FixLoop: LLM returned no content for app/models/user.py on attempt 1
+warn: FixLoop: LLM returned no content for app/models/user.py on attempt 2
+warn: FixLoop: LLM returned no content for app/models/user.py on attempt 3
+warn: FixLoop: could not fix app/models/user.py after 3 attempts
+info: FixLoop: 0/4 files fixed, 4 still failing
+warn: Validation job 8: 4/40 files still failing after fix loop for project 69cffc3065904dcd0e816621
+info: Validation job 8 completed
