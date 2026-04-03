@@ -7,10 +7,12 @@ import { executeToolCall, ToolResult } from './tools/executor'
 
 export type AgentEventType = 'token' | 'tool_call' | 'tool_result' | 'done' | 'error'
 
-export interface AgentEvent {
-  type: AgentEventType
-  payload: any
-}
+export type AgentEvent =
+  | { type: 'token'; payload: string }
+  | { type: 'tool_call'; payload: { name: string; args: Record<string, unknown> } }
+  | { type: 'tool_result'; payload: { name: string; result: ToolResult } }
+  | { type: 'done'; payload: { summary: string } }
+  | { type: 'error'; payload: { message: string } }
 
 export interface AgentRunOptions {
   projectId: string
@@ -22,7 +24,21 @@ export interface AgentRunOptions {
 }
 
 const TOOL_EXECUTION_TIMEOUT_MS = 30_000
-const CONTEXT_CHAR_LIMIT = 24_000 * 4 // ~24k tokens estimated at 4 chars/token
+
+/**
+ * Context budget: 12K tokens estimated at 4 chars/token.
+ * Matches the plan spec — leaves ample room for system prompt + new response.
+ */
+const CONTEXT_CHAR_LIMIT = 12_000 * 4
+
+/**
+ * Older tool results beyond this many recent pairs are compressed to a brief summary.
+ * The last KEEP_TOOL_PAIRS tool-call+result exchanges are always kept verbatim.
+ */
+const KEEP_TOOL_PAIRS = 3
+
+/** Max chars kept from an older tool result when compressing. */
+const COMPRESSED_TOOL_RESULT_CHARS = 200
 
 export class AgentEngine {
   private app: Application
@@ -49,8 +65,8 @@ export class AgentEngine {
     ]
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
-      // Trim messages to stay within context window before each LLM call
-      this.trimMessages(messages)
+      // Smart context compression before each LLM call
+      smartTrimMessages(messages)
 
       let responseContent = ''
       const pendingToolCalls = new Map<string, OllamaToolCall>()
@@ -77,8 +93,9 @@ export class AgentEngine {
             }
           }
         }
-      } catch (err: any) {
-        onEvent({ type: 'error', payload: { message: `LLM error: ${err.message}` } })
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        onEvent({ type: 'error', payload: { message: `LLM error: ${message}` } })
         return
       }
 
@@ -97,17 +114,21 @@ export class AgentEngine {
 
       for (const toolCall of toolCallsArr) {
         const name = toolCall.function.name
-        let args: any = {}
+        let args: Record<string, unknown> = {}
         try {
-          args = JSON.parse(toolCall.function.arguments)
+          const parsed: unknown = JSON.parse(toolCall.function.arguments)
+          args = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : {}
         } catch {
-          args = toolCall.function.arguments
+          // arguments not valid JSON — leave args as empty object
         }
 
         onEvent({ type: 'tool_call', payload: { name, args } })
 
-        if (name === 'finish') {
-          onEvent({ type: 'done', payload: { summary: args.summary } })
+        if (name === 'done' || name === 'finish') {
+          const summary = typeof args.summary === 'string' ? args.summary : ''
+          onEvent({ type: 'done', payload: { summary } })
           return
         }
 
@@ -117,11 +138,15 @@ export class AgentEngine {
           result = await Promise.race([
             executeToolCall(name, args, projectId, this.app),
             new Promise<ToolResult>((_, reject) =>
-              setTimeout(() => reject(new Error(`Tool ${name} timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`)), TOOL_EXECUTION_TIMEOUT_MS)
+              setTimeout(
+                () => reject(new Error(`Tool ${name} timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`)),
+                TOOL_EXECUTION_TIMEOUT_MS
+              )
             )
           ])
-        } catch (err: any) {
-          result = { success: false, error: err.message }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err)
+          result = { success: false, error: message }
         }
 
         onEvent({ type: 'tool_result', payload: { name, result } })
@@ -140,22 +165,80 @@ export class AgentEngine {
       payload: { message: 'Max agent iterations reached without completion' }
     })
   }
+}
 
-  /**
-   * Trims the messages array in-place to stay within the estimated context window.
-   * Always preserves the system prompt (index 0). Removes oldest non-system messages first.
-   */
-  private trimMessages(messages: OllamaMessage[]): void {
-    const totalChars = messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0)
-    if (totalChars <= CONTEXT_CHAR_LIMIT) return
+// ---------------------------------------------------------------------------
+// Smart context compression
+// ---------------------------------------------------------------------------
 
-    // Keep system prompt (index 0) and trim from oldest non-system messages
-    let i = 1
-    let chars = totalChars
-    while (chars > CONTEXT_CHAR_LIMIT && i < messages.length - 1) {
-      chars -= messages[i].content?.length ?? 0
-      messages.splice(i, 1)
-      // Don't increment i — next element shifts down
+/**
+ * Compress the conversation in-place to stay within CONTEXT_CHAR_LIMIT.
+ *
+ * Strategy (from the plan spec):
+ *   1. System message (index 0) — always kept verbatim
+ *   2. User messages — always kept verbatim
+ *   3. Last KEEP_TOOL_PAIRS assistant+tool message pairs — kept verbatim
+ *   4. Older assistant+tool pairs — tool result compressed to COMPRESSED_TOOL_RESULT_CHARS
+ *   5. If still over limit, drop oldest compressed pairs
+ */
+export function smartTrimMessages(messages: OllamaMessage[]): void {
+  if (totalChars(messages) <= CONTEXT_CHAR_LIMIT) return
+
+  // Identify assistant+tool pairs in order (tool call followed by its results)
+  // A pair is: assistant message with tool_calls[] + one or more following tool messages
+  const pairs: Array<{ assistantIdx: number; toolIdxs: number[] }> = []
+
+  for (let i = 1; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+      const toolIdxs: number[] = []
+      let j = i + 1
+      while (j < messages.length && messages[j].role === 'tool') {
+        toolIdxs.push(j)
+        j++
+      }
+      if (toolIdxs.length > 0) {
+        pairs.push({ assistantIdx: i, toolIdxs })
+        i = j - 1
+      }
     }
   }
+
+  // Compress older pairs (keep last KEEP_TOOL_PAIRS verbatim)
+  const compressUntil = Math.max(0, pairs.length - KEEP_TOOL_PAIRS)
+  for (let p = 0; p < compressUntil; p++) {
+    const { toolIdxs } = pairs[p]
+    for (const idx of toolIdxs) {
+      const msg = messages[idx]
+      if ((msg.content?.length ?? 0) > COMPRESSED_TOOL_RESULT_CHARS) {
+        messages[idx] = {
+          ...msg,
+          content: msg.content!.slice(0, COMPRESSED_TOOL_RESULT_CHARS) + ' …[compressed]'
+        }
+      }
+    }
+  }
+
+  if (totalChars(messages) <= CONTEXT_CHAR_LIMIT) return
+
+  // Still over limit: drop oldest compressed pairs entirely
+  for (let p = 0; p < compressUntil && totalChars(messages) > CONTEXT_CHAR_LIMIT; p++) {
+    const { assistantIdx, toolIdxs } = pairs[p]
+    const removeSet = new Set([assistantIdx, ...toolIdxs])
+    // Splice from highest index to lowest to preserve earlier indices
+    const toRemove = [...removeSet].sort((a, b) => b - a)
+    for (const idx of toRemove) {
+      messages.splice(idx, 1)
+    }
+    // Adjust subsequent pair indices since we shifted the array
+    for (let q = p + 1; q < pairs.length; q++) {
+      const shift = removeSet.size
+      pairs[q].assistantIdx -= shift
+      pairs[q].toolIdxs = pairs[q].toolIdxs.map(i => i - shift)
+    }
+  }
+}
+
+function totalChars(messages: OllamaMessage[]): number {
+  return messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0)
 }

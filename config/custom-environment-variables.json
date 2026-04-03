@@ -6,5 +6,35 @@
   "host": "HOSTNAME",
   "authentication": {
     "secret": "FEATHERS_SECRET"
+  },
+  "ollama": {
+    "baseUrl": "OLLAMA_BASE_URL",
+    "model": "OLLAMA_MODEL",
+    "embedModel": "OLLAMA_EMBED_MODEL"
+  },
+  "models": {
+    "planning": { "name": "PLANNING_MODEL" },
+    "generation": { "name": "GENERATION_MODEL" },
+    "fixing": { "name": "FIXING_MODEL" },
+    "editing": { "name": "EDITING_MODEL" },
+    "conversation": { "name": "CONVERSATION_MODEL" }
+  },
+  "llm": {
+    "provider": "LLM_PROVIDER"
+  },
+  "chromadb": {
+    "host": "CHROMADB_HOST",
+    "port": {
+      "__name": "CHROMADB_PORT",
+      "__format": "number"
+    },
+    "collection": "CHROMADB_COLLECTION"
+  },
+  "validation": {
+    "venvBasePath": "VENV_BASE_PATH",
+    "bootTestPort": {
+      "__name": "BOOT_TEST_PORT",
+      "__format": "number"
+    }
   }
 }

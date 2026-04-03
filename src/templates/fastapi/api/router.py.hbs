@@ -1,0 +1,23 @@
+from fastapi import APIRouter
+
+from app.api.routes import health
+{{#each entities}}
+from app.api.routes import {{snakeCase this.name}}
+{{/each}}
+{{#if authRequired}}
+from app.api.routes import auth
+{{/if}}
+
+api_router = APIRouter()
+
+api_router.include_router(health.router, tags=["health"])
+{{#if authRequired}}
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+{{/if}}
+{{#each entities}}
+api_router.include_router(
+    {{snakeCase this.name}}.router,
+    prefix="/{{snakeCase this.name}}s",
+    tags=["{{snakeCase this.name}}s"],
+)
+{{/each}}

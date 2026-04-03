@@ -59,6 +59,7 @@
   "ollama": {
     "baseUrl": "http://localhost:11434",
     "model": "qwen2.5-coder:7b",
+    "embedModel": "nomic-embed-text",
     "numPredict": 16384,
     "numCtx": 32768,
     "temperature": 0.3,
@@ -66,11 +67,51 @@
     "repeatPenalty": 1.1,
     "timeout": 240000
   },
+  "models": {
+    "planning": {
+      "name": "qwen3:8b",
+      "temperature": 0.1,
+      "think": true,
+      "timeout": 90000
+    },
+    "generation": {
+      "name": "qwen2.5-coder:7b",
+      "temperature": 0.3,
+      "think": false,
+      "timeout": 120000
+    },
+    "fixing": {
+      "name": "qwen2.5-coder:7b",
+      "temperature": 0.2,
+      "think": false,
+      "timeout": 120000
+    },
+    "editing": {
+      "name": "qwen3:8b",
+      "temperature": 0.4,
+      "think": true,
+      "toolCalling": true,
+      "timeout": 60000
+    },
+    "conversation": {
+      "name": "qwen3:8b",
+      "temperature": 0.5,
+      "think": true,
+      "timeout": 60000
+    }
+  },
   "redis": {
     "url": "redis://localhost:6379"
   },
   "llm": {
-    "provider": "ollama"
+    "provider": "ollama",
+    "planning": { "temperature": 0.1 },
+    "generation": { "temperature": 0.3 },
+    "conversation": { "temperature": 0.5 },
+    "timeout": 60000,
+    "complexTimeout": 120000,
+    "maxRetries": 3,
+    "maxContextTokens": 6000
   },
   "openai": {
     "apiKey": "",
@@ -100,5 +141,25 @@
     "bullBoard": {
         "username": "admin",
         "password": "admin"
+    },
+    "validation": {
+        "venvBasePath": "/tmp/mockline-venvs",
+        "maxFixRounds": 3,
+        "bootTestTimeout": 30000,
+        "bootTestPort": 9000
+    },
+    "templates": {
+        "dir": "./src/templates/fastapi",
+        "versionMapPath": "./version-map.json"
+    },
+    "chromadb": {
+        "host": "localhost",
+        "port": 8001,
+        "collection": "mockline_code"
+    },
+    "queue": {
+        "concurrency": 1,
+        "retryAttempts": 3,
+        "backoffDelay": 1000
     }
 }

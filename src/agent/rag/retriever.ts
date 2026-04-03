@@ -8,6 +8,15 @@ export interface FileContext {
   content: string
 }
 
+interface FileRecord {
+  name: string
+  key: string
+}
+
+interface FindResult {
+  data?: FileRecord[]
+}
+
 /**
  * Retrieves the most relevant project files for a given query using semantic search.
  * Falls back to listing all files when the embedding store is empty.
@@ -32,8 +41,9 @@ export class ContextRetriever {
       // Embedding store not populated yet — fall back to listing recent files from MongoDB
       const result = (await this.app.service('files').find({
         query: { projectId, $limit: topK, $sort: { createdAt: -1 } }
-      })) as any
-      paths = (result.data ?? result).map((f: any) => f.name)
+      })) as FindResult | FileRecord[]
+      const records: FileRecord[] = Array.isArray(result) ? result : (result.data ?? [])
+      paths = records.map(f => f.name)
     }
 
     const contextResults = await Promise.all(
@@ -41,8 +51,9 @@ export class ContextRetriever {
         try {
           const content = await r2Client.getObject(`projects/${projectId}/${path}`)
           return { path, content } as FileContext
-        } catch (err: any) {
-          logger.warn('ContextRetriever: could not fetch %s/%s: %s', projectId, path, err.message)
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err)
+          logger.warn('ContextRetriever: could not fetch %s/%s: %s', projectId, path, message)
           return null
         }
       })
@@ -59,8 +70,8 @@ export class ContextRetriever {
     embeddingStore.clear(projectId)
     const result = (await this.app.service('files').find({
       query: { projectId, $limit: 500 }
-    })) as any
-    const files: any[] = result.data ?? result
+    })) as FindResult | FileRecord[]
+    const files: FileRecord[] = Array.isArray(result) ? result : (result.data ?? [])
 
     for (const file of files) {
       try {

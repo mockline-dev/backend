@@ -265,6 +265,16 @@ DATABASE DEFAULT:
 - For .env and .env.example: include DATABASE_URL=sqlite:///./app.db as the default
 - Do NOT add psycopg2, pymysql, or other DB drivers unless explicitly specified in the schema
 
+CRITICAL - FastAPI Function Parameter Ordering Rule:
+- Parameters WITH defaults must come AFTER parameters WITHOUT defaults.
+- In FastAPI route functions, ALWAYS put request body/path/query params BEFORE dependency injections:
+  ✓ CORRECT:  async def create_item(data: ItemCreate, db: Session = Depends(get_db)) -> Item:
+  ✗ WRONG:    async def create_item(db: Session = Depends(get_db), data: ItemCreate) -> Item:
+  ✓ CORRECT:  async def get_item(item_id: int, db: Session = Depends(get_db)) -> Item:
+  ✗ WRONG:    async def get_item(db: Session = Depends(get_db), item_id: int) -> Item:
+  ✓ CORRECT:  async def update_item(item_id: int, data: ItemUpdate, db: Session = Depends(get_db)) -> Item:
+- This rule is mandatory — violating it causes SyntaxError: parameter without a default follows parameter with a default.
+
 CRITICAL - Python Class Naming Rule:
 - Python filenames are snake_case (e.g. shopping_cart.py, order_item.py).
 - Python CLASS names in those files MUST be PascalCase matching the entity schema name exactly.
@@ -315,7 +325,39 @@ ${filePath.startsWith('app/models/') && !filePath.endsWith('__init__.py') ? `CRI
 - ForeignKey must use the PLURAL snake_case table name: ForeignKey("users.id"), ForeignKey("tasks.id"), ForeignKey("projects.id")
 - Always add back_populates on BOTH sides of a relationship
 - Never import other model files directly (avoids circular imports) — SQLAlchemy resolves string refs at runtime
-- Each model MUST define __tablename__ as plural snake_case of the class name` : ''}
+- Each model MUST define __tablename__ as plural snake_case of the class name
+- CRITICAL — Mapped[] type annotations MUST use string literals for cross-model refs to avoid NameError:
+  ✓ CORRECT:  user: Mapped[Optional["User"]] = relationship("User", back_populates="items")
+  ✓ CORRECT:  items: Mapped[List["TodoItem"]] = relationship("TodoItem", back_populates="user")
+  ✗ WRONG:    user: Mapped[Optional[User]] = relationship("User", ...)   # User not imported → NameError
+  ✗ WRONG:    items: Mapped[List[TodoItem]] = relationship("TodoItem", ...)  # TodoItem not imported → NameError
+- Only use unquoted type names in Mapped[] if you have actually imported that class in the same file` : ''}
+${filePath.startsWith('app/crud/') && !filePath.endsWith('__init__.py') ? `CRITICAL for CRUD files:
+- The CRUD instance MUST be named crud_{entity_snake_case} (e.g., crud_note, crud_user, crud_post)
+  ✓ CORRECT: crud_note = CRUDNote(Note)
+  ✗ WRONG:   note = CRUDNote(Note)
+- Export the instance as crud_{entity_snake} — importers use: from app.crud.note import crud_note` : ''}
+${filePath === 'app/crud/__init__.py' ? `CRITICAL for CRUD __init__.py:
+- Imports MUST use the crud_ prefix: from app.crud.note import crud_note
+  ✓ CORRECT: from app.crud.note import crud_note
+  ✗ WRONG:   from app.crud.note import note` : ''}
+${filePath.startsWith('app/services/') && !filePath.endsWith('__init__.py') ? `CRITICAL — FUNCTION DECLARATION RULES for service files:
+- Use 'def' (synchronous) for functions that ONLY do database operations with SQLAlchemy synchronous sessions.
+- Use 'async def' ONLY when the function body contains 'await' calls.
+- SQLAlchemy synchronous sessions (Session) do NOT need async — use plain 'def'.
+  ✓ CORRECT: def get_note(db: Session, note_id: int) -> Note | None:
+  ✗ WRONG:   async def get_note(db: Session, note_id: int) -> Note | None:  # no await = wrong
+
+CRITICAL — NEVER use Depends() in service functions:
+- Depends() is ONLY for FastAPI route handlers. Service functions receive 'db: Session' as a plain parameter.
+- The db session is resolved by the route handler and passed into the service — services never import Depends.
+  ✓ CORRECT: def create_organization(db: Session, data: OrganizationCreate) -> Organization:
+  ✗ WRONG:   def create_organization(db: Session = Depends(get_db), data: OrganizationCreate):
+  ✗ WRONG:   async def create_organization(db: Session = Depends(get_db), data: OrganizationCreate):
+- Putting Depends() in a service signature causes: SyntaxError: parameter without a default follows parameter with a default
+- Parameter order in service functions: plain params first (db, ids, data), no defaults needed.
+  ✓ CORRECT: def update_user(db: Session, user_id: int, data: UserUpdate) -> User:
+  ✗ WRONG:   def update_user(db: Session = Depends(get_db), user_id: int, data: UserUpdate) -> User:` : ''}
 ${filePath.startsWith('alembic/') ? `CRITICAL for Alembic files:
 - alembic/env.py MUST import all models before target_metadata: import app.models.user, app.models.task, etc.
 - Set target_metadata = Base.metadata (import Base from app.core.database)
@@ -332,7 +374,8 @@ ${filePath.startsWith('alembic/') ? `CRITICAL for Alembic files:
     memoryBlock?: string,
     relationships?: any[],
     contextBlock?: string,
-    projectManifest?: string
+    projectManifest?: string,
+    availableImports?: string
   ): string => `
 Generate the complete content for file: ${file.path}
 Purpose: ${file.description}
@@ -362,8 +405,14 @@ ${
     : ''
 }
 ${contextBlock ? `Context Block:\n${contextBlock}\n` : ''}
+${
+  availableImports
+    ? `EXACT AVAILABLE IMPORTS (already generated — use these exact names, do not invent new ones):
+${availableImports}
 
-CRITICAL - Python Import Guidelines:
+`
+    : ''
+}CRITICAL - Python Import Guidelines:
 - Standard library imports (typing, datetime, os, sys, etc.) are NOT file references
 - Third-party imports (fastapi, pydantic, sqlalchemy, etc.) are NOT file references
 - Type annotations like List, Dict, Optional, EmailStr, Session are from typing/pydantic, NOT files
@@ -386,6 +435,19 @@ IMPORT CONSISTENCY RULE:
 - This is MANDATORY. Inventing class or function names not in the manifest will break the project.`
     : ''
 }
+
+CRITICAL — async/await consistency in FastAPI routes:
+- If a service function is declared as 'async def', ALL callers MUST use 'await':
+  CORRECT:  return await create_note(db, data)
+  WRONG:    return create_note(db, data)   # missing await → coroutine never awaited
+- If a service function does NOT use await internally, declare it as 'def' (NOT 'async def')
+- Route handlers in FastAPI should use 'async def'; service functions that only call sync DB ops should be plain 'def'.
+
+CRITICAL — Only import what you actually USE:
+- Never add an import unless you call or reference that name in the code body.
+- Remove unused imports — pyflakes/ruff will fail the file otherwise.
+- For password hashing in services/routes: import from app.core.security:
+  from app.core.security import get_password_hash, verify_password
 
 Quality checklist:
 - Keep architecture consistent with schema and relationships.

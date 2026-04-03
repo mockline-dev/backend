@@ -1,0 +1,10 @@
+from app.crud.base import CRUDBase
+from app.models.{{snakeCase name}} import {{pascalCase name}}
+from app.schemas.{{snakeCase name}} import {{pascalCase name}}Create, {{pascalCase name}}Update
+
+
+class CRUD{{pascalCase name}}(CRUDBase[{{pascalCase name}}, {{pascalCase name}}Create, {{pascalCase name}}Update]):
+    pass
+
+
+{{snakeCase name}} = CRUD{{pascalCase name}}({{pascalCase name}})

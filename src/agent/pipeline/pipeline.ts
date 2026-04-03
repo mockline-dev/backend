@@ -11,6 +11,7 @@ import { FileGenerator, type GeneratedFile } from './file-generator'
 import { IntentAnalyzer } from './intent-analyzer'
 import { SchemaValidator } from './schema-validator'
 import { TaskPlanner } from './task-planner'
+import { renderScaffold } from './template-engine'
 
 export interface PipelineOptions {
   projectId: string
@@ -170,7 +171,25 @@ export class GenerationPipeline {
       }
     } as any)
 
-    // Stage 3 — File generation
+    // Stage 2 — Scaffold: generate boilerplate files from templates (no LLM)
+    await onProgress('Scaffolding templates', 17)
+    const scaffoldStartedAt = Date.now()
+    let preScaffolded = new Map<string, string>()
+    try {
+      const scaffoldFiles = renderScaffold(schema)
+      preScaffolded = new Map(scaffoldFiles.map(f => [f.path, f.content]))
+      logger.info(
+        'Pipeline: scaffold completed in %dms — %d template files for project %s',
+        Date.now() - scaffoldStartedAt,
+        preScaffolded.size,
+        projectId
+      )
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      logger.warn('Pipeline: scaffold failed (non-fatal, falling back to LLM for all files): %s', msg)
+    }
+
+    // Stage 3 — File generation (LLM for non-scaffold files only)
     const generationStartedAt = Date.now()
     const generatedFiles = await this.fileGenerator.generateAll(
       prompt,
@@ -194,8 +213,8 @@ export class GenerationPipeline {
         globalContext,
         dependencyGraph,
         contextBuilder: this.contextBuilder,
-        // Full file manifest so every generator phase knows the complete project structure
-        plan
+        plan,
+        preScaffolded
       }
     )
     logger.info(

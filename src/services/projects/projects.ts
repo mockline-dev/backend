@@ -30,7 +30,7 @@ export const projects = (app: Application) => {
     // A list of all methods this service exposes externally
     methods: projectsMethods,
     // You can add additional custom events to be sent to clients here
-    events: ['progress']
+    events: ['progress', 'project:ready']
   })
   // Initialize hooks
   app.service(projectsPath).hooks({
@@ -52,11 +52,11 @@ export const projects = (app: Application) => {
         async (context: HookContext) => {
           const { user } = context.params
           context.data.userId = user._id
-          context.data.status = 'initializing'
+          context.data.status = 'created'
           // Keep progress in the nested object to match the validated schema.
           context.data.generationProgress = {
             percentage: 0,
-            currentStage: 'initializing',
+            currentStage: 'created',
             filesGenerated: 0,
             totalFiles: 0
           }
@@ -115,6 +115,11 @@ export const projects = (app: Application) => {
               currentStage: progress.currentStage || result.status,
               errorMessage: result.errorMessage
             })
+
+            // Emit project:ready event when status transitions to ready
+            if (result.status === 'ready') {
+              projectsService.emit('project:ready', { projectId })
+            }
           }
 
           return context

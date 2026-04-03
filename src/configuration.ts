@@ -23,6 +23,7 @@ export const configurationSchema = Type.Intersect([
     }),
     ollama: Type.Object({
       model: Type.String(),
+      embedModel: Type.String(),
       numPredict: Type.Number(),
       numCtx: Type.Number(),
       temperature: Type.Number(),
@@ -51,6 +52,43 @@ export const configurationSchema = Type.Intersect([
     }),
     firebase: Type.Object({
       serviceAccountPath: Type.String()
+    }),
+    models: Type.Object({
+      planning: Type.Object({ name: Type.String(), temperature: Type.Number(), think: Type.Boolean(), timeout: Type.Number() }),
+      generation: Type.Object({ name: Type.String(), temperature: Type.Number(), think: Type.Boolean(), timeout: Type.Number() }),
+      fixing: Type.Object({ name: Type.String(), temperature: Type.Number(), think: Type.Boolean(), timeout: Type.Number() }),
+      editing: Type.Object({ name: Type.String(), temperature: Type.Number(), think: Type.Boolean(), toolCalling: Type.Optional(Type.Boolean()), timeout: Type.Number() }),
+      conversation: Type.Object({ name: Type.String(), temperature: Type.Number(), think: Type.Boolean(), timeout: Type.Number() })
+    }),
+    llm: Type.Object({
+      provider: Type.String(),
+      planning: Type.Object({ temperature: Type.Number() }),
+      generation: Type.Object({ temperature: Type.Number() }),
+      conversation: Type.Object({ temperature: Type.Number() }),
+      timeout: Type.Number(),
+      complexTimeout: Type.Number(),
+      maxRetries: Type.Number(),
+      maxContextTokens: Type.Number()
+    }),
+    validation: Type.Object({
+      venvBasePath: Type.String(),
+      maxFixRounds: Type.Number(),
+      bootTestTimeout: Type.Number(),
+      bootTestPort: Type.Number()
+    }),
+    templates: Type.Object({
+      dir: Type.String(),
+      versionMapPath: Type.String()
+    }),
+    chromadb: Type.Object({
+      host: Type.String(),
+      port: Type.Number(),
+      collection: Type.String()
+    }),
+    queue: Type.Object({
+      concurrency: Type.Number(),
+      retryAttempts: Type.Number(),
+      backoffDelay: Type.Number()
     })
   })
 ])

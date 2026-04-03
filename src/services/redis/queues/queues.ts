@@ -13,5 +13,13 @@ export interface ValidationJobData {
   files: Array<{ path: string; content: string }>
 }
 
+export interface EditJobData {
+  projectId: string
+  userId: string
+  message: string
+  conversationId?: string
+}
+
 export const generationQueue = createQueue('code-generation')
 export const validationQueue = createQueue('code-validation')
+export const editQueue = createQueue('code-edit')

@@ -1,0 +1,9 @@
+{{#each entities}}
+from app.models.{{snakeCase this.name}} import {{pascalCase this.name}}
+{{/each}}
+
+__all__ = [
+{{#each entities}}
+    "{{pascalCase this.name}}",
+{{/each}}
+]

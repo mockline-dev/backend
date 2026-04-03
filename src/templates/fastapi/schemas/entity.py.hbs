@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
+
+
+class {{pascalCase name}}Base(BaseModel):
+{{#each fields}}
+{{#unless this.reference}}
+    {{snakeCase this.name}}: {{#if this.required}}{{pydanticType this.type}}{{else}}Optional[{{pydanticType this.type}}] = None{{/if}}
+{{/unless}}
+{{/each}}
+
+
+class {{pascalCase name}}Create({{pascalCase name}}Base):
+{{#each fields}}
+{{#if this.required}}
+{{#unless this.reference}}
+    {{snakeCase this.name}}: {{pydanticType this.type}}
+{{/unless}}
+{{/if}}
+{{/each}}
+    pass
+
+
+class {{pascalCase name}}Update(BaseModel):
+{{#each fields}}
+{{#unless this.reference}}
+    {{snakeCase this.name}}: Optional[{{pydanticType this.type}}] = None
+{{/unless}}
+{{/each}}
+
+
+class {{pascalCase name}}Response({{pascalCase name}}Base):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

@@ -31,8 +31,9 @@ export async function validateTypeScript(path: string, content: string): Promise
     )
 
     return { path, valid: true, errors: [] }
-  } catch (err: any) {
-    const output: string = (err.stdout ?? '') + (err.stderr ?? '')
+  } catch (err: unknown) {
+    const e = err as { stdout?: string; stderr?: string }
+    const output: string = (e.stdout ?? '') + (e.stderr ?? '')
     const errors = output
       .split('\n')
       .filter(l => l.includes('error TS'))

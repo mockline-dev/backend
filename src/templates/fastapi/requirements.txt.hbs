@@ -1,0 +1,23 @@
+fastapi=={{versions.fastapi}}
+uvicorn[standard]=={{versions.uvicorn}}
+sqlalchemy=={{versions.sqlalchemy}}
+alembic=={{versions.alembic}}
+pydantic=={{versions.pydantic}}
+pydantic-settings=={{versions.pydantic-settings}}
+python-multipart=={{versions.python-multipart}}
+psycopg2-binary=={{versions.psycopg2-binary}}
+httpx=={{versions.httpx}}
+{{#if authRequired}}
+python-jose[cryptography]=={{versions.python-jose}}
+passlib[bcrypt]=={{versions.passlib}}
+bcrypt=={{versions.bcrypt}}
+email-validator=={{versions.email-validator}}
+{{/if}}
+{{#each externalPackages}}
+{{this}}
+{{/each}}
+# dev / testing
+pytest=={{versions.pytest}}
+pytest-asyncio=={{versions.pytest-asyncio}}
+anyio[trio]=={{versions.anyio}}
+pyflakes=={{versions.pyflakes}}

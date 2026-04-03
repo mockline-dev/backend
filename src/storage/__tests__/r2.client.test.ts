@@ -1,13 +1,50 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { r2Client } from '../r2.client'
 
-// Mock fetch globally
-const mockFetch = vi.fn()
-global.fetch = mockFetch
+// Hoisted so it's available inside vi.mock factory
+const mockSend = vi.hoisted(() => vi.fn())
+
+vi.mock('@aws-sdk/client-s3', () => {
+  class MockS3Client {
+    send = mockSend
+  }
+  class PutObjectCommand { constructor(public input: unknown) {} }
+  class GetObjectCommand { constructor(public input: unknown) {} }
+  class DeleteObjectCommand { constructor(public input: unknown) {} }
+  class ListObjectsV2Command { constructor(public input: unknown) {} }
+  class HeadObjectCommand { constructor(public input: unknown) {} }
+  class CopyObjectCommand { constructor(public input: unknown) {} }
+  return {
+    S3Client: MockS3Client,
+    PutObjectCommand,
+    GetObjectCommand,
+    DeleteObjectCommand,
+    ListObjectsV2Command,
+    HeadObjectCommand,
+    CopyObjectCommand
+  }
+})
+
+// Mock config
+vi.mock('config', () => ({
+  default: {
+    get: vi.fn().mockReturnValue({
+      bucket: 'test-bucket',
+      region: 'auto',
+      endpoint: 'https://test.r2.cloudflarestorage.com',
+      accessKeyId: 'test-key',
+      secretAccessKey: 'test-secret'
+    })
+  }
+}))
+
+import { R2Client } from '../r2.client'
 
 describe('R2Client', () => {
+  let r2: R2Client
+
   beforeEach(() => {
     vi.clearAllMocks()
+    r2 = new R2Client()
   })
 
   afterEach(() => {
@@ -16,198 +53,130 @@ describe('R2Client', () => {
 
   describe('putObject', () => {
     it('should upload content to R2', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200
-      } as Response)
+      mockSend.mockResolvedValue({})
 
-      await r2Client.putObject('test-key', 'test content')
+      await r2.putObject('test-key', 'test content')
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('.r2.cloudflarestorage.com'),
-        expect.objectContaining({
-          method: 'PUT',
-          body: expect.any(Buffer),
-          headers: expect.objectContaining({
-            'x-amz-content-sha256': expect.any(String),
-            'Content-Type': expect.any(String)
-          })
-        })
-      )
+      expect(mockSend).toHaveBeenCalledTimes(1)
     })
 
-    it('should retry on failure', async () => {
-      let attemptCount = 0
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    it('should retry on failure then succeed', async () => {
+      mockSend.mockRejectedValueOnce(new Error('Network error'))
+      mockSend.mockRejectedValueOnce(new Error('Network error'))
+      mockSend.mockResolvedValue({})
 
-      const startTime = Date.now()
-      await r2Client.putObject('test-key', 'test content')
+      await r2.putObject('test-key', 'test content')
 
-      // Should complete within timeout with retries
-      expect(attemptCount).toBe(3)
-      expect(Date.now() - startTime).toBeLessThan(125000)
+      expect(mockSend).toHaveBeenCalledTimes(3)
     })
 
-    it('should timeout after configured duration', async () => {
-      const abortController = new AbortController()
-      mockFetch.mockImplementationOnce(() => {
-        return new Promise(() => {})
-      })
+    it('should throw after exhausting retries', async () => {
+      mockSend.mockRejectedValue(new Error('Persistent error'))
 
-      const startTime = Date.now()
-      await r2Client.putObject('test-key', 'test content')
-
-      // Should complete within timeout
-      expect(Date.now() - startTime).toBeLessThan(125000)
-      expect(abortController.signal.aborted).toBe(true)
+      await expect(r2.putObject('test-key', 'test content')).rejects.toThrow('Persistent error')
+      expect(mockSend).toHaveBeenCalledTimes(3)
     })
   })
 
   describe('getObject', () => {
     it('should download content from R2', async () => {
-      const mockContent = 'Downloaded content'
-      const mockStream = {
-        getReader: () => ({
-          read: async () => {
-            return { done: false, value: mockContent }
-          }
-        })
-      }
+      const { Readable } = await import('stream')
+      const stream = Readable.from([Buffer.from('Downloaded content')])
 
-      mockFetch.mockResolvedValue({
-        ok: true,
-        body: mockStream
-      } as unknown as Response)
+      mockSend.mockResolvedValue({ Body: stream })
 
-      const result = await r2Client.getObject('test-key')
+      const result = await r2.getObject('test-key')
 
-      expect(result).toBe(mockContent)
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('.r2.cloudflarestorage.com'),
-        expect.objectContaining({
-          method: 'GET'
-        })
-      )
+      expect(result).toBe('Downloaded content')
+      expect(mockSend).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('deleteObject', () => {
     it('should delete object from R2', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 204
-      } as Response)
+      mockSend.mockResolvedValue({})
 
-      await r2Client.deleteObject('test-key')
+      await r2.deleteObject('test-key')
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('.r2.cloudflarestorage.com'),
-        expect.objectContaining({
-          method: 'DELETE'
-        })
-      )
+      expect(mockSend).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('listObjects', () => {
     it('should list objects with pagination', async () => {
-      const mockObjects = [
-        { Key: 'test/file1.txt', Size: 100, LastModified: new Date('2024-01-01T00:00:00.000Z') },
-        { Key: 'test/file2.txt', Size: 200, LastModified: new Date('2024-01-01T00:00.00.000Z') },
-        { Key: 'test/subdir/file3.txt', Size: 150, LastModified: new Date('2024-01-01T00:00.00.000Z') }
-      ]
-
-      const mockResponse = {
-        Contents: mockObjects,
-        NextContinuationToken: 'next-token-123'
+      const page1 = {
+        Contents: [
+          { Key: 'test/file1.txt', Size: 100, LastModified: new Date('2024-01-01') },
+          { Key: 'test/file2.txt', Size: 200, LastModified: new Date('2024-01-01') }
+        ],
+        NextContinuationToken: 'next-token'
+      }
+      const page2 = {
+        Contents: [{ Key: 'test/file3.txt', Size: 150, LastModified: new Date('2024-01-01') }],
+        NextContinuationToken: undefined
       }
 
-      mockFetch.mockResolvedValueOnce(mockResponse)
-      mockFetch.mockResolvedValueOnce({ Contents: [], NextContinuationToken: undefined })
+      mockSend.mockResolvedValueOnce(page1).mockResolvedValueOnce(page2)
 
-      const result = await r2Client.listObjects('test/')
+      const result = await r2.listObjects('test/')
 
       expect(result).toHaveLength(3)
-      expect(mockFetch).toHaveBeenCalledTimes(2)
+      expect(mockSend).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('exists', () => {
+    it('should return true when object exists', async () => {
+      mockSend.mockResolvedValue({})
+
+      const result = await r2.exists('test-key')
+
+      expect(result).toBe(true)
+      expect(mockSend).toHaveBeenCalledTimes(1)
+    })
+
+    it('should return false when object does not exist', async () => {
+      mockSend.mockRejectedValueOnce(new Error('Not found'))
+
+      const result = await r2.exists('test-key')
+
+      expect(result).toBe(false)
     })
   })
 
   describe('copyPrefix', () => {
     it('should copy all objects from source to dest prefix', async () => {
-      const mockObjects = [
-        { Key: 'source/file1.txt', Size: 100 },
-        { Key: 'source/file2.txt', Size: 200 }
-      ]
+      // listObjects returns 2 objects
+      mockSend.mockResolvedValueOnce({
+        Contents: [
+          { Key: 'source/file1.txt', Size: 100, LastModified: new Date() },
+          { Key: 'source/file2.txt', Size: 200, LastModified: new Date() }
+        ],
+        NextContinuationToken: undefined
+      })
+      // copyObject calls for each
+      mockSend.mockResolvedValue({})
 
-      const mockStream = {
-        getReader: () => ({
-          read: async () => {
-            return { done: false, value: 'Content 1' }
-          }
-        })
-      }
+      await r2.copyPrefix('source/', 'dest/')
 
-      // First call returns source objects
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        body: mockStream
-      } as unknown as Response)
-
-      // Second call copies each object
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        body: 'Content 2'
-      } as unknown as Response)
-
-      await r2Client.copyPrefix('source/', 'dest/')
-
-      expect(mockFetch).toHaveBeenCalledTimes(2)
+      // 1 list + 2 copy = 3 calls
+      expect(mockSend).toHaveBeenCalledTimes(3)
     })
 
-    describe('deletePrefix', () => {
-      it('should delete all objects under a prefix', async () => {
-        const mockObjects = [
-          { Key: 'prefix/file1.txt', Size: 100 },
-          { Key: 'prefix/file2.txt', Size: 200 }
-        ]
-
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          status: 204
-        } as Response)
-
-        await r2Client.deletePrefix('prefix/')
-
-        expect(mockFetch).toHaveBeenCalledTimes(2)
+    it('should delete all objects under a prefix', async () => {
+      mockSend.mockResolvedValueOnce({
+        Contents: [
+          { Key: 'prefix/file1.txt', Size: 100, LastModified: new Date() },
+          { Key: 'prefix/file2.txt', Size: 200, LastModified: new Date() }
+        ],
+        NextContinuationToken: undefined
       })
-    })
+      mockSend.mockResolvedValue({})
 
-    describe('exists', () => {
-      it('should return true when object exists', async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          status: 200
-        } as Response)
+      await r2.deletePrefix('prefix/')
 
-        const result = await r2Client.exists('test-key')
-
-        expect(result).toBe(true)
-        expect(mockFetch).toHaveBeenCalledWith(
-          expect.stringContaining('.r2.cloudflarestorage.com'),
-          expect.objectContaining({
-            method: 'HEAD'
-          })
-        )
-      })
-
-      it('should return false when object does not exist', async () => {
-        mockFetch.mockRejectedValueOnce(new Error('Not found'))
-
-        const result = await r2Client.exists('test-key')
-
-        expect(result).toBe(false)
-      })
+      // 1 list + 2 delete = 3 calls
+      expect(mockSend).toHaveBeenCalledTimes(3)
     })
   })
 })

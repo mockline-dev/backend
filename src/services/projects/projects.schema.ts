@@ -18,12 +18,19 @@ export const projectsSchema = Type.Object(
     language: Type.Union([Type.Literal('python'), Type.Literal('typescript')]),
     model: Type.String(),
     status: Type.Union([
+      Type.Literal('created'),
       Type.Literal('initializing'),
+      Type.Literal('planning'),
+      Type.Literal('scaffolding'),
       Type.Literal('generating'),
       Type.Literal('validating'),
+      Type.Literal('editing'),
       Type.Literal('ready'),
       Type.Literal('error')
     ]),
+    // Stored project plan (set by planning worker after executePlanningPipeline)
+    // Type.Any() is required here — plan is an arbitrary nested JSON object (ProjectPlan)
+    plan: Type.Optional(Type.Any()),
     errorMessage: Type.Optional(Type.String()),
     errorType: Type.Optional(Type.String()),
     retryAttempts: Type.Optional(Type.Number()),
@@ -33,7 +40,7 @@ export const projectsSchema = Type.Object(
     jobId: Type.Optional(Type.String()),
     // Soft delete
     deletedAt: Type.Optional(Type.Number()),
-    // Nested progress object
+    // Nested progress object for initial code generation
     generationProgress: Type.Optional(
       Type.Object({
         percentage: Type.Number({ minimum: 0, maximum: 100, default: 0 }),
@@ -52,9 +59,22 @@ export const projectsSchema = Type.Object(
           Type.Object({
             passCount: Type.Number(),
             failCount: Type.Number(),
-            failedFiles: Type.Array(Type.String())
+            failedFiles: Type.Array(Type.String()),
+            fixedCount: Type.Optional(Type.Number()),
+            fixedFiles: Type.Optional(Type.Array(Type.String()))
           })
         )
+      })
+    ),
+    // Nested progress object for agentic edit jobs
+    editProgress: Type.Optional(
+      Type.Object({
+        stage: Type.String(),
+        percentage: Type.Number({ minimum: 0, maximum: 100 }),
+        startedAt: Type.Optional(Type.Number()),
+        completedAt: Type.Optional(Type.Number()),
+        iterations: Type.Optional(Type.Number()),
+        errorMessage: Type.Optional(Type.String())
       })
     )
   },
@@ -121,17 +141,31 @@ const generationProgressPatchSchema = Type.Partial(
       Type.Object({
         passCount: Type.Number(),
         failCount: Type.Number(),
-        failedFiles: Type.Array(Type.String())
+        failedFiles: Type.Array(Type.String()),
+        fixedCount: Type.Optional(Type.Number()),
+        fixedFiles: Type.Optional(Type.Array(Type.String()))
       })
     )
   })
 )
 
+const editProgressPatchSchema = Type.Partial(
+  Type.Object({
+    stage: Type.String(),
+    percentage: Type.Number({ minimum: 0, maximum: 100 }),
+    startedAt: Type.Optional(Type.Number()),
+    completedAt: Type.Optional(Type.Number()),
+    iterations: Type.Optional(Type.Number()),
+    errorMessage: Type.Optional(Type.String())
+  })
+)
+
 export const projectsPatchSchema = Type.Intersect(
   [
-    Type.Partial(Type.Omit(projectsSchema, ['generationProgress'])),
+    Type.Partial(Type.Omit(projectsSchema, ['generationProgress', 'editProgress'])),
     Type.Object({
-      generationProgress: Type.Optional(generationProgressPatchSchema)
+      generationProgress: Type.Optional(generationProgressPatchSchema),
+      editProgress: Type.Optional(editProgressPatchSchema)
     })
   ],
   {
