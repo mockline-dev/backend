@@ -1,9 +1,9 @@
 {{#each entities}}
-from app.crud.{{snakeCase this.name}} import {{snakeCase this.name}}
+from app.crud.{{snakeCase this.name}} import crud_{{snakeCase this.name}}
 {{/each}}
 
 __all__ = [
 {{#each entities}}
-    "{{snakeCase this.name}}",
+    "crud_{{snakeCase this.name}}",
 {{/each}}
 ]

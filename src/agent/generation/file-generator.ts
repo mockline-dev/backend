@@ -55,6 +55,41 @@ function validateAST(code: string): string | null {
   }
 }
 
+/**
+ * Run pyflakes on the code and return F821 (undefined name) errors.
+ * Returns null if pyflakes is not installed (soft failure).
+ */
+function validatePyflakes(code: string): string[] | null {
+  const dir = mkdtempSync(join(tmpdir(), 'mockline-gen-'))
+  const file = join(dir, 'check.py')
+  try {
+    writeFileSync(file, code, 'utf8')
+    execFileSync('python3', ['-m', 'pyflakes', file], { stdio: 'pipe' })
+    return []
+  } catch (err: unknown) {
+    // execFileSync throws when exit code != 0 (pyflakes found issues) or when not installed
+    const stderr = err instanceof Error && 'stderr' in err
+      ? (err as NodeJS.ErrnoException & { stderr: Buffer }).stderr?.toString() ?? ''
+      : ''
+    const stdout = err instanceof Error && 'stdout' in err
+      ? (err as NodeJS.ErrnoException & { stdout: Buffer }).stdout?.toString() ?? ''
+      : ''
+
+    // If pyflakes is not installed, stderr will contain "No module named pyflakes"
+    if (stderr.includes('No module named pyflakes')) {
+      return null
+    }
+
+    // Extract F821 (undefined name) lines from stdout
+    const lines = stdout.split('\n')
+    return lines
+      .filter(l => l.includes("undefined name"))
+      .map(l => l.replace(file, '<generated>'))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
 /** Find the relevant entity for the file being generated. */
 function entityForFile(filePath: string, plan: ProjectPlan): PlanEntity | undefined {
   for (const entity of plan.entities) {
@@ -214,6 +249,28 @@ export async function generateFile(
           role: 'user',
           content:
             `Remove these imports — they do not exist in this project: ${unknownImports.join(', ')}\n` +
+            `Use only imports from the "Available imports" section. Output ONLY corrected Python code.`,
+        }
+      )
+      continue
+    }
+
+    // ── Pyflakes F821 (undefined name) validation ───────────────────────────
+    const f821Errors = validatePyflakes(code)
+    if (f821Errors !== null && f821Errors.length > 0) {
+      lastError = `Undefined names: ${f821Errors.join('; ')}`
+      logger.warn(
+        'generateFile: %s attempt %d — pyflakes F821: %s',
+        fileSpec.outputPath,
+        attempt,
+        f821Errors.join('; ')
+      )
+      messages.push(
+        { role: 'assistant', content: response.content },
+        {
+          role: 'user',
+          content:
+            `Fix these undefined name errors — add the required imports:\n${f821Errors.join('\n')}\n` +
             `Use only imports from the "Available imports" section. Output ONLY corrected Python code.`,
         }
       )

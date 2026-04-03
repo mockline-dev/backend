@@ -159,13 +159,21 @@ async function fixOneFile(
   let { content } = target.file
   const { path } = target.file
   let errors = target.errors
+  let useFullFile = false
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    logger.debug('FixLoop: attempt %d/%d for %s (%d errors)', attempt, maxAttempts, path, errors.length)
+    logger.debug('FixLoop: attempt %d/%d for %s (%d errors, mode=%s)', attempt, maxAttempts, path, errors.length, useFullFile ? 'full-file' : 'search-replace')
 
-    const fixedContent = await callLLM(path, content, errors)
+    const fixedContent = useFullFile
+      ? await callLLMFullFile(path, content, errors)
+      : await callLLM(path, content, errors)
+
     if (!fixedContent) {
       logger.warn('FixLoop: LLM returned no content for %s on attempt %d', path, attempt)
+      if (!useFullFile) {
+        logger.debug('FixLoop: switching to full-file rewrite mode for %s', path)
+        useFullFile = true
+      }
       continue
     }
 
@@ -190,6 +198,51 @@ async function fixOneFile(
 
   logger.warn('FixLoop: could not fix %s after %d attempts', path, maxAttempts)
   return null
+}
+
+async function callLLMFullFile(
+  path: string,
+  content: string,
+  errors: ValidationError[]
+): Promise<string | null> {
+  const modelCfg = getModelConfig('fixing')
+  const provider = getProvider()
+
+  const errorBlock = errors
+    .slice(0, MAX_ERRORS_SHOWN)
+    .map(e => `  Line ${e.line ?? '?'}${e.code ? ` [${e.code}]` : ''}: ${e.message}`)
+    .join('\n')
+
+  const truncated = content.length > MAX_FILE_CHARS
+    ? content.slice(0, MAX_FILE_CHARS) + '\n# ... (truncated)'
+    : content
+
+  try {
+    let raw = ''
+    for await (const chunk of provider.chatStream(
+      [
+        {
+          role: 'system',
+          content: 'You are an expert Python developer. Output ONLY the complete corrected Python file — no explanations, no markdown fences, just the raw Python code.'
+        },
+        {
+          role: 'user',
+          content: `Fix ALL the following errors in this Python file and return the complete corrected file.\n\nFILE: ${path}\n\nERRORS:\n${errorBlock}\n\nFILE CONTENT:\n${truncated}`
+        }
+      ],
+      undefined,
+      { temperature: modelCfg.temperature, num_predict: 4096 }
+    )) {
+      raw += chunk.message.content
+    }
+
+    const newContent = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
+    return newContent || null
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    logger.warn('FixLoop: full-file LLM call failed for %s: %s', path, msg)
+    return null
+  }
 }
 
 async function callLLM(

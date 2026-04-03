@@ -5,6 +5,47 @@ import type { ProjectPlan } from '../../types'
 export interface PlanValidationResult {
   valid: boolean
   errors: string[]
+  warnings: string[]
+}
+
+// ─── Entity coverage ──────────────────────────────────────────────────────────
+
+// Words that appear in features but are never entity names
+const COVERAGE_STOP_WORDS = new Set([
+  'auth', 'authentication', 'authorization', 'management', 'system',
+  'basic', 'simple', 'full', 'crud', 'data', 'support', 'feature',
+  'api', 'rest', 'admin', 'access', 'control', 'with', 'and', 'the',
+  'for', 'can', 'will', 'have', 'that', 'this', 'from', 'into',
+  'based', 'using', 'each', 'list', 'view', 'edit', 'delete', 'create',
+  'update', 'read', 'search', 'filter', 'sort', 'page', 'track',
+])
+
+/**
+ * Checks whether entities cover the domain concepts mentioned in the feature list.
+ * Returns advisory warning strings (not hard errors).
+ */
+export function checkEntityCoverage(features: string[], entityNames: string[]): string[] {
+  const warnings: string[] = []
+  const entityNamesLower = new Set(entityNames.map(n => n.toLowerCase()))
+
+  for (const feature of features) {
+    const words = feature
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !COVERAGE_STOP_WORDS.has(w))
+
+    for (const word of words) {
+      // Match singular and plural (strip trailing 's' or 'es')
+      const singular = word.endsWith('es') ? word.slice(0, -2) : word.endsWith('s') ? word.slice(0, -1) : word
+      if (!entityNamesLower.has(word) && !entityNamesLower.has(singular)) {
+        warnings.push(`Feature "${feature}" mentions "${word}" but no matching entity found — consider adding it`)
+        break // one warning per feature to avoid noise
+      }
+    }
+  }
+
+  return warnings
 }
 
 // ─── Validator ────────────────────────────────────────────────────────────────
@@ -24,8 +65,6 @@ export interface PlanValidationResult {
  */
 export function validatePlan(plan: ProjectPlan): PlanValidationResult {
   const errors: string[] = []
-
-  // ── Entities ──────────────────────────────────────────────────────────────
 
   if (plan.entities.length === 0) {
     errors.push('Plan must define at least one entity')
@@ -113,5 +152,5 @@ export function validatePlan(plan: ProjectPlan): PlanValidationResult {
     }
   }
 
-  return { valid: errors.length === 0, errors }
+  return { valid: errors.length === 0, errors, warnings: checkEntityCoverage(plan.features, plan.entities.map(e => e.name)) }
 }

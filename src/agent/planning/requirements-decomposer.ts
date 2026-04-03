@@ -1,9 +1,14 @@
 import type { ChatMessage, OllamaClient } from '../../llm/client'
 import { getModelConfig } from '../../llm/client'
 import { structuredLLMCall } from '../../llm/structured-output'
+import { logger } from '../../logger'
 
 import { RequirementsSchema } from './schemas'
 import type { Requirements } from './schemas'
+
+// ─── Auth keyword detector ────────────────────────────────────────────────────
+
+const AUTH_KEYWORD_RE = /\b(auth|login|logout|register|authentication|sign[-\s]?in|sign[-\s]?up|password|jwt|token|bearer|user\s+management)\b/i
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -56,9 +61,24 @@ export async function decomposeRequirements(
   ]
 
   const modelCfg = getModelConfig('planning')
-  return structuredLLMCall(client, RequirementsSchema, messages, {
+  const result = await structuredLLMCall(client, RequirementsSchema, messages, {
     model: modelCfg.name,
     temperature: modelCfg.temperature,
     think: modelCfg.think,
   })
+
+  // ── Post-validation: enforce auth detection regardless of LLM output ────────
+  if (!result.authRequired && AUTH_KEYWORD_RE.test(userPrompt)) {
+    logger.warn(
+      'decomposeRequirements: LLM returned authRequired=false but prompt contains auth keywords — overriding to true'
+    )
+    result.authRequired = true
+  }
+
+  if (result.authRequired && !result.entityNames.some(n => n.toLowerCase() === 'user')) {
+    logger.warn('decomposeRequirements: authRequired=true but "User" entity missing — adding it')
+    result.entityNames.unshift('User')
+  }
+
+  return result
 }

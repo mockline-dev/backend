@@ -77,8 +77,8 @@ describe('resolveAvailableImports — service file', () => {
   })
 
   it('includes exception imports', () => {
-    expect(result).toContain('NotFoundException')
-    expect(result).toContain('BadRequestException')
+    expect(result).toContain('HTTPException')
+    expect(result).toContain('status_code=404')
   })
 
   it('includes Session import', () => {

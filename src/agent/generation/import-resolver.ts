@@ -101,7 +101,9 @@ function resolveServiceImports(entity: PlanEntity, authRequired: boolean): strin
     crudMethodBlock(entity.name),
     '',
     'Exceptions:',
-    '  from app.core.exceptions import NotFoundException, BadRequestException',
+    '  from fastapi import HTTPException',
+    '  # Raise HTTPException(status_code=404, detail="...") for not-found',
+    '  # Raise HTTPException(status_code=400, detail="...") for bad requests',
   ]
   if (authRequired) {
     lines.push('', 'Security:', '  from app.core.security import get_password_hash, verify_password')
@@ -123,9 +125,11 @@ function resolveRouteImports(
   const lines: string[] = [
     'Available imports (use ONLY these, do not invent others):',
     '',
+    'Standard library:',
+    '  from typing import List, Optional',
+    '',
     'FastAPI:',
     '  from fastapi import APIRouter, Depends, HTTPException, status',
-    '  from typing import List',
     '',
     'Database dependency:',
     '  from app.api.deps import get_db',

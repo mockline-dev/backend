@@ -101,6 +101,14 @@ export async function executePlanningPipeline(
     )
   }
 
+  if (validation.warnings.length > 0) {
+    logger.warn(
+      'PlanningPipeline: entity coverage warnings (%d): %s',
+      validation.warnings.length,
+      validation.warnings.join(' | ')
+    )
+  }
+
   logger.info('PlanningPipeline: plan validated — "%s"', plan.projectName)
   return plan
 }
