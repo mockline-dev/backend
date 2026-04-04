@@ -1,8 +1,8 @@
 import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
-import { getProvider } from '../../llm/providers/registry'
+import { llmClient, getModelConfig } from '../../llm/client'
+import { stripThinkTags } from '../../llm/structured-output'
 import { parseInferProjectMetaResponse } from '../../utils/parseMarkdown'
-import { safeGenerate, SafeGenerateError } from '../../llm/safe-llm-call'
 
 const INFER_PROJECT_META_SYSTEM = `You are an expert product strategist for AI code generation systems.
 
@@ -32,17 +32,19 @@ export default function (app: any) {
       }
 
       try {
-        const ollamaConfig = app.get('ollama')
-        const provider = getProvider()
-        const aiResponse = await safeGenerate(provider, INFER_PROJECT_META_SYSTEM, enhancedPrompt, {
-          temperature: 0.7,
-          num_predict: ollamaConfig.numPredict,
-          num_ctx: ollamaConfig.numCtx,
-          top_p: ollamaConfig.topP,
-          purpose: 'infer-project-meta',
-          timeoutMs: 60_000
+        const modelCfg = getModelConfig('conversation')
+        const response = await llmClient.chat({
+          model: modelCfg.name,
+          messages: [
+            { role: 'system', content: INFER_PROJECT_META_SYSTEM },
+            { role: 'user', content: enhancedPrompt }
+          ],
+          temperature: modelCfg.temperature,
+          think: modelCfg.think,
+          format: 'json'
         })
-        const parsed = parseInferProjectMetaResponse(aiResponse)
+        const raw = stripThinkTags(response.content)
+        const parsed = parseInferProjectMetaResponse(raw)
 
         if (!parsed.name || !parsed.description) {
           throw new Error('Model did not return valid project metadata')
@@ -50,11 +52,7 @@ export default function (app: any) {
 
         return parsed
       } catch (error) {
-        if (error instanceof SafeGenerateError) {
-          console.warn(`Project meta inference failed (${error.reason}): ${error.message}`)
-          throw new Error('Failed to infer project metadata. Please try again later.')
-        }
-        console.error('Error inferring project metadata:', error)
+        console.warn(`Project meta inference failed:`, error)
         throw new Error('Failed to infer project metadata. Please try again later.')
       }
     }

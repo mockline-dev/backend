@@ -1,8 +1,8 @@
 import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
-import { getProvider } from '../../llm/providers/registry'
+import { llmClient, getModelConfig } from '../../llm/client'
+import { stripThinkTags } from '../../llm/structured-output'
 import { parseEnhancePromptResponse } from '../../utils/parseMarkdown'
-import { safeGenerate, SafeGenerateError } from '../../llm/safe-llm-call'
 
 const ENHANCE_PROMPT_SYSTEM = `You are an expert software prompt engineer specialized in preparing high-quality prompts for coding AI models such as Qwen-Coder.
 
@@ -56,24 +56,22 @@ export default function (app: any) {
       }
 
       try {
-        const ollamaConfig = app.get('ollama')
-        const provider = getProvider()
-        const aiResponse = await safeGenerate(provider, ENHANCE_PROMPT_SYSTEM, userPrompt, {
-          temperature: 0.7,
-          num_predict: ollamaConfig.numPredict,
-          num_ctx: ollamaConfig.numCtx,
-          top_p: ollamaConfig.topP,
-          purpose: 'enhance-prompt',
-          timeoutMs: 60_000
+        const modelCfg = getModelConfig('conversation')
+        const response = await llmClient.chat({
+          model: modelCfg.name,
+          messages: [
+            { role: 'system', content: ENHANCE_PROMPT_SYSTEM },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: modelCfg.temperature,
+          think: modelCfg.think,
+          format: 'json'
         })
-        const parsedResponse = parseEnhancePromptResponse(aiResponse)
+        const raw = stripThinkTags(response.content)
+        const parsedResponse = parseEnhancePromptResponse(raw)
         return parsedResponse
       } catch (error) {
-        if (error instanceof SafeGenerateError) {
-          console.warn(`Prompt enhancement failed (${error.reason}): ${error.message}`)
-          throw new Error('Failed to enhance prompt. Please try again later.')
-        }
-        console.error('Error enhancing prompt:', error)
+        console.warn(`Prompt enhancement failed:`, error)
         throw new Error('Failed to enhance prompt. Please try again later.')
       }
     }
