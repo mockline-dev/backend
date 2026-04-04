@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/shakhboz/Projects/mockline.dev/back/logs/.eb7516214383762e2bbf542b27cdf85d6021a13b-audit.json",
+    "files": [
+        {
+            "date": 1775332179501,
+            "name": "/Users/shakhboz/Projects/mockline.dev/back/logs/combined-2026-04-05.log",
+            "hash": "12aba60433ab4d22b44d1b97c64a31c669f5f809ade6c21875ee79e350783dd7"
+        }
+    ],
+    "hashType": "sha256"
+}
