@@ -81,8 +81,11 @@
     "aws-sdk": "^2.1692.0",
     "bull": "^4.16.5",
     "bullmq": "^5.58.2",
+    "chromadb": "^3.4.0",
     "feathers-hooks-common": "^8.2.1",
     "firebase-admin": "^13.4.0",
+    "gpt-tokenizer": "^3.4.0",
+    "groq-sdk": "^1.1.2",
     "ioredis": "^5.7.0",
     "mongodb": "^6.16.0",
     "node-cron": "^4.1.0",
@@ -91,7 +94,10 @@
     "openai": "^6.27.0",
     "reflect-metadata": "^0.2.2",
     "s3-blob-store": "^4.1.1",
-    "winston": "^3.17.0"
+    "tree-sitter-wasms": "^0.1.13",
+    "web-tree-sitter": "^0.26.8",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@feathersjs/cli": "^5.0.34",

@@ -1,5 +1,5 @@
 
-import { Application } from '../../../back/src/declarations';
+import { Application } from '../declarations';
 import { hashFileName } from './hashFileName';
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks

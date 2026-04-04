@@ -3,9 +3,9 @@ import type { Worker } from 'bullmq'
 import { logger } from '../../logger'
 import { closeRedisClient, configureRedisClientFromApp, getRedisClient } from './client'
 import { initBullBoard } from './monitor/monitor'
+import { startOrchestrationWorker, stopOrchestrationWorker } from './workers/orchestration.worker'
 
-let generationWorker: Worker | null = null
-let validationWorker: Worker | null = null
+let orchestrationWorker: Worker | null = null
 let started = false
 
 export async function startWorkerService(app: any) {
@@ -15,6 +15,9 @@ export async function startWorkerService(app: any) {
     configureRedisClientFromApp(app)
     await getRedisClient()
     await initBullBoard(app)
+
+    orchestrationWorker = startOrchestrationWorker(app)
+
     started = true
     logger.info('Worker service started successfully')
   } catch (err) {
@@ -24,15 +27,7 @@ export async function startWorkerService(app: any) {
 
 export async function stopWorkerService() {
   try {
-    if (generationWorker) {
-      await generationWorker.close()
-      generationWorker = null
-    }
-
-    if (validationWorker) {
-      await validationWorker.close()
-      validationWorker = null
-    }
+    await stopOrchestrationWorker()
 
     await closeRedisClient()
     started = false
