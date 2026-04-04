@@ -5,10 +5,10 @@
  * No Redis, BullMQ, or MongoDB required — runs standalone.
  *
  * Usage:
- *   GROQ_API_KEY=gsk_... npx ts-node --skip-project scripts/test-orchestration.ts
+ *   GROQ_API_KEY=gsk_... pnpm run test:smoke
  *
  * Or with keys already in config/default.json:
- *   npx ts-node --skip-project scripts/test-orchestration.ts
+ *   pnpm run test:smoke
  *
  * Optional env vars:
  *   GROQ_API_KEY      — Groq API key
@@ -18,30 +18,31 @@
  *   CHROMA_PORT       — ChromaDB port (default: 8000)
  */
 
+import * as fs from 'fs'
 import * as path from 'path'
 
-// Load config from config/default.json (same as the app)
+// ─── Config loading (before any src/ imports) ────────────────────────────────
+
 const configPath = path.resolve(__dirname, '../config/default.json')
-const defaultConfig = JSON.parse(require('fs').readFileSync(configPath, 'utf8'))
+const defaultConfig: Record<string, any> = JSON.parse(fs.readFileSync(configPath, 'utf8'))
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY || defaultConfig.llm?.groq?.apiKey
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || defaultConfig.llm?.minimax?.apiKey
-const GROQ_MODEL = defaultConfig.llm?.groq?.defaultModel || 'llama-3.3-70b-versatile'
-const CLASSIFIER_MODEL = defaultConfig.llm?.groq?.classifierModel || 'llama-3.1-8b-instant'
-const MINIMAX_BASE_URL = defaultConfig.llm?.minimax?.baseUrl || 'https://api.minimaxi.chat/v1'
-const MINIMAX_MODEL = defaultConfig.llm?.minimax?.defaultModel || 'MiniMax-Text-01'
-const CHROMA_HOST = process.env.CHROMA_HOST || defaultConfig.chromadb?.host || 'localhost'
-const CHROMA_PORT = Number(process.env.CHROMA_PORT || defaultConfig.chromadb?.port || 8000)
-const TEST_PROMPT = process.env.TEST_PROMPT || 'Create a simple FastAPI todo app with SQLite'
+const GROQ_API_KEY: string = process.env.GROQ_API_KEY || defaultConfig?.llm?.groq?.apiKey || ''
+const MINIMAX_API_KEY: string = process.env.MINIMAX_API_KEY || defaultConfig?.llm?.minimax?.apiKey || ''
+const GROQ_MODEL: string = defaultConfig?.llm?.groq?.defaultModel || 'llama-3.3-70b-versatile'
+const CLASSIFIER_MODEL: string = defaultConfig?.llm?.groq?.classifierModel || 'llama-3.1-8b-instant'
+const MINIMAX_BASE_URL: string = defaultConfig?.llm?.minimax?.baseUrl || 'https://api.minimaxi.chat/v1'
+const MINIMAX_MODEL: string = defaultConfig?.llm?.minimax?.defaultModel || 'MiniMax-Text-01'
+const CHROMA_HOST: string = process.env.CHROMA_HOST || defaultConfig?.chromadb?.host || 'localhost'
+const CHROMA_PORT: number = Number(process.env.CHROMA_PORT || defaultConfig?.chromadb?.port || 8000)
+const TEST_PROMPT: string = process.env.TEST_PROMPT || 'Create a simple FastAPI todo app with SQLite'
 
-// ─── Imports ──────────────────────────────────────────────────────────────────
+// ─── Src imports (after config is resolved) ──────────────────────────────────
 
 import { GroqProvider } from '../src/orchestration/providers/groq.provider'
 import { MinimaxProvider } from '../src/orchestration/providers/minimax.provider'
 import { LLMRouter } from '../src/orchestration/providers/router'
 import { classifyIntent } from '../src/orchestration/intent/classifier'
 import { ChromaVectorStore } from '../src/orchestration/rag/chroma.client'
-import { retrieveContext } from '../src/orchestration/rag/retriever'
 import { buildPrompt } from '../src/orchestration/prompt/builder'
 import { countTokens } from '../src/orchestration/prompt/token-counter'
 import { chunkText } from '../src/orchestration/chunking/text.chunker'
@@ -49,26 +50,33 @@ import { orchestrate } from '../src/orchestration/pipeline/orchestrator'
 import { Intent } from '../src/orchestration/types'
 import type { OrchestratorDeps } from '../src/orchestration/pipeline/orchestrator'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Console helpers ─────────────────────────────────────────────────────────
 
-const GREEN = '\x1b[32m'
-const RED = '\x1b[31m'
+const GREEN  = '\x1b[32m'
+const RED    = '\x1b[31m'
 const YELLOW = '\x1b[33m'
-const CYAN = '\x1b[36m'
-const DIM = '\x1b[2m'
-const RESET = '\x1b[0m'
-const BOLD = '\x1b[1m'
+const CYAN   = '\x1b[36m'
+const DIM    = '\x1b[2m'
+const RESET  = '\x1b[0m'
+const BOLD   = '\x1b[1m'
+
+let passCount = 0
+let failCount = 0
+let warnCount = 0
 
 function ok(label: string, detail?: string) {
+  passCount++
   console.log(`  ${GREEN}✓${RESET} ${label}${detail ? `  ${DIM}${detail}${RESET}` : ''}`)
 }
 
 function fail(label: string, err: unknown) {
+  failCount++
   const msg = err instanceof Error ? err.message : String(err)
   console.log(`  ${RED}✗${RESET} ${label}  ${DIM}${msg}${RESET}`)
 }
 
 function warn(label: string, detail?: string) {
+  warnCount++
   console.log(`  ${YELLOW}⚠${RESET} ${label}${detail ? `  ${DIM}${detail}${RESET}` : ''}`)
 }
 
@@ -77,25 +85,31 @@ function section(title: string) {
 }
 
 function banner(title: string) {
-  console.log(`\n${BOLD}${'─'.repeat(55)}${RESET}`)
+  const line = '─'.repeat(55)
+  console.log(`\n${BOLD}${line}${RESET}`)
   console.log(`${BOLD}  ${title}${RESET}`)
-  console.log(`${BOLD}${'─'.repeat(55)}${RESET}`)
+  console.log(`${BOLD}${line}${RESET}`)
 }
 
-// ─── Test Runners ─────────────────────────────────────────────────────────────
+function isPlaceholder(key: string): boolean {
+  return !key || key.startsWith('PLACEHOLDER')
+}
+
+// ─── Test sections ────────────────────────────────────────────────────────────
 
 async function testConfig() {
   section('1. Configuration')
-  if (GROQ_API_KEY && !GROQ_API_KEY.startsWith('PLACEHOLDER')) {
+
+  if (!isPlaceholder(GROQ_API_KEY)) {
     ok('GROQ_API_KEY is set', `${GROQ_API_KEY.slice(0, 8)}...`)
   } else {
-    fail('GROQ_API_KEY missing or placeholder', 'set GROQ_API_KEY env var or update config/default.json')
+    fail('GROQ_API_KEY missing or placeholder — set GROQ_API_KEY env var or update config/default.json', '')
   }
 
-  if (MINIMAX_API_KEY && !MINIMAX_API_KEY.startsWith('PLACEHOLDER')) {
+  if (!isPlaceholder(MINIMAX_API_KEY)) {
     ok('MINIMAX_API_KEY is set', `${MINIMAX_API_KEY.slice(0, 8)}...`)
   } else {
-    warn('MINIMAX_API_KEY not set', 'fallback provider unavailable — not blocking')
+    warn('MINIMAX_API_KEY not set', 'fallback provider unavailable — non-blocking')
   }
 
   ok('Groq model', GROQ_MODEL)
@@ -120,9 +134,10 @@ async function testTokenCounter() {
   }
 }
 
-async function testGroqProvider() {
+async function testGroqProvider(): Promise<boolean> {
   section('3. Groq Provider')
-  if (!GROQ_API_KEY || GROQ_API_KEY.startsWith('PLACEHOLDER')) {
+
+  if (isPlaceholder(GROQ_API_KEY)) {
     warn('Skipping — no API key')
     return false
   }
@@ -132,11 +147,11 @@ async function testGroqProvider() {
   try {
     process.stdout.write(`  Calling ${GROQ_MODEL}... `)
     const response = await provider.chat(
-      [{ role: 'user', content: 'Reply with exactly: OK' }],
+      [{ role: 'user', content: 'Reply with exactly the word: OK' }],
       { maxTokens: 10, temperature: 0 }
     )
     console.log(`${GREEN}done${RESET}`)
-    ok('chat() works', `"${response.content.trim()}"  [${response.usage.totalTokens} tokens]`)
+    ok('chat() works', `"${response.content.trim()}"  [${response.usage.totalTokens} tokens, model=${response.model}]`)
     return true
   } catch (err) {
     console.log(`${RED}failed${RESET}`)
@@ -145,9 +160,10 @@ async function testGroqProvider() {
   }
 }
 
-async function testMinimaxProvider() {
+async function testMinimaxProvider(): Promise<boolean> {
   section('4. MiniMax Provider (fallback)')
-  if (!MINIMAX_API_KEY || MINIMAX_API_KEY.startsWith('PLACEHOLDER')) {
+
+  if (isPlaceholder(MINIMAX_API_KEY)) {
     warn('Skipping — no API key')
     return false
   }
@@ -161,7 +177,7 @@ async function testMinimaxProvider() {
   try {
     process.stdout.write(`  Calling ${MINIMAX_MODEL}... `)
     const response = await provider.chat(
-      [{ role: 'user', content: 'Reply with exactly: OK' }],
+      [{ role: 'user', content: 'Reply with exactly the word: OK' }],
       { maxTokens: 10, temperature: 0 }
     )
     console.log(`${GREEN}done${RESET}`)
@@ -174,8 +190,9 @@ async function testMinimaxProvider() {
   }
 }
 
-async function testRouter(groqOk: boolean, minimaxOk: boolean) {
+async function testRouter(groqOk: boolean, minimaxOk: boolean): Promise<LLMRouter | null> {
   section('5. LLM Router')
+
   if (!groqOk) {
     warn('Skipping — Groq provider not available')
     return null
@@ -189,10 +206,11 @@ async function testRouter(groqOk: boolean, minimaxOk: boolean) {
 
   try {
     const response = await router.chat(
-      [{ role: 'user', content: 'Reply with exactly: ROUTER_OK' }],
+      [{ role: 'user', content: 'Reply with exactly the word: ROUTER_OK' }],
       { maxTokens: 10, temperature: 0 }
     )
-    ok('Router routes to primary', `provider=${response.provider}, content="${response.content.trim()}"`)
+    ok('Routes to primary provider', `content="${response.content.trim()}"`)
+    ok('Fallbacks configured', minimaxOk ? '1 fallback (MiniMax)' : 'none — only Groq available')
     return router
   } catch (err) {
     fail('Router error', err)
@@ -202,6 +220,7 @@ async function testRouter(groqOk: boolean, minimaxOk: boolean) {
 
 async function testIntentClassifier(router: LLMRouter | null) {
   section('6. Intent Classifier')
+
   if (!router) {
     warn('Skipping — router not available')
     return
@@ -209,23 +228,23 @@ async function testIntentClassifier(router: LLMRouter | null) {
 
   const classifierProvider = new GroqProvider({ apiKey: GROQ_API_KEY, defaultModel: CLASSIFIER_MODEL })
 
-  const cases: Array<{ prompt: string; expectedIntent: Intent }> = [
-    { prompt: 'Create a FastAPI todo app with authentication', expectedIntent: Intent.GenerateProject },
-    { prompt: 'Fix the login endpoint it returns 500', expectedIntent: Intent.FixBug },
-    { prompt: 'Explain how the user model works', expectedIntent: Intent.ExplainCode },
+  const cases: Array<{ prompt: string; expected: Intent }> = [
+    { prompt: 'Create a FastAPI todo app with authentication', expected: Intent.GenerateProject },
+    { prompt: 'Fix the login endpoint it returns 500', expected: Intent.FixBug },
+    { prompt: 'Explain how the user model works', expected: Intent.ExplainCode },
+    { prompt: 'Add a search endpoint to the posts service', expected: Intent.AddFeature },
   ]
 
-  for (const { prompt, expectedIntent } of cases) {
+  for (const { prompt, expected } of cases) {
     try {
       const result = await classifyIntent(prompt, classifierProvider, CLASSIFIER_MODEL)
-      const match = result.intent === expectedIntent
+      const match = result.intent === expected
+      const confidence = `${(result.confidence * 100).toFixed(0)}%`
+      const short = `"${prompt.slice(0, 45)}"`
       if (match) {
-        ok(`"${prompt.slice(0, 40)}"`, `→ ${result.intent} (${(result.confidence * 100).toFixed(0)}% confidence)`)
+        ok(short, `→ ${result.intent} (${confidence})`)
       } else {
-        warn(
-          `"${prompt.slice(0, 40)}"`,
-          `expected ${expectedIntent}, got ${result.intent} (${(result.confidence * 100).toFixed(0)}%)`
-        )
+        warn(short, `expected ${expected}, got ${result.intent} (${confidence})`)
       }
     } catch (err) {
       fail(`classify: "${prompt.slice(0, 40)}"`, err)
@@ -233,35 +252,30 @@ async function testIntentClassifier(router: LLMRouter | null) {
   }
 }
 
-async function testChromaDB() {
+async function testChromaDB(): Promise<ChromaVectorStore> {
   section('7. ChromaDB Vector Store')
-  const store = new ChromaVectorStore(CHROMA_HOST, CHROMA_PORT)
 
+  const store = new ChromaVectorStore(CHROMA_HOST, CHROMA_PORT)
   const alive = await store.ping()
+
   if (!alive) {
-    warn(`ChromaDB not reachable at ${CHROMA_HOST}:${CHROMA_PORT}`, 'RAG will be skipped — pipeline continues without it')
-    warn('Start ChromaDB with: docker run -p 8000:8000 chromadb/chroma')
+    warn(`Not reachable at ${CHROMA_HOST}:${CHROMA_PORT}`, 'RAG will be skipped — pipeline still works')
+    warn('To start: docker run -p 8000:8000 chromadb/chroma')
     return store
   }
 
-  ok(`ChromaDB reachable at ${CHROMA_HOST}:${CHROMA_PORT}`)
+  ok(`Reachable at ${CHROMA_HOST}:${CHROMA_PORT}`)
 
-  // Test upsert + query
+  const testProjectId = '_smoke_test_'
   try {
-    const testProjectId = '_smoke_test_'
-    const chunks = [
+    await store.addChunks(testProjectId, [
       { id: 'test:0', filepath: 'test.py', content: 'def greet(name): return f"Hello {name}"', startLine: 0, endLine: 1 },
       { id: 'test:1', filepath: 'test.py', content: 'def add(a, b): return a + b', startLine: 2, endLine: 3 },
-    ]
-
-    await store.addChunks(testProjectId, chunks)
+    ])
     ok('addChunks() — upserted 2 chunks')
 
     const results = await store.query(testProjectId, 'greeting function', 5)
-    ok('query() works', `found ${results.length} result(s)`)
-    if (results.length > 0) {
-      ok('top result', `score=${results[0].score.toFixed(3)}, file=${results[0].chunk.filepath}`)
-    }
+    ok(`query() — found ${results.length} result(s)`, results.length > 0 ? `top score=${results[0].score.toFixed(3)}` : '')
 
     await store.deleteCollection(testProjectId)
     ok('deleteCollection() — cleaned up')
@@ -274,27 +288,27 @@ async function testChromaDB() {
 
 async function testFullPipeline(router: LLMRouter | null, vectorStore: ChromaVectorStore) {
   section('8. Full Pipeline (end-to-end)')
+
   if (!router) {
     warn('Skipping — LLM router not available')
     return
   }
 
   const classifierProvider = new GroqProvider({ apiKey: GROQ_API_KEY, defaultModel: CLASSIFIER_MODEL })
-
   const events: string[] = []
+
   const emit = (event: string, _projectId: string, payload: unknown) => {
     events.push(event)
-    const p = payload as any
+    const p = payload as Record<string, any>
     if (event === 'orchestration:intent') {
       process.stdout.write(`\n  ${DIM}[intent: ${p.intent} @ ${(p.confidence * 100).toFixed(0)}%]${RESET}`)
     } else if (event === 'orchestration:context') {
-      process.stdout.write(` ${DIM}[rag: ${p.chunksFound} chunks]${RESET}`)
-    } else if (event === 'orchestration:token') {
+      process.stdout.write(` ${DIM}[rag: ${p.chunksFound} chunk(s)]${RESET}`)
+    } else if (event === 'orchestration:token' && p.token) {
       process.stdout.write(p.token)
     }
   }
 
-  // Minimal mock app (no DB needed for standalone test)
   const mockApp = {
     service: (_name: string) => ({
       get: async (_id: string) => ({ framework: 'FastAPI', language: 'Python', name: 'test-project' }),
@@ -323,17 +337,17 @@ async function testFullPipeline(router: LLMRouter | null, vectorStore: ChromaVec
   try {
     const start = Date.now()
     const result = await orchestrate(
-      { projectId: 'smoke-test-project', userId: 'smoke-test-user', prompt: TEST_PROMPT },
+      { projectId: 'smoke-test', userId: 'smoke-user', prompt: TEST_PROMPT },
       deps
     )
     const elapsed = Date.now() - start
 
-    console.log(`\n`)
+    console.log('\n')
     ok('Pipeline completed', `${elapsed}ms`)
     ok('Intent detected', result.intent)
-    ok('Content length', `${result.content.length} chars`)
+    ok('Content generated', `${result.content.length} chars`)
     ok('Events fired', events.join(' → '))
-    ok('Usage', `prompt=${result.usage.promptTokens} / completion=${result.usage.completionTokens} tokens`)
+    ok('Token usage', `prompt=${result.usage.promptTokens} + completion=${result.usage.completionTokens} = ${result.usage.totalTokens} total`)
   } catch (err) {
     console.log()
     fail('Pipeline failed', err)
@@ -344,18 +358,24 @@ async function testFullPipeline(router: LLMRouter | null, vectorStore: ChromaVec
 
 async function main() {
   banner('Mockline Orchestration Smoke Test')
-  console.log(`${DIM}  Tests each layer: config → token counter → providers → intent → ChromaDB → full pipeline${RESET}`)
+  console.log(`${DIM}  Tests each layer: config → tokens → Groq → MiniMax → router → intent → ChromaDB → full pipeline${RESET}`)
 
   await testConfig()
   await testTokenCounter()
-  const groqOk = await testGroqProvider()
-  const minimaxOk = await testMinimaxProvider()
-  const router = await testRouter(groqOk, minimaxOk)
+  const groqOk     = await testGroqProvider()
+  const minimaxOk  = await testMinimaxProvider()
+  const router     = await testRouter(groqOk, minimaxOk)
   await testIntentClassifier(router)
   const vectorStore = await testChromaDB()
   await testFullPipeline(router, vectorStore)
 
-  console.log(`\n${BOLD}${'─'.repeat(55)}${RESET}\n`)
+  // ─── Summary ─────────────────────────────────────────────────────────────
+  const line = '─'.repeat(55)
+  console.log(`\n${BOLD}${line}${RESET}`)
+  console.log(`  ${GREEN}${passCount} passed${RESET}  ${failCount > 0 ? RED : DIM}${failCount} failed${RESET}  ${warnCount > 0 ? YELLOW : DIM}${warnCount} warnings${RESET}`)
+  console.log(`${BOLD}${line}${RESET}\n`)
+
+  if (failCount > 0) process.exit(1)
 }
 
 main().catch((err) => {
