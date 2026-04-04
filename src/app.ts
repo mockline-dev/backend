@@ -4,6 +4,8 @@ import { feathers } from '@feathersjs/feathers'
 import { bodyParser, cors, errorHandler, koa, parseAuthentication, rest, serveStatic } from '@feathersjs/koa'
 import socketio from '@feathersjs/socketio'
 
+import { configureSessionLogger } from './logging'
+import { logger } from './logger'
 import { authentication } from './authentication'
 import { channels } from './channels'
 import { configurationValidator } from './configuration'
@@ -17,6 +19,9 @@ const app: Application = koa(feathers())
 
 // Load our app configuration (see config/ folder)
 app.configure(configuration(configurationValidator))
+
+// Configure session-based file logging
+configureSessionLogger(logger)
 
 initializeFirebase(app)
 
