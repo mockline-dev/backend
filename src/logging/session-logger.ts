@@ -1,7 +1,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { createLogger, format, transports } from 'winston'
-import DailyRotateFile from 'winston-daily-rotate-file'
+import * as DailyRotateFileModule from 'winston-daily-rotate-file'
+const DailyRotateFile = (DailyRotateFileModule as any).default ?? DailyRotateFileModule
 
 const LOG_DIR = path.resolve(process.cwd(), 'logs')
 const SESSION_ID = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
