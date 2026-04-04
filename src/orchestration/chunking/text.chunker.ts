@@ -14,6 +14,8 @@ export function chunkText(
   filepath: string,
   maxTokens = DEFAULT_MAX_TOKENS
 ): CodeChunk[] {
+  if (!content.trim()) return []
+
   const lines = content.split('\n')
   const chunks: CodeChunk[] = []
   let chunkIndex = 0
