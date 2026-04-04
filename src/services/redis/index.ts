@@ -14,12 +14,6 @@ export async function startWorkerService(app: any) {
   try {
     configureRedisClientFromApp(app)
     await getRedisClient()
-
-    const generationModule = await import('./worker/generation.worker')
-    const validationModule = await import('./worker/validation.worker')
-    generationWorker = generationModule.generationWorker
-    validationWorker = validationModule.validationWorker
-
     await initBullBoard(app)
     started = true
     logger.info('Worker service started successfully')

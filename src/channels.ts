@@ -9,42 +9,6 @@ export const channels = (app: Application) => {
     // On a new real-time connection, add it to the anonymous channel
     app.channel('anonymous').join(connection)
 
-    // Client can emit 'join-project' / 'leave-project' over Socket.IO to manage project subscriptions
-    const socket = (connection as any)?.socket
-    if (socket?.on) {
-      socket.on('join-project', async (projectId?: string) => {
-        const targetId = projectId?.toString().trim()
-        if (!targetId) {
-          return
-        }
-
-        // Authentication: Verify user is authenticated
-        const userId = (connection as any)?.user?._id?.toString()
-        if (!userId) {
-          return // Not authenticated, don't allow joining
-        }
-
-        // Authorization: Verify user owns the project
-        try {
-          const project = await app.service('projects').get(targetId)
-          if (project.userId.toString() !== userId) {
-            return // User doesn't own this project
-          }
-        } catch (error) {
-          return // Project doesn't exist or other error
-        }
-
-        app.channel(`projects/${targetId}`).join(connection)
-      })
-
-      socket.on('leave-project', (projectId?: string) => {
-        const targetId = projectId?.toString().trim()
-        if (!targetId) {
-          return
-        }
-        app.channel(`projects/${targetId}`).leave(connection)
-      })
-    }
   })
 
   app.on('login', (authResult: AuthenticationResult, { connection }: Params) => {
@@ -61,11 +25,6 @@ export const channels = (app: Application) => {
 
   const getId = (value: any) => value?._id?.toString?.() ?? value?.id?.toString?.()
 
-  app.service('messages').publish((data: any) => {
-    const projectId = data?.projectId?.toString?.()
-    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
-  })
-
   app.service('projects').publish((data: any) => {
     const projectId = getId(data)
     return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
@@ -81,18 +40,6 @@ export const channels = (app: Application) => {
     return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
   })
 
-  // Publish ai-stream events to project-scoped channels
-  app.service('ai-stream').publish((data: any) => {
-    return app.channel(`projects/${data.projectId}`)
-  })
-
-  app.service('ai-stream').publish('chunk', (data: any) => {
-    return app.channel(`projects/${data.projectId}`)
-  })
-
-  app.service('ai-stream').publish('file-updates', (data: any) => {
-    return app.channel(`projects/${data.projectId}`)
-  })
 
   // eslint-disable-next-line no-unused-vars
   app.publish((_data: any, _context: HookContext) => {
