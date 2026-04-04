@@ -230,26 +230,32 @@ async function testIntentClassifier(router: LLMRouter | null) {
 
   const cases: Array<{ prompt: string; expected: Intent }> = [
     { prompt: 'Create a FastAPI todo app with authentication', expected: Intent.GenerateProject },
+    { prompt: 'Build a REST API for a blog with users and posts', expected: Intent.GenerateProject },
     { prompt: 'Fix the login endpoint it returns 500', expected: Intent.FixBug },
     { prompt: 'Explain how the user model works', expected: Intent.ExplainCode },
     { prompt: 'Add a search endpoint to the posts service', expected: Intent.AddFeature },
   ]
 
-  for (const { prompt, expected } of cases) {
-    try {
-      const result = await classifyIntent(prompt, classifierProvider, CLASSIFIER_MODEL)
-      const match = result.intent === expected
-      const confidence = `${(result.confidence * 100).toFixed(0)}%`
-      const short = `"${prompt.slice(0, 45)}"`
-      if (match) {
-        ok(short, `→ ${result.intent} (${confidence})`)
-      } else {
-        warn(short, `expected ${expected}, got ${result.intent} (${confidence})`)
-      }
-    } catch (err) {
-      fail(`classify: "${prompt.slice(0, 40)}"`, err)
+  // Run all cases in parallel — cuts serial latency from N×400ms to ~400ms
+  const start = Date.now()
+  const results = await Promise.all(
+    cases.map(({ prompt }) => classifyIntent(prompt, classifierProvider, CLASSIFIER_MODEL))
+  )
+  const elapsed = Date.now() - start
+
+  for (let i = 0; i < cases.length; i++) {
+    const { prompt, expected } = cases[i]
+    const result = results[i]
+    const match = result.intent === expected
+    const confidence = `${(result.confidence * 100).toFixed(0)}%`
+    const short = `"${prompt.slice(0, 50)}"`
+    if (match) {
+      ok(short, `→ ${result.intent} (${confidence})`)
+    } else {
+      warn(short, `expected ${expected}, got ${result.intent} (${confidence})`)
     }
   }
+  ok(`All ${cases.length} cases completed in parallel`, `${elapsed}ms total`)
 }
 
 async function testChromaDB(): Promise<ChromaVectorStore> {
