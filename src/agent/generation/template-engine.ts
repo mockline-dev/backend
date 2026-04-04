@@ -120,8 +120,23 @@ function registerHelpers(): void {
       if (!f.required) continue  // only required fields in test payload
       obj[f.name] = testValue(f.type ?? 'string')
     }
-    return JSON.stringify(obj)
+    return toPythonDict(obj)
   })
+}
+
+function toPythonDict(val: unknown): string {
+  if (val === null) return 'None'
+  if (val === true) return 'True'
+  if (val === false) return 'False'
+  if (typeof val === 'number') return String(val)
+  if (typeof val === 'string') return `"${val.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+  if (Array.isArray(val)) return `[${val.map(toPythonDict).join(', ')}]`
+  if (typeof val === 'object') {
+    const pairs = Object.entries(val as Record<string, unknown>)
+      .map(([k, v]) => `"${k}": ${toPythonDict(v)}`)
+    return `{${pairs.join(', ')}}`
+  }
+  return String(val)
 }
 
 function testValue(type: string): unknown {

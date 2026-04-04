@@ -154,5 +154,6 @@ export async function planProject(
     model: modelCfg.name,
     temperature: modelCfg.temperature,
     think: modelCfg.think,
+    maxRetries: 2,
   })
 }

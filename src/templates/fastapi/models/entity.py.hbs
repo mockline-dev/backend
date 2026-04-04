@@ -28,8 +28,6 @@ class {{pascalCase name}}(Base):
 {{/if}}
 {{/each}}
 {{#each relations}}
-{{#if isSource}}
-{{!-- Entity is the FROM side: owns the relationship / holds the foreign key --}}
 {{#if (eq this.type "one-to-many")}}
     {{snakeCase this.to}}s: Mapped[List["{{pascalCase this.to}}"]] = relationship(
         "{{pascalCase this.to}}",
@@ -56,38 +54,6 @@ class {{pascalCase name}}(Base):
         secondary="{{this.junctionTable}}",
         back_populates="{{snakeCase ../name}}s",
     )
-{{/if}}
-{{else}}
-{{!-- Entity is the TO side: generate the back-reference field --}}
-{{#if (eq this.type "one-to-many")}}
-{{!-- TO side of one-to-many = many-to-one back-ref --}}
-    {{snakeCase this.from}}: Mapped[Optional["{{pascalCase this.from}}"]] = relationship(
-        "{{pascalCase this.from}}",
-        back_populates="{{snakeCase ../name}}s",
-    )
-{{/if}}
-{{#if (eq this.type "many-to-one")}}
-{{!-- TO side of many-to-one = one-to-many back-ref --}}
-    {{snakeCase this.from}}s: Mapped[List["{{pascalCase this.from}}"]] = relationship(
-        "{{pascalCase this.from}}",
-        back_populates="{{snakeCase ../name}}",
-        lazy="select",
-    )
-{{/if}}
-{{#if (eq this.type "one-to-one")}}
-    {{snakeCase this.from}}: Mapped[Optional["{{pascalCase this.from}}"]] = relationship(
-        "{{pascalCase this.from}}",
-        back_populates="{{snakeCase ../name}}",
-        uselist=False,
-    )
-{{/if}}
-{{#if (eq this.type "many-to-many")}}
-    {{snakeCase this.from}}s: Mapped[List["{{pascalCase this.from}}"]] = relationship(
-        "{{pascalCase this.from}}",
-        secondary="{{this.junctionTable}}",
-        back_populates="{{snakeCase ../name}}s",
-    )
-{{/if}}
 {{/if}}
 {{/each}}
     created_at: Mapped[Optional[datetime]] = mapped_column(

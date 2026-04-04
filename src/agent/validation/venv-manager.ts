@@ -67,7 +67,7 @@ export class VenvManager {
     try {
       await execFileAsync(
         pip,
-        ['install', '-q', '--no-cache-dir', '--disable-pip-version-check', '-r', reqFile],
+        ['install', '-q', '--no-cache-dir', '--disable-pip-version-check', '--only-binary', ':all:', '-r', reqFile],
         { timeout: INSTALL_TIMEOUT_MS }
       )
       logger.info('VenvManager: pip install complete for project %s', projectId)
