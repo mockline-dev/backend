@@ -75,5 +75,24 @@
     "bullBoard": {
         "username": "admin",
         "password": "admin"
+    },
+    "llm": {
+        "groq": {
+            $1REDACTED_API_KEY$2,
+            "defaultModel": "llama-3.3-70b-versatile",
+            "classifierModel": "llama-3.1-8b-instant"
+        },
+        "minimax": {
+            $1REDACTED_API_KEY$2,
+            "baseUrl": "https://api.minimaxi.chat/v1",
+            "defaultModel": "MiniMax-Text-01"
+        },
+        "contextWindow": 131072,
+        "maxResponseTokens": 2048,
+        "timeout": 60000
+    },
+    "chromadb": {
+        "host": "localhost",
+        "port": 8000
     }
 }

@@ -17,19 +17,24 @@ export const configurationSchema = Type.Intersect([
       bucket: Type.String()
     }),
     r2PublicUrl: Type.String(),
-    aiService: Type.Object({
-      url: Type.String(),
-      timeout: Type.Optional(Type.Number())
+    llm: Type.Object({
+      groq: Type.Object({
+        apiKey: Type.String(),
+        defaultModel: Type.String(),
+        classifierModel: Type.String()
+      }),
+      minimax: Type.Object({
+        apiKey: Type.String(),
+        baseUrl: Type.String(),
+        defaultModel: Type.String()
+      }),
+      contextWindow: Type.Number(),
+      maxResponseTokens: Type.Number(),
+      timeout: Type.Number()
     }),
-    ollama: Type.Object({
-      model: Type.String(),
-      numPredict: Type.Number(),
-      numCtx: Type.Number(),
-      temperature: Type.Number(),
-      topP: Type.Number(),
-      repeatPenalty: Type.Number(),
-      timeout: Type.Number(),
-      baseUrl: Type.Optional(Type.String())
+    chromadb: Type.Object({
+      host: Type.String(),
+      port: Type.Number()
     }),
     redisConfig: Type.Object({
       host: Type.String(),

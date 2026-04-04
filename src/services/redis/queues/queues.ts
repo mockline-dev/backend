@@ -1,5 +1,7 @@
 import { createQueue } from './queue.client'
 
+// ─── Job Data Types ───────────────────────────────────────────────────────────
+
 export interface GenerationJobData {
   projectId: string
   prompt: string
@@ -13,3 +15,16 @@ export interface ValidationJobData {
   files: Array<{ path: string; content: string }>
 }
 
+export interface OrchestrationJobData {
+  projectId: string
+  userId: string
+  prompt: string
+  conversationHistory?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  model?: string
+}
+
+// ─── Queue Instances ─────────────────────────────────────────────────────────
+
+export const generationQueue = createQueue<GenerationJobData>('generation')
+export const validationQueue = createQueue<ValidationJobData>('validation')
+export const orchestrationQueue = createQueue<OrchestrationJobData>('orchestration')

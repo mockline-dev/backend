@@ -6,5 +6,13 @@
   "host": "HOSTNAME",
   "authentication": {
     "secret": "FEATHERS_SECRET"
+  },
+  "llm": {
+    "groq": {
+      "apiKey": "GROQ_API_KEY"
+    },
+    "minimax": {
+      "apiKey": "MINIMAX_API_KEY"
+    }
   }
 }
