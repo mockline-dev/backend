@@ -8,21 +8,19 @@ export interface TemplateFileSpec {
   context: Record<string, unknown>
 }
 
+/** Kept for backward compatibility — always empty in template-first generation */
 export interface LLMFileSpec {
   outputPath: string
   purpose: string
-  /**
-   * Paths of OTHER LLM files this file depends on.
-   * Used exclusively for topological ordering — not for import resolution.
-   */
   dependencies: string[]
   context: Record<string, unknown>
 }
 
 export interface FilePlan {
   templateFiles: TemplateFileSpec[]
+  /** Always empty — all files are now generated from templates */
   llmFiles: LLMFileSpec[]
-  /** Union of all output paths (template + LLM). */
+  /** Union of all output paths */
   allPaths: string[]
 }
 
@@ -35,21 +33,14 @@ function toSnakeCase(s: string): string {
     .toLowerCase()
 }
 
-function toPascalCase(s: string): string {
-  return s.replace(/[-_\s]+(.)/g, (_, c: string) => c.toUpperCase()).replace(/^(.)/, c => c.toUpperCase())
-}
-
 // ─── Planner ──────────────────────────────────────────────────────────────────
 
 /**
  * Deterministically computes the complete file plan from a ProjectPlan.
- *
- * Template files: boilerplate generated from Handlebars templates (no LLM).
- * LLM files: business logic files that require the LLM.
+ * All files are now generated from Handlebars templates — no LLM calls.
  */
 export function planFiles(plan: ProjectPlan): FilePlan {
   const templateFiles: TemplateFileSpec[] = []
-  const llmFiles: LLMFileSpec[] = []
 
   // ── Infrastructure templates ───────────────────────────────────────────────
   templateFiles.push(
@@ -62,9 +53,7 @@ export function planFiles(plan: ProjectPlan): FilePlan {
   )
 
   // ── __init__.py stubs ──────────────────────────────────────────────────────
-  const stubDirs = [
-    'app', 'app/core', 'app/api', 'app/api/routes', 'app/services', 'tests',
-  ]
+  const stubDirs = ['app', 'app/core', 'app/api', 'app/api/routes', 'app/services', 'tests']
   for (const dir of stubDirs) {
     templateFiles.push({
       templateName: 'init.py.stub',
@@ -134,6 +123,31 @@ export function planFiles(plan: ProjectPlan): FilePlan {
     { templateName: 'api/deps.py.hbs', outputPath: 'app/api/deps.py', context: {} },
     { templateName: 'api/routes/health.py.hbs', outputPath: 'app/api/routes/health.py', context: {} },
   )
+  for (const entity of plan.entities) {
+    const snake = toSnakeCase(entity.name)
+    templateFiles.push({
+      templateName: 'api/routes/entity.py.hbs',
+      outputPath: `app/api/routes/${snake}.py`,
+      context: { entityName: entity.name },
+    })
+  }
+  if (plan.authRequired) {
+    templateFiles.push({
+      templateName: 'api/routes/auth.py.hbs',
+      outputPath: 'app/api/routes/auth.py',
+      context: {},
+    })
+  }
+
+  // ── Service templates ──────────────────────────────────────────────────────
+  for (const entity of plan.entities) {
+    const snake = toSnakeCase(entity.name)
+    templateFiles.push({
+      templateName: 'services/entity_service.py.hbs',
+      outputPath: `app/services/${snake}_service.py`,
+      context: { entityName: entity.name },
+    })
+  }
 
   // ── Core templates ─────────────────────────────────────────────────────────
   templateFiles.push({
@@ -149,76 +163,31 @@ export function planFiles(plan: ProjectPlan): FilePlan {
     })
   }
 
-  // ── Test conftest template ─────────────────────────────────────────────────
+  // ── Test templates ─────────────────────────────────────────────────────────
   templateFiles.push({
     templateName: 'tests/conftest.py.hbs',
     outputPath: 'tests/conftest.py',
     context: {},
   })
+  for (const entity of plan.entities) {
+    const snake = toSnakeCase(entity.name)
+    templateFiles.push({
+      templateName: 'tests/test_entity.py.hbs',
+      outputPath: `tests/test_${snake}.py`,
+      context: { entityName: entity.name },
+    })
+  }
 
   // ── Alembic templates ──────────────────────────────────────────────────────
   templateFiles.push(
     { templateName: 'alembic/alembic.ini.hbs', outputPath: 'alembic.ini', context: {} },
     { templateName: 'alembic/env.py.hbs', outputPath: 'alembic/env.py', context: {} },
-    // Empty versions directory marker
     { templateName: 'init.py.stub', outputPath: 'alembic/versions/.gitkeep', context: {} },
   )
 
-  // ── LLM service files ──────────────────────────────────────────────────────
-  for (const entity of plan.entities) {
-    const snake = toSnakeCase(entity.name)
-    const pascal = toPascalCase(entity.name)
-    llmFiles.push({
-      outputPath: `app/services/${snake}_service.py`,
-      purpose: `Business logic for ${pascal}: get-or-404, list, create, update, delete`,
-      dependencies: [], // depends only on template files (already generated)
-      context: { entityName: entity.name },
-    })
+  return {
+    templateFiles,
+    llmFiles: [],
+    allPaths: templateFiles.map(f => f.outputPath),
   }
-
-  // ── LLM route files (depend on corresponding service) ─────────────────────
-  for (const entity of plan.entities) {
-    const snake = toSnakeCase(entity.name)
-    const pascal = toPascalCase(entity.name)
-    llmFiles.push({
-      outputPath: `app/api/routes/${snake}.py`,
-      purpose: `REST endpoint handlers for ${pascal}: list, get, create, update, delete`,
-      dependencies: [`app/services/${snake}_service.py`],
-      context: { entityName: entity.name },
-    })
-  }
-
-  // ── LLM auth route (depends on user service if User entity exists) ─────────
-  if (plan.authRequired) {
-    const userEntity = plan.entities.find(e => e.name.toLowerCase() === 'user')
-    const userServicePath = userEntity
-      ? `app/services/${toSnakeCase(userEntity.name)}_service.py`
-      : (llmFiles[0]?.outputPath ?? '')
-
-    llmFiles.push({
-      outputPath: 'app/api/routes/auth.py',
-      purpose: 'Authentication endpoints: login, register, token refresh',
-      dependencies: userServicePath ? [userServicePath] : [],
-      context: { entityName: 'User' },
-    })
-  }
-
-  // ── LLM test files (depend on corresponding route) ────────────────────────
-  for (const entity of plan.entities) {
-    const snake = toSnakeCase(entity.name)
-    const pascal = toPascalCase(entity.name)
-    llmFiles.push({
-      outputPath: `tests/test_${snake}.py`,
-      purpose: `API integration tests for ${pascal} endpoints`,
-      dependencies: [`app/api/routes/${snake}.py`],
-      context: { entityName: entity.name },
-    })
-  }
-
-  const allPaths = [
-    ...templateFiles.map(f => f.outputPath),
-    ...llmFiles.map(f => f.outputPath),
-  ]
-
-  return { templateFiles, llmFiles, allPaths }
 }

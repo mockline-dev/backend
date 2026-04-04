@@ -1,0 +1,42 @@
+from typing import List, Optional
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.crud.{{snakeCase name}} import crud_{{snakeCase name}}
+from app.models.{{snakeCase name}} import {{pascalCase name}}
+from app.schemas.{{snakeCase name}} import {{pascalCase name}}Create, {{pascalCase name}}Update
+
+
+def get_{{snakeCase name}}_or_404(db: Session, item_id: int) -> {{pascalCase name}}:
+    item = crud_{{snakeCase name}}.get(db, id=item_id)
+    if item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{{pascalCase name}} with id={item_id} not found",
+        )
+    return item
+
+
+def list_{{snakeCase name}}s(
+    db: Session, *, skip: int = 0, limit: int = 100
+) -> List[{{pascalCase name}}]:
+    return crud_{{snakeCase name}}.get_multi(db, skip=skip, limit=limit)
+
+
+def create_{{snakeCase name}}(
+    db: Session, *, {{snakeCase name}}_in: {{pascalCase name}}Create
+) -> {{pascalCase name}}:
+    return crud_{{snakeCase name}}.create(db, obj_in={{snakeCase name}}_in)
+
+
+def update_{{snakeCase name}}(
+    db: Session, *, item_id: int, {{snakeCase name}}_in: {{pascalCase name}}Update
+) -> {{pascalCase name}}:
+    item = get_{{snakeCase name}}_or_404(db, item_id)
+    return crud_{{snakeCase name}}.update(db, db_obj=item, obj_in={{snakeCase name}}_in)
+
+
+def delete_{{snakeCase name}}(db: Session, *, item_id: int) -> bool:
+    removed = crud_{{snakeCase name}}.remove(db, id=item_id)
+    return removed is not None

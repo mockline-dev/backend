@@ -7,12 +7,15 @@ export interface GenerationJobData {
 }
 
 export const generationQueue = new Queue<GenerationJobData>('generation', {
-  connection: redisConnection as never
+  connection: redisConnection as never,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: { age: 3600, count: 100 },
+    removeOnFail: { age: 86400, count: 200 }
+  }
 })
 
 export async function addGenerationJob(data: GenerationJobData) {
-  return generationQueue.add('generate', data, {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 5000 }
-  })
+  return generationQueue.add('generate', data)
 }

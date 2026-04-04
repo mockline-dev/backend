@@ -21,8 +21,15 @@ export class StructuredOutputError extends Error {
 /**
  * Strips <think>...</think> blocks from qwen3 responses before JSON parsing.
  * Also handles unclosed tags (truncation) and markdown code fences.
+ *
+ * Edge cases handled:
+ * - null/undefined/empty input → returns ''
+ * - Content is only think tags → returns ''
+ * - Think tags containing code blocks → fallback extracts last think block content
  */
-export function stripThinkTags(content: string): string {
+export function stripThinkTags(content: string | null | undefined): string {
+  if (!content) return ''
+
   // Remove complete <think>...</think> blocks (multiline)
   let stripped = content.replace(/<think>[\s\S]*?<\/think>/g, '')
 
@@ -30,6 +37,21 @@ export function stripThinkTags(content: string): string {
   stripped = stripped.replace(/<think>[\s\S]*/g, '')
 
   stripped = stripped.trim()
+
+  // If nothing remains after stripping, try extracting content from the last think block
+  // (fallback for when the actual response ended up inside a think block)
+  if (!stripped) {
+    const lastThinkMatch = content.match(/<think>([\s\S]*?)(?:<\/think>|$)/)
+    if (lastThinkMatch) {
+      const thinkContent = lastThinkMatch[1].trim()
+      // Only use it if it looks like JSON (starts with { or [)
+      if (thinkContent.startsWith('{') || thinkContent.startsWith('[')) {
+        stripped = thinkContent
+      }
+    }
+  }
+
+  if (!stripped) return ''
 
   // Extract JSON from markdown code fence if present
   const jsonMatch = stripped.match(/```(?:json)?\s*([\s\S]*?)```/)
@@ -83,6 +105,21 @@ export async function structuredLLMCall<T>(
 
     // Strip <think>...</think> blocks from qwen3 responses before parsing
     const raw = stripThinkTags(response.content)
+
+    // Guard: treat empty response as a retriable error
+    if (!raw) {
+      lastZodError = 'Response was empty after stripping think tags'
+      logger.warn('structuredLLMCall: attempt %d/%d — empty response', attempt, maxRetries)
+      conversation.push(
+        { role: 'assistant', content: '' },
+        {
+          role: 'user',
+          content:
+            'Your response was empty. Please respond with valid JSON matching the required schema.'
+        }
+      )
+      continue
+    }
 
     // ── Step 1: parse as JSON ────────────────────────────────────────────────
     let parsed: unknown

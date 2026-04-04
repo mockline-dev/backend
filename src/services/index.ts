@@ -3,6 +3,7 @@ import apiTestsService from './api-tests/api-tests.service'
 import { architecture } from './architecture/architecture'
 import { conversations } from './conversations/conversations'
 import { files } from './files/files'
+import healthService from './health/health.service'
 import { messages } from './messages/messages'
 import { models } from './models/models'
 import { projects } from './projects/projects'
@@ -42,5 +43,6 @@ export const services = (app: Application) => {
   app.configure(serverMonitorService)
   app.configure(aiConversations)
   app.configure(validationRuns)
+  app.configure(healthService)
   // All services will be registered here
 }

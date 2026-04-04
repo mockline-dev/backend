@@ -2,6 +2,7 @@ import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
 import { getProvider } from '../../llm/providers/registry'
 import { parseEnhancePromptResponse } from '../../utils/parseMarkdown'
+import { safeGenerate, SafeGenerateError } from '../../llm/safe-llm-call'
 
 const ENHANCE_PROMPT_SYSTEM = `You are an expert software prompt engineer specialized in preparing high-quality prompts for coding AI models such as Qwen-Coder.
 
@@ -57,15 +58,21 @@ export default function (app: any) {
       try {
         const ollamaConfig = app.get('ollama')
         const provider = getProvider()
-        const aiResponse = await provider.generate(ENHANCE_PROMPT_SYSTEM, userPrompt, {
+        const aiResponse = await safeGenerate(provider, ENHANCE_PROMPT_SYSTEM, userPrompt, {
           temperature: 0.7,
           num_predict: ollamaConfig.numPredict,
           num_ctx: ollamaConfig.numCtx,
-          top_p: ollamaConfig.topP
+          top_p: ollamaConfig.topP,
+          purpose: 'enhance-prompt',
+          timeoutMs: 60_000
         })
         const parsedResponse = parseEnhancePromptResponse(aiResponse)
         return parsedResponse
       } catch (error) {
+        if (error instanceof SafeGenerateError) {
+          console.warn(`Prompt enhancement failed (${error.reason}): ${error.message}`)
+          throw new Error('Failed to enhance prompt. Please try again later.')
+        }
         console.error('Error enhancing prompt:', error)
         throw new Error('Failed to enhance prompt. Please try again later.')
       }

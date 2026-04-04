@@ -1,6 +1,7 @@
 import { authenticate } from '@feathersjs/authentication'
 import { disallow } from 'feathers-hooks-common'
 import { getProvider } from '../../llm/providers/registry'
+import { safeGenerate, SafeGenerateError } from '../../llm/safe-llm-call'
 
 interface ValidatePromptRequest {
   prompt: string
@@ -104,10 +105,20 @@ Respond in this exact JSON format:
 Keep the response concise and focused on backend development feasibility.`
 
           const provider = getProvider()
-          const aiResponseText = await provider.generate('', validationPrompt, {
-            temperature: 0.2,
-            num_predict: 500
-          })
+          let aiResponseText: string
+          try {
+            aiResponseText = await safeGenerate(provider, '', validationPrompt, {
+              temperature: 0.2,
+              num_predict: 500,
+              purpose: 'validate-prompt',
+              timeoutMs: 30_000
+            })
+          } catch (err) {
+            if (err instanceof SafeGenerateError) {
+              throw err  // rethrow to outer catch
+            }
+            throw err
+          }
 
           // Try to parse JSON response
           try {

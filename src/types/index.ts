@@ -6,7 +6,6 @@ export enum ProjectStatus {
   scaffolding = 'scaffolding',
   generating = 'generating',
   validating = 'validating',
-  fixing = 'fixing',
   ready = 'ready',
   error = 'error',
   editing = 'editing'
@@ -34,6 +33,8 @@ export interface PlanEntity {
   fields: PlanField[]
   timestamps: boolean
   softDelete: boolean
+  /** Feature flags extracted from the LLM plan (e.g. 'slug', 'search', 'filter') */
+  features: string[]
 }
 
 export interface PlanRelationship {

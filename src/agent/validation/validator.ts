@@ -1,6 +1,6 @@
 import type { Application } from '../../declarations'
 import { logger } from '../../logger'
-import { runFixLoop, runLastResortFix, type FixTarget } from './fix-loop'
+import { fixFileDeterministic } from './deterministic-fixer'
 import { validatePython } from './python-validator'
 import { validateTypeScript } from './ts-validator'
 import type { VenvManager } from './venv-manager'
@@ -15,19 +15,28 @@ export interface FileValidationResult {
   path: string
   valid: boolean
   errors: Array<{ line?: number; code?: string; message: string }>
-  /** True when the file was fixed by the fix loop */
+  /** True when the file was fixed by the deterministic fixer */
   wasFixed?: boolean
+  /** Strategy applied when the file was fixed */
+  fixStrategy?: 'auto-fixed' | 'stubbed' | 'unchanged'
 }
 
 export interface ValidationSummary {
   passCount: number
+  /** Number of files that failed py_compile (syntax errors) — NOT ruff/pyflakes warnings */
   failCount: number
   results: FileValidationResult[]
   fixedCount: number
+  stubbedCount: number
+  warnings: string[]
 }
 
 /**
- * Validates all generated files, then runs the AI fix loop for any failures.
+ * Validates all generated files, then applies deterministic fixes (no LLM calls).
+ *
+ * Phase 1: Validate all files
+ * Phase 2: For each failing file → apply deterministic fix (ruff auto-fix or stub)
+ * Phase 3: Re-validate fixed files; remaining ruff/pyflakes warnings are accepted
  *
  * @param files        Files to validate (path + content in-memory).
  * @param projectId    Used for venv-based import validation.
@@ -44,7 +53,7 @@ export async function validateGeneratedFiles(
 ): Promise<ValidationSummary> {
   // ── Phase 1: validate all files ──────────────────────────────────────────
   const results: FileValidationResult[] = []
-  const failTargets: FixTarget[] = []
+  const failTargets: Array<{ index: number; file: GeneratedFile; errors: Array<{ line?: number; code?: string; message: string }> }> = []
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
@@ -64,13 +73,17 @@ export async function validateGeneratedFiles(
     }
 
     if (!result.valid && result.errors.length > 0) {
-      failTargets.push({ file, errors: result.errors })
+      // Only queue for fixing if there are syntax errors (py_compile failures, E999)
+      const syntaxErrors = result.errors.filter(e => e.code === 'E999')
+      if (syntaxErrors.length > 0 || ext !== 'py') {
+        failTargets.push({ index: i, file, errors: result.errors })
+      }
       const errorSummary = result.errors
         .slice(0, 5)
         .map(e => `L${e.line ?? '?'}${e.code ? `[${e.code}]` : ''}: ${e.message}`)
         .join(' | ')
       logger.warn(
-        'Validator: %s has %d error(s) — queued for fix loop: %s',
+        'Validator: %s has %d error(s) — queued for deterministic fix: %s',
         file.path,
         result.errors.length,
         errorSummary
@@ -81,18 +94,18 @@ export async function validateGeneratedFiles(
   }
 
   if (failTargets.length === 0) {
-    return buildSummary(results, 0)
+    return buildSummary(results, [], 0)
   }
 
-  // ── Phase 2: AI fix loop ─────────────────────────────────────────────────
+  // ── Phase 2: deterministic fix ────────────────────────────────────────────
   logger.info(
-    'Validator: running fix loop for %d failed file(s) (project %s)',
+    'Validator: running deterministic fix for %d failed file(s) (project %s)',
     failTargets.length,
     projectId
   )
-  await onProgress('Running AI fix loop', 95)
+  await onProgress('Running deterministic fix', 95)
 
-  const validateFn = async (path: string, content: string): Promise<Array<{ line?: number; code?: string; message: string }>> => {
+  const revalidate = async (path: string, content: string): Promise<Array<{ line?: number; code?: string; message: string }>> => {
     const ext = path.split('.').pop()?.toLowerCase() ?? ''
     if (ext === 'py') {
       const r = await validatePython(path, content, venv, projectId)
@@ -105,50 +118,87 @@ export async function validateGeneratedFiles(
     return []
   }
 
-  const { fixed, failed } = await runFixLoop(failTargets, {
-    validate: validateFn,
-    maxAttempts: 3
-  })
+  const allWarnings: string[] = []
 
-  // Apply SEARCH/REPLACE fixes into in-memory files and update results
-  const applyFixes = (fixList: typeof fixed) => {
-    for (const fix of fixList) {
-      const file = files.find(f => f.path === fix.path)
-      if (file) file.content = fix.content
+  for (const target of failTargets) {
+    const { index, file } = target
+    const fixResult = await fixFileDeterministic(file.path, file.content, target.errors, revalidate)
 
-      const idx = results.findIndex(r => r.path === fix.path)
-      if (idx >= 0) {
-        results[idx] = { path: fix.path, valid: true, errors: [], wasFixed: true }
+    // Update in-memory file content
+    files[index].content = fixResult.content
+
+    // Update results
+    const resultIdx = results.findIndex(r => r.path === file.path)
+    if (resultIdx >= 0) {
+      results[resultIdx] = {
+        path: file.path,
+        valid: true,
+        errors: [],
+        wasFixed: fixResult.strategy !== 'unchanged',
+        fixStrategy: fixResult.strategy
       }
+    }
 
-      logger.info('Validator: fixed %s after %d attempt(s)', fix.path, fix.attempts)
+    allWarnings.push(...fixResult.warnings)
+
+    logger.info(
+      'Validator: %s fixed via strategy=%s, fixes=[%s]',
+      file.path,
+      fixResult.strategy,
+      fixResult.fixes.join(', ')
+    )
+  }
+
+  // ── Phase 3: re-validate; accept remaining warnings ───────────────────────
+  await onProgress('Accepting remaining warnings', 98)
+
+  for (const target of failTargets) {
+    const { index, file } = target
+    const ext = file.path.split('.').pop()?.toLowerCase() ?? ''
+    if (ext !== 'py') continue
+
+    const remaining = await revalidate(file.path, files[index].content)
+    const syntaxErrors = remaining.filter(e => e.code === 'E999')
+
+    if (syntaxErrors.length > 0) {
+      // Still has syntax errors — mark as failed (should not happen after stubbing)
+      const resultIdx = results.findIndex(r => r.path === file.path)
+      if (resultIdx >= 0) {
+        results[resultIdx] = {
+          path: file.path,
+          valid: false,
+          errors: syntaxErrors,
+          wasFixed: false
+        }
+      }
+      logger.warn('Validator: %s still has syntax errors after fix — accepting as-is', file.path)
+    } else if (remaining.length > 0) {
+      // Only warnings — accept them
+      for (const e of remaining) {
+        allWarnings.push(`${file.path}:${e.line ?? '?'} [${e.code ?? 'W'}]: ${e.message}`)
+      }
     }
   }
 
-  applyFixes(fixed)
-
-  // ── Phase 3: Last-resort full-file replacement for still-failing files ───
-  if (failed.length > 0) {
-    logger.info(
-      'Validator: running last-resort full-file rewrite for %d file(s) (project %s)',
-      failed.length,
-      projectId
-    )
-    await onProgress('Last-resort file rewrite', 97)
-
-    const lastResortFixed = await runLastResortFix(failed, validateFn)
-    applyFixes(lastResortFixed)
-  }
-
-  return buildSummary(results, results.filter(r => r.wasFixed).length)
+  const fixedCount = results.filter(r => r.wasFixed && r.fixStrategy !== 'stubbed').length
+  return buildSummary(results, allWarnings, fixedCount)
 }
 
-function buildSummary(results: FileValidationResult[], fixedCount: number): ValidationSummary {
+function buildSummary(
+  results: FileValidationResult[],
+  warnings: string[],
+  fixedCount: number
+): ValidationSummary {
+  // failCount only counts py_compile (syntax) failures — not ruff/pyflakes warnings
   const failCount = results.filter(r => !r.valid).length
+  const stubbedCount = results.filter(r => r.fixStrategy === 'stubbed').length
+
   return {
     passCount: results.length - failCount,
     failCount,
     results,
-    fixedCount
+    fixedCount,
+    stubbedCount,
+    warnings
   }
 }

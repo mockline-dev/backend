@@ -108,6 +108,35 @@ function registerHelpers(): void {
   Handlebars.registerHelper('joinImports', (arr: unknown) =>
     Array.isArray(arr) ? arr.join(', ') : ''
   )
+
+  Handlebars.registerHelper('testJson', (fields: unknown) => {
+    if (!Array.isArray(fields)) return '{}'
+    const obj: Record<string, unknown> = {}
+    for (const field of fields) {
+      if (typeof field !== 'object' || field === null) continue
+      const f = field as { name?: string; type?: string; required?: boolean; reference?: unknown }
+      if (!f.name) continue
+      if (f.reference) continue  // skip FK fields
+      if (!f.required) continue  // only required fields in test payload
+      obj[f.name] = testValue(f.type ?? 'string')
+    }
+    return JSON.stringify(obj)
+  })
+}
+
+function testValue(type: string): unknown {
+  switch (type.toLowerCase()) {
+    case 'string': case 'password': case 'uuid': return 'test_value'
+    case 'text': return 'Test content for field'
+    case 'integer': case 'number': case 'int': return 1
+    case 'float': case 'decimal': case 'double': return 1.5
+    case 'boolean': case 'bool': return true
+    case 'email': return 'test@example.com'
+    case 'date': return '2024-01-01'
+    case 'datetime': case 'timestamp': return '2024-01-01T00:00:00'
+    case 'json': return {}
+    default: return 'test_value'
+  }
 }
 
 // ─── Case converters ──────────────────────────────────────────────────────────
@@ -256,6 +285,19 @@ export class TemplateEngine {
     files.push(this.renderFile('api/router.py.hbs', 'app/api/router.py', base))
     files.push(this.renderFile('api/deps.py.hbs', 'app/api/deps.py', base))
     files.push(this.renderFile('api/routes/health.py.hbs', 'app/api/routes/health.py', base))
+    for (const entity of plan.entities) {
+      const ectx = this.entityContext(entity, plan, base)
+      files.push(this.renderFile('api/routes/entity.py.hbs', `app/api/routes/${toSnakeCase(entity.name)}.py`, ectx))
+    }
+    if (plan.authRequired) {
+      files.push(this.renderFile('api/routes/auth.py.hbs', 'app/api/routes/auth.py', base))
+    }
+
+    // ── Services ────────────────────────────────────────────────────────────
+    for (const entity of plan.entities) {
+      const ectx = this.entityContext(entity, plan, base)
+      files.push(this.renderFile('services/entity_service.py.hbs', `app/services/${toSnakeCase(entity.name)}_service.py`, ectx))
+    }
 
     // ── Core ────────────────────────────────────────────────────────────────
     files.push(this.renderFile('core/exceptions.py.hbs', 'app/core/exceptions.py', base))
@@ -265,6 +307,10 @@ export class TemplateEngine {
 
     // ── Tests ───────────────────────────────────────────────────────────────
     files.push(this.renderFile('tests/conftest.py.hbs', 'tests/conftest.py', base))
+    for (const entity of plan.entities) {
+      const ectx = this.entityContext(entity, plan, base)
+      files.push(this.renderFile('tests/test_entity.py.hbs', `tests/test_${toSnakeCase(entity.name)}.py`, ectx))
+    }
 
     // ── Alembic ─────────────────────────────────────────────────────────────
     files.push(this.renderFile('alembic/alembic.ini.hbs', 'alembic.ini', base))

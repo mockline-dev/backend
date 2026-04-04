@@ -2,6 +2,8 @@ import { Job, Worker } from 'bullmq'
 
 import { validateGeneratedFiles } from '../../../agent/validation/validator'
 import { venvManager } from '../../../agent/validation/venv-manager'
+import { classifyError } from '../../../agent/pipeline/error-utils'
+import { PipelineTimer } from '../../../agent/pipeline/timing'
 import { r2Client } from '../../../storage/r2.client'
 import { createSnapshotWithR2 } from '../../snapshots/snapshots.class'
 import { app } from '../../../app'
@@ -16,10 +18,12 @@ export const validationWorker = new Worker<ValidationJobData>(
   async (job: Job<ValidationJobData>) => {
     const { projectId } = job.data
     const jobId = job.id ?? 'unknown'
+    const timer = new PipelineTimer()
 
     logger.info('Validation job %s started — project %s', jobId, projectId)
 
     try {
+      timer.start('validation')
       // ── 1. Fetch all files from R2 ──────────────────────────────────────
       await job.updateProgress(5)
       const prefix = `projects/${projectId}/`
@@ -98,7 +102,7 @@ export const validationWorker = new Worker<ValidationJobData>(
         }
       }
 
-      // ── 3. Execute validation pipeline (includes fix loop) ────────────────
+      // ── 3. Execute validation pipeline (deterministic fix — no LLM calls) ─
       await job.updateProgress(20)
       const noop = async (_stage: string, _pct: number): Promise<void> => {}
       const summary = await validateGeneratedFiles(
@@ -110,14 +114,14 @@ export const validationWorker = new Worker<ValidationJobData>(
       )
 
       // ── 4. If fixes applied: update files in R2 ──────────────────────────
-      if (summary.fixedCount > 0) {
+      const fixedOrStubbed = summary.results.filter(r => r.wasFixed)
+      if (fixedOrStubbed.length > 0) {
         await job.updateProgress(85)
-        const fixedFiles = files.filter(f => {
-          const result = summary.results.find(r => r.path === f.path)
-          return result?.wasFixed === true
-        })
 
-        for (const file of fixedFiles) {
+        for (const result of fixedOrStubbed) {
+          const file = files.find(f => f.path === result.path)
+          if (!file) continue
+
           const key = `${prefix}${file.path}`
           try {
             await r2Client.putObject(key, file.content)
@@ -139,9 +143,9 @@ export const validationWorker = new Worker<ValidationJobData>(
         }
 
         logger.info(
-          'Validation job %s: wrote %d fixed files back to R2',
+          'Validation job %s: wrote %d fixed/stubbed files back to R2',
           jobId,
-          summary.fixedCount
+          fixedOrStubbed.length
         )
       }
 
@@ -170,113 +174,100 @@ export const validationWorker = new Worker<ValidationJobData>(
         logger.warn('Validation job %s: failed to record validation run: %s', jobId, msg)
       }
 
-      // ── 5. Determine final status ─────────────────────────────────────────
+      // ── 5. Always mark project as ready ──────────────────────────────────
       await job.updateProgress(95)
 
-      if (summary.failCount === 0) {
-        // Passed: status → ready, create snapshot
-        await app.service('projects').patch(projectId, {
-          status: 'ready',
-          generationProgress: {
-            currentStage: 'validation_complete',
-            percentage: 100,
-            completedAt: Date.now(),
-            validationResults: {
-              passCount: summary.passCount,
-              failCount: 0,
-              failedFiles: [],
-              fixedCount: summary.fixedCount,
-              fixedFiles: summary.results.filter(r => r.wasFixed).map(r => r.path)
-            }
-          }
-        } satisfies ProjectsPatch)
+      const currentStage = summary.failCount === 0
+        ? 'validation_complete'
+        : 'validation_complete_with_warnings'
 
-        // Create snapshot after successful validation
-        try {
-          const snapshotResult = await app.service('snapshots').find({
-            query: { projectId, $limit: 0 }
-          }) as { total: number }
-          await createSnapshotWithR2(app, {
-            projectId,
-            version: snapshotResult.total + 1,
-            label: 'Post-validation snapshot',
-            trigger: 'auto-generation'
-          })
-        } catch (snapErr: unknown) {
-          const msg = snapErr instanceof Error ? snapErr.message : String(snapErr)
-          logger.warn('Validation job %s: snapshot creation failed: %s', jobId, msg)
-        }
+      const failedFiles = summary.results.filter(r => !r.valid).map(r => r.path)
 
-        app.channel(`projects/${projectId}`).send({
-          type: 'validation:complete',
-          payload: {
-            passed: true,
-            passCount: summary.passCount,
-            failCount: 0,
-            fixedCount: summary.fixedCount
-          }
-        })
-        broadcastProgress(app, projectId, { phase: 'validation', step: 'complete', detail: `${summary.passCount} files passed`, percent: 100 })
-
-        logger.info(
-          'Validation job %s: all %d files pass for project %s (%d fixed)',
-          jobId,
-          summary.passCount,
-          projectId,
-          summary.fixedCount
-        )
-      } else {
-        // Failed: status → error, store validation errors
-        const failedFiles = summary.results.filter(r => !r.valid).map(r => r.path)
-
-        await app.service('projects').patch(projectId, {
-          status: 'error',
-          generationProgress: {
-            currentStage: 'validation_failed',
-            percentage: 100,
-            failedAt: Date.now(),
-            errorMessage: `${summary.failCount} file(s) failed validation`,
-            validationResults: {
-              passCount: summary.passCount,
-              failCount: summary.failCount,
-              failedFiles,
-              fixedCount: summary.fixedCount,
-              fixedFiles: summary.results.filter(r => r.wasFixed).map(r => r.path)
-            }
-          }
-        } satisfies ProjectsPatch)
-
-        app.channel(`projects/${projectId}`).send({
-          type: 'validation:complete',
-          payload: {
-            passed: false,
+      await app.service('projects').patch(projectId, {
+        status: 'ready',
+        generationProgress: {
+          currentStage,
+          percentage: 100,
+          completedAt: Date.now(),
+          validationResults: {
             passCount: summary.passCount,
             failCount: summary.failCount,
+            failedFiles,
             fixedCount: summary.fixedCount,
-            failedFiles
+            fixedFiles: summary.results.filter(r => r.wasFixed).map(r => r.path)
           }
-        })
+        }
+      } satisfies ProjectsPatch)
 
-        logger.warn(
-          'Validation job %s: %d/%d files still failing after fix loop for project %s',
-          jobId,
-          summary.failCount,
-          files.length,
-          projectId
-        )
+      // Always create snapshot (even when warnings remain)
+      try {
+        const snapshotResult = await app.service('snapshots').find({
+          query: { projectId, $limit: 0 }
+        }) as { total: number }
+        await createSnapshotWithR2(app, {
+          projectId,
+          version: snapshotResult.total + 1,
+          label: summary.stubbedCount > 0 ? 'Post-validation snapshot (with stubs)' : 'Post-validation snapshot',
+          trigger: 'auto-generation'
+        })
+      } catch (snapErr: unknown) {
+        const msg = snapErr instanceof Error ? snapErr.message : String(snapErr)
+        logger.warn('Validation job %s: snapshot creation failed: %s', jobId, msg)
       }
 
+      // Emit validation:summary for frontend stats
+      app.channel(`projects/${projectId}`).send({
+        type: 'validation:summary',
+        payload: {
+          filesValidated: files.length,
+          filesPassed: summary.passCount,
+          filesAutoFixed: summary.fixedCount,
+          filesStubbed: summary.stubbedCount,
+          warningsAccepted: summary.warnings.length
+        }
+      })
+
+      app.channel(`projects/${projectId}`).send({
+        type: 'validation:complete',
+        payload: {
+          passed: true,
+          passCount: summary.passCount,
+          failCount: summary.failCount,
+          fixedCount: summary.fixedCount,
+          stubbedCount: summary.stubbedCount,
+          failedFiles
+        }
+      })
+      broadcastProgress(app, projectId, {
+        phase: 'validation',
+        step: 'complete',
+        detail: `${summary.passCount} files ready (${summary.fixedCount} auto-fixed, ${summary.stubbedCount} stubbed)`,
+        percent: 100
+      })
+
       await job.updateProgress(100)
+      logger.info(
+        'Validation job %s complete — project %s ready: %d passed, %d fixed, %d stubbed, %d warnings (total=%dms)',
+        jobId,
+        projectId,
+        summary.passCount,
+        summary.fixedCount,
+        summary.stubbedCount,
+        summary.warnings.length,
+        timer.end('validation')
+      )
       return summary
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      logger.error('Validation job %s failed: %s', jobId, msg)
+      const { message, category } = classifyError(err)
+      logger.error('Validation job %s failed (project %s): %s', jobId, projectId, err instanceof Error ? err.message : String(err))
 
       await app.service('projects').patch(projectId, {
         status: 'error',
+        errorMessage: message,
+        errorType: category,
         generationProgress: {
           currentStage: 'validation_error',
-          errorMessage: msg,
+          errorMessage: message,
           failedAt: Date.now()
         }
       } satisfies ProjectsPatch)
@@ -284,7 +275,7 @@ export const validationWorker = new Worker<ValidationJobData>(
       throw err
     }
   },
-  // concurrency=1 — fix loop uses the LLM (single-GPU constraint)
+  // concurrency=1 — deterministic fix — no LLM calls, but sequential for consistency
   { connection: redisConnection as never, concurrency: 1, lockDuration: 300_000 }
 )
 

@@ -1,0 +1,65 @@
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_db{{#if authRequired}}, get_current_user{{/if}}
+from app.models.{{snakeCase name}} import {{pascalCase name}}
+from app.crud.{{snakeCase name}} import crud_{{snakeCase name}}
+from app.schemas.{{snakeCase name}} import {{pascalCase name}}Create, {{pascalCase name}}Update, {{pascalCase name}}Response
+
+router = APIRouter()
+
+
+@router.get("/", response_model=List[{{pascalCase name}}Response])
+def list_{{snakeCase name}}s(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+) -> List[{{pascalCase name}}Response]:
+    return crud_{{snakeCase name}}.get_multi(db, skip=skip, limit=limit)  # type: ignore[return-value]
+
+
+@router.post("/", response_model={{pascalCase name}}Response, status_code=status.HTTP_201_CREATED)
+def create_{{snakeCase name}}(
+    {{snakeCase name}}_in: {{pascalCase name}}Create,
+    db: Session = Depends(get_db),{{#if authRequired}}
+    _current_user: {{pascalCase name}} = Depends(get_current_user),{{/if}}
+) -> {{pascalCase name}}Response:
+    return crud_{{snakeCase name}}.create(db, obj_in={{snakeCase name}}_in)  # type: ignore[return-value]
+
+
+@router.get("/{item_id}", response_model={{pascalCase name}}Response)
+def get_{{snakeCase name}}(
+    item_id: int,
+    db: Session = Depends(get_db),
+) -> {{pascalCase name}}Response:
+    item = crud_{{snakeCase name}}.get(db, id=item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="{{pascalCase name}} not found")
+    return item  # type: ignore[return-value]
+
+
+@router.put("/{item_id}", response_model={{pascalCase name}}Response)
+def update_{{snakeCase name}}(
+    item_id: int,
+    {{snakeCase name}}_in: {{pascalCase name}}Update,
+    db: Session = Depends(get_db),{{#if authRequired}}
+    _current_user: {{pascalCase name}} = Depends(get_current_user),{{/if}}
+) -> {{pascalCase name}}Response:
+    item = crud_{{snakeCase name}}.get(db, id=item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="{{pascalCase name}} not found")
+    return crud_{{snakeCase name}}.update(db, db_obj=item, obj_in={{snakeCase name}}_in)  # type: ignore[return-value]
+
+
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_{{snakeCase name}}(
+    item_id: int,
+    db: Session = Depends(get_db),{{#if authRequired}}
+    _current_user: {{pascalCase name}} = Depends(get_current_user),{{/if}}
+) -> None:
+    item = crud_{{snakeCase name}}.get(db, id=item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="{{pascalCase name}} not found")
+    crud_{{snakeCase name}}.remove(db, id=item_id)

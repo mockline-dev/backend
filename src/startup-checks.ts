@@ -8,6 +8,7 @@ import { logger } from './logger'
 import { llmClient, getModelConfig } from './llm/client'
 import { chromaClient } from './agent/context/chroma-client'
 import { r2Client } from './storage/r2.client'
+import { cleanupStaleProjects } from './services/projects/stale-cleanup'
 
 // ─── ChromaDB process management ──────────────────────────────────────────────
 
@@ -272,4 +273,17 @@ export async function runStartupChecks(app: Application): Promise<void> {
   }
 
   logger.info('All critical startup checks passed.')
+
+  // ── Stale project cleanup ─────────────────────────────────────────────────
+  try {
+    const { retried, failed } = await cleanupStaleProjects(app)
+    if (retried > 0 || failed > 0) {
+      logger.info('Startup cleanup: %d project(s) retried, %d failed', retried, failed)
+    }
+  } catch (err: unknown) {
+    logger.warn(
+      'Startup cleanup failed (non-fatal): %s',
+      err instanceof Error ? err.message : String(err)
+    )
+  }
 }

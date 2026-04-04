@@ -2,6 +2,8 @@ import { Job, Worker } from 'bullmq'
 
 import { executePlanningPipeline } from '../../../agent/planning/planning-pipeline'
 import { llmClient } from '../../../llm/client'
+import { classifyError } from '../../../agent/pipeline/error-utils'
+import { PipelineTimer } from '../../../agent/pipeline/timing'
 import { app } from '../../../app'
 import { logger } from '../../../logger'
 import { redisConnection } from '../queues/queue.client'
@@ -25,26 +27,28 @@ export const planningWorker = new Worker<PlanningJobData>(
   async (job: Job<PlanningJobData>) => {
     const { projectId, userPrompt } = job.data
     const jobId = job.id ?? 'unknown'
+    const timer = new PipelineTimer()
 
     logger.info('Planning job %s started — project %s', jobId, projectId)
 
-    // ── 1. Update project status → planning ─────────────────────────────────
-    await job.updateProgress({ step: 'starting', detail: 'Initializing planning', percent: 0 })
-    await app.service('projects').patch(projectId, {
-      status: 'planning',
-      generationProgress: {
-        currentStage: 'planning',
-        percentage: 0,
-        startedAt: Date.now()
-      }
-    } satisfies ProjectsPatch)
-
-    app.channel(`projects/${projectId}`).send({
-      type: 'planning:started',
-      payload: { jobId }
-    })
-
     try {
+      // ── 1. Update project status → planning ─────────────────────────────────
+      timer.start('planning')
+      await job.updateProgress({ step: 'starting', detail: 'Initializing planning', percent: 0 })
+      await app.service('projects').patch(projectId, {
+        status: 'planning',
+        generationProgress: {
+          currentStage: 'planning',
+          percentage: 0,
+          startedAt: Date.now()
+        }
+      } satisfies ProjectsPatch)
+
+      app.channel(`projects/${projectId}`).send({
+        type: 'planning:started',
+        payload: { jobId }
+      })
+
       // ── 2. Execute planning pipeline ──────────────────────────────────────
       const plan = await executePlanningPipeline(
         llmClient,
@@ -59,6 +63,8 @@ export const planningWorker = new Worker<PlanningJobData>(
           broadcastProgress(app, projectId, { phase: 'planning', step, detail, percent })
         }
       )
+
+      const planningMs = timer.end('planning')
 
       // ── 3. Store plan on project record ───────────────────────────────────
       await app.service('projects').patch(projectId, {
@@ -81,24 +87,36 @@ export const planningWorker = new Worker<PlanningJobData>(
         type: 'planning:complete',
         payload: { jobId }
       })
-      logger.info('Planning job %s completed for project %s', jobId, projectId)
+      logger.info(
+        'Planning job %s completed for project %s in %dms',
+        jobId,
+        projectId,
+        planningMs
+      )
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      logger.error('Planning job %s failed: %s', jobId, msg)
+      const { message, category } = classifyError(err)
+      logger.error(
+        'Planning job %s failed (project %s): %s',
+        jobId,
+        projectId,
+        err instanceof Error ? err.message : String(err)
+      )
 
       // ── On failure: update project status → error ─────────────────────────
       await app.service('projects').patch(projectId, {
         status: 'error',
+        errorMessage: message,
+        errorType: category,
         generationProgress: {
           currentStage: 'planning_error',
-          errorMessage: msg,
+          errorMessage: message,
           failedAt: Date.now()
         }
       } satisfies ProjectsPatch)
 
       app.channel(`projects/${projectId}`).send({
         type: 'planning:error',
-        payload: { msg }
+        payload: { message, category }
       })
       throw err
     }

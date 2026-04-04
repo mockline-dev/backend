@@ -1,5 +1,5 @@
 import { exec, execFile } from 'child_process'
-import { mkdir, unlink, writeFile } from 'fs/promises'
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { promisify } from 'util'
@@ -72,6 +72,38 @@ export async function validatePython(
   }
 
   return { path, valid: true, errors: [], tiersRun }
+}
+
+/**
+ * Runs ruff check --fix on content and returns the (possibly modified) result.
+ * Used by the deterministic fixer to auto-fix lint errors before stubbing.
+ * Falls back gracefully if ruff is not installed.
+ */
+export async function runRuffFix(
+  path: string,
+  content: string
+): Promise<{ content: string; fixed: boolean }> {
+  await mkdir(TMP_DIR, { recursive: true })
+  const tmpFile = join(TMP_DIR, `rufffix_${Date.now()}_${safeFilename(path)}`)
+
+  try {
+    await writeFile(tmpFile, content, 'utf8')
+
+    await execAsync(
+      `ruff check --fix --unsafe-fixes --select=E9,F821,F811,F9,E711,W605,F401,I --quiet "${tmpFile}"`,
+      { timeout: 10_000 }
+    ).catch(() => {
+      // ruff exits non-zero when there are unfixable errors — that's fine, read the file anyway
+    })
+
+    const fixed = await readFile(tmpFile, 'utf8')
+    return { content: fixed, fixed: fixed !== content }
+  } catch (err: unknown) {
+    logger.debug('runRuffFix: unavailable for %s: %s', path, String(err))
+    return { content, fixed: false }
+  } finally {
+    await unlink(tmpFile).catch(() => {})
+  }
 }
 
 /**
