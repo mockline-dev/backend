@@ -1,0 +1,8 @@
+{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-04T19-49-39","timestamp":"2026-04-04T19:49:40.897Z"}
+{"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-04T19:49:40.935Z"}
+{"level":"info","message":"Redis connected successfully","timestamp":"2026-04-04T19:49:40.946Z"}
+{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-04T19:49:40.952Z"}
+{"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-04T19-49-39","timestamp":"2026-04-04T19:49:40.953Z"}
+{"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-04T19:49:40.952Z"}
+{"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-04T19:49:40.952Z"}
+{"level":"info","message":"Worker service started successfully","timestamp":"2026-04-04T19:49:40.953Z"}
