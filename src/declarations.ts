@@ -18,11 +18,6 @@ export interface Configuration extends ApplicationConfiguration {
 export interface ServiceTypes {
   'file-stream': any
   uploads: any
-  'ai-service': any
-  'ai-stream': any
-  'validate-prompt': any
-  'server-monitor': any
-  models: any
 }
 
 // The application instance type that will be used everywhere else

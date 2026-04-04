@@ -9,7 +9,6 @@ import { channels } from './channels'
 import { configurationValidator } from './configuration'
 import type { Application } from './declarations'
 import { initializeFirebase } from './firebase'
-import { logError } from './hooks/log-error'
 import { mongodb } from './mongodb'
 import { services } from './services/index'
 import { startWorkerService } from './services/redis'
@@ -40,29 +39,6 @@ app.configure(
       cors: {
         origin: app.get('origins')
       }
-    },
-    io => {
-      io.on('connection', socket => {
-        socket.on('join-project', (projectId?: string) => {
-          const targetId = projectId?.toString().trim()
-          if (!targetId) return
-
-          const connection = (socket as any).feathers
-          if (connection) {
-            app.channel(`projects/${targetId}`).join(connection)
-          }
-        })
-
-        socket.on('leave-project', (projectId?: string) => {
-          const targetId = projectId?.toString().trim()
-          if (!targetId) return
-
-          const connection = (socket as any).feathers
-          if (connection) {
-            app.channel(`projects/${targetId}`).leave(connection)
-          }
-        })
-      })
     }
   )
 )
@@ -78,7 +54,7 @@ app.hooks({
   },
   before: {},
   after: {},
-  error: [logError]
+  error: []
 })
 // Register application setup and teardown hooks here
 app.hooks({
