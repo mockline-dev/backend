@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/shahboz_munirov/Projects/mockline.dev/backend/logs/.b15fcaf6212344e17290a882c948889920e5a2c8-audit.json",
+    "files": [
+        {
+            "date": 1775333374716,
+            "name": "/Users/shahboz_munirov/Projects/mockline.dev/backend/logs/combined-2026-04-05.log",
+            "hash": "97b3947e0d44b628fa8f3377a7487ce2d40cde5c042baf8f4e23db08ff8be86e"
+        }
+    ],
+    "hashType": "sha256"
+}

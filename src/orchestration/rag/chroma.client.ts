@@ -4,7 +4,24 @@ import type { CodeChunk } from '../types'
 
 const log = createModuleLogger('chroma-client')
 
-const COLLECTION_PREFIX = 'project_'
+const COLLECTION_PREFIX = 'proj'
+
+/**
+ * Produce a ChromaDB-safe collection name from a projectId.
+ * Rules: 3-512 chars, only [a-zA-Z0-9._-], must start AND end with [a-zA-Z0-9].
+ */
+function sanitizeCollectionName(projectId: string): string {
+  // Replace anything that isn't alphanumeric, dot, hyphen, or underscore with a hyphen
+  let name = `${COLLECTION_PREFIX}-${projectId}`.replace(/[^a-zA-Z0-9._-]/g, '-')
+  // Collapse runs of non-alphanumeric into a single hyphen
+  name = name.replace(/[^a-zA-Z0-9]+/g, '-')
+  // Strip leading/trailing hyphens (start/end must be alphanumeric)
+  name = name.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '')
+  // Ensure minimum length of 3
+  if (name.length < 3) name = `prj${name}`
+  // Truncate to 512
+  return name.slice(0, 512)
+}
 
 export interface ChromaQueryResult {
   chunk: CodeChunk
@@ -41,7 +58,7 @@ export class ChromaVectorStore {
   }
 
   private async getCollection(projectId: string): Promise<Collection | null> {
-    const name = `${COLLECTION_PREFIX}${projectId.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+    const name = sanitizeCollectionName(projectId)
 
     const cached = this.collectionCache.get(name)
     if (cached) return cached
@@ -137,7 +154,7 @@ export class ChromaVectorStore {
    * Delete all chunks for a project (e.g. when project is deleted).
    */
   async deleteCollection(projectId: string): Promise<void> {
-    const name = `${COLLECTION_PREFIX}${projectId.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+    const name = sanitizeCollectionName(projectId)
     try {
       await this.client.deleteCollection({ name })
       this.collectionCache.delete(name)
