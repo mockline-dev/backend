@@ -98,6 +98,7 @@
     "sandbox": {
         "provider": "opensandbox",
         "timeoutMs": 30000,
+        "executionTimeoutMs": 300000,
         "maxRetries": 2,
         "opensandbox": {
             "domain": "localhost:8080",

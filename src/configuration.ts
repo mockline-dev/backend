@@ -60,6 +60,7 @@ export const configurationSchema = Type.Intersect([
     sandbox: Type.Object({
       provider: Type.String(),
       timeoutMs: Type.Number(),
+      executionTimeoutMs: Type.Optional(Type.Number()),
       maxRetries: Type.Number(),
       opensandbox: Type.Object({
         domain: Type.String(),

@@ -22,6 +22,7 @@ export const projectsSchema = Type.Object(
       Type.Literal('generating'),
       Type.Literal('validating'),
       Type.Literal('ready'),
+      Type.Literal('running'),
       Type.Literal('error')
     ]),
     errorMessage: Type.Optional(Type.String()),
