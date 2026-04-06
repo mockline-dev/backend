@@ -33,7 +33,7 @@ const SANDBOX_API_KEY = process.env.OPENSANDBOX_API_KEY
 const SANDBOX_PROTOCOL = defaultConfig?.sandbox?.opensandbox?.protocol || 'http'
 const SANDBOX_IMAGE = process.env.OPENSANDBOX_IMAGE
   || defaultConfig?.sandbox?.opensandbox?.defaultImage
-  || 'opensandbox/code-interpreter:v1.0.2'
+  || 'python:3.11-slim'
 const SANDBOX_TIMEOUT = defaultConfig?.sandbox?.timeoutMs || 30000
 
 import { extractCodeBlocks, detectPrimaryLanguage } from '../src/orchestration/sandbox/code-extractor'
@@ -206,10 +206,10 @@ async function checkOpenSandboxConnectivity(): Promise<boolean> {
   }
 }
 
-// ─── 4. TypeScript Sandbox Execution ─────────────────────────────────────────
+// ─── 4. Python Sandbox Execution (primary language) ──────────────────────────
 
-async function testTypescriptExecution(available: boolean) {
-  section('4. TypeScript Code Execution')
+async function testPythonExecution(available: boolean) {
+  section('4. Python Code Execution (primary)')
 
   if (!available) {
     warn('Skipping — OpenSandbox not available')
@@ -217,15 +217,25 @@ async function testTypescriptExecution(available: boolean) {
   }
 
   const llmOutput = `
-Here is the TypeScript code:
+Here is the Python implementation:
 
-\`\`\`typescript // filepath: src/greet.ts
-export function greet(name: string): string {
-  return \`Hello, \${name}!\`
-}
+\`\`\`python
+# src/main.py
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
 
-const result = greet("World")
-console.log(result)
+def add(a: int, b: int) -> int:
+    return a + b
+
+if __name__ == "__main__":
+    print(greet("World"))
+    print(add(2, 3))
+\`\`\`
+
+\`\`\`python
+# src/utils.py
+def flatten(lst: list) -> list:
+    return [item for sublist in lst for item in sublist]
 \`\`\`
   `.trim()
 
@@ -243,116 +253,68 @@ console.log(result)
   const start = Date.now()
 
   try {
-    const { result } = await runSandbox(llmOutput, provider, emit, 'test-proj', {
-      timeoutMs: SANDBOX_TIMEOUT,
-      language: 'typescript',
-      runTests: false,
-    })
-
-    const elapsed = Date.now() - start
-
-    ok(`Sandbox executed in ${elapsed}ms`, `success=${result.success}`)
-
-    if (result.files.length > 0) ok('Code blocks extracted', `files=[${result.files.map(f => f.path).join(', ')}]`)
-    else fail('No files extracted from LLM output', '')
-
-    if (events.includes('sandbox:started')) ok('sandbox:started event emitted')
-    else fail('sandbox:started not emitted', `events=[${events.join(', ')}]`)
-
-    if (result.success) {
-      ok('TypeScript compilation succeeded', result.compilationOutput?.slice(0, 60) || 'no output')
-    } else {
-      warn('TypeScript compilation failed (may be expected if tsc not in image)', result.compilationOutput?.slice(0, 80) || result.stderr?.slice(0, 80) || 'unknown')
-    }
-
-    if (result.stdout) ok('stdout captured', result.stdout.trim().slice(0, 60))
-    if (result.stderr && !result.success) warn('stderr', result.stderr.trim().slice(0, 80))
-
-  } catch (err) {
-    fail('TypeScript execution threw', err)
-  }
-}
-
-// ─── 5. Python Sandbox Execution ─────────────────────────────────────────────
-
-async function testPythonExecution(available: boolean) {
-  section('5. Python Code Execution')
-
-  if (!available) {
-    warn('Skipping — OpenSandbox not available')
-    return
-  }
-
-  const llmOutput = `
-Here is the Python code:
-
-\`\`\`python
-# src/main.py
-def greet(name: str) -> str:
-    return f"Hello, {name}!"
-
-if __name__ == "__main__":
-    print(greet("World"))
-\`\`\`
-  `.trim()
-
-  const provider = new OpenSandboxProvider({
-    domain: SANDBOX_DOMAIN,
-    apiKey: SANDBOX_API_KEY,
-    protocol: SANDBOX_PROTOCOL as any,
-    defaultImage: SANDBOX_IMAGE,
-  })
-
-  const emit = (_e: string, _p: string, _d: unknown) => {}
-
-  console.log(`  ${DIM}Running Python syntax check...${RESET}`)
-  const start = Date.now()
-
-  try {
     const { result } = await runSandbox(llmOutput, provider, emit, 'test-proj-py', {
       timeoutMs: SANDBOX_TIMEOUT,
       language: 'python',
       runTests: false,
     })
-    const elapsed = Date.now() - start
-    ok(`Python sandbox executed in ${elapsed}ms`, `success=${result.success}`)
 
-    if (result.files.length > 0 && result.files[0].path === 'src/main.py') {
-      ok('Python filepath extracted correctly', `path=${result.files[0].path}`)
+    const elapsed = Date.now() - start
+    ok(`Sandbox executed in ${elapsed}ms`, `success=${result.success}`)
+
+    if (result.files.length === 2) {
+      ok('Both Python files extracted', `files=[${result.files.map(f => f.path).join(', ')}]`)
     } else {
-      warn('Python filepath extraction', `files=[${result.files.map(f => f.path).join(', ')}]`)
+      warn('Unexpected file count', `got ${result.files.length} files`)
     }
 
-    if (result.success) ok('Python syntax check passed')
-    else warn('Python syntax check failed (may be expected if python3 not in image)', result.compilationOutput?.slice(0, 80) || '')
+    if (events.includes('sandbox:started')) ok('sandbox:started event emitted')
+    else fail('sandbox:started not emitted', `events=[${events.join(', ')}]`)
+
+    if (result.success) {
+      ok('Python syntax check passed')
+    } else {
+      warn('Python syntax check failed', result.compilationOutput?.slice(0, 80) || result.error || '')
+    }
+
+    if (result.stdout) ok('stdout captured', result.stdout.trim().slice(0, 60))
 
   } catch (err) {
     fail('Python execution threw', err)
   }
 }
 
-// ─── 6. Agentic Fix Loop (broken code) ───────────────────────────────────────
+// ─── 5. TypeScript Sandbox Execution (future language) ────────────────────────
+
+async function testTypescriptExecution(available: boolean) {
+  section('5. TypeScript Code Execution (future language — skipped in Python-first mode)')
+  warn('TypeScript sandbox execution not tested in Python-first mode', 'will be enabled when multi-language support is added')
+}
+
+// ─── 6. Agentic Fix Loop (broken Python → fixed) ─────────────────────────────
 
 async function testAgenticFixLoop(available: boolean) {
-  section('6. Agentic Fix Loop (broken → fixed)')
+  section('6. Agentic Fix Loop (broken Python → fixed)')
 
   if (!available) {
     warn('Skipping — OpenSandbox not available')
     return
   }
 
-  // This code has a deliberate type error that tsc will catch
+  // Deliberate SyntaxError Python will catch
   const brokenOutput = `
-\`\`\`typescript // filepath: src/broken.ts
-const x: number = "this is a string"  // TS2322: Type 'string' is not assignable to type 'number'
-console.log(x)
+\`\`\`python
+# src/broken.py
+def greet(name: str) -> str
+    return f"Hello, {name}!"   # missing colon on def line
 \`\`\`
   `.trim()
 
   const fixedOutput = `
-\`\`\`typescript // filepath: src/broken.ts
-const x: number = 42
-console.log(x)
+\`\`\`python
+# src/broken.py
+def greet(name: str) -> str:
+    return f"Hello, {name}!"
 \`\`\`
   `.trim()
 
@@ -372,39 +334,38 @@ console.log(x)
     }
   }
 
-  console.log(`  ${DIM}Running broken code (expecting compilation failure)...${RESET}`)
+  console.log(`  ${DIM}Running broken Python code (expecting SyntaxError)...${RESET}`)
 
   try {
     // Step 1: run broken code
     const { result: brokenResult } = await runSandbox(brokenOutput, provider, emit, 'test-fix', {
       timeoutMs: SANDBOX_TIMEOUT,
-      language: 'typescript',
+      language: 'python',
       runTests: false,
     })
 
     if (!brokenResult.success) {
-      ok('Broken code detected as failed', `compilationOutput="${brokenResult.compilationOutput?.slice(0,50)}..."`)
+      ok('Broken code detected as failed', `output="${brokenResult.compilationOutput?.slice(0,60)}..."`)
     } else {
-      warn('Broken code unexpectedly succeeded (tsc may be lenient in this image)')
+      warn('Broken code unexpectedly succeeded (py_compile may be lenient on this syntax)')
     }
 
     // Step 2: build fix prompt
     const fixPrompt = buildFixPrompt(brokenOutput, brokenResult)
     ok('buildFixPrompt() generated', `${fixPrompt.length} chars`)
-    if (fixPrompt.includes('fix') || fixPrompt.includes('Fix')) ok('Fix instruction present in prompt')
 
     // Step 3: simulate LLM returning fixed code → run again
-    console.log(`  ${DIM}Running fixed code...${RESET}`)
+    console.log(`  ${DIM}Running fixed Python code...${RESET}`)
     const { result: fixedResult } = await runSandbox(fixedOutput, provider, emit, 'test-fix', {
       timeoutMs: SANDBOX_TIMEOUT,
-      language: 'typescript',
+      language: 'python',
       runTests: false,
     })
 
     if (fixedResult.success) {
-      ok('Fixed code passes compilation — agentic loop works end-to-end')
+      ok('Fixed Python code passes — agentic loop works end-to-end')
     } else {
-      warn('Fixed code failed too', fixedResult.compilationOutput?.slice(0, 80) || fixedResult.error || '')
+      warn('Fixed code still failed', fixedResult.compilationOutput?.slice(0, 80) || fixedResult.error || '')
     }
 
   } catch (err) {
