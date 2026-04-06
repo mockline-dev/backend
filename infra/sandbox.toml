@@ -1,0 +1,22 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+log_level = "INFO"
+# Set a non-empty string to require OPEN-SANDBOX-API-KEY header.
+# Leave empty for local dev (no auth required).
+api_key = ""
+
+[runtime]
+type = "docker"
+execd_image = "opensandbox/execd:latest"
+
+[docker]
+# "host" mode gives sandbox containers direct access to the host network stack.
+# Use "bridge" if you want stricter isolation.
+network_mode = "host"
+api_timeout = 30
+no_new_privileges = true
+pids_limit = 512
+
+[ingress]
+mode = "direct"
