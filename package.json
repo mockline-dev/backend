@@ -64,6 +64,7 @@
     "@bull-board/api": "^6.12.6",
     "@bull-board/express": "^6.12.6",
     "@bull-board/koa": "^6.12.6",
+    "@chroma-core/default-embed": "^0.1.9",
     "@feathersjs/adapter-commons": "^5.0.34",
     "@feathersjs/authentication": "^5.0.34",
     "@feathersjs/authentication-client": "^5.0.34",

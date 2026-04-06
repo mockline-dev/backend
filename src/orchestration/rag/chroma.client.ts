@@ -1,10 +1,14 @@
 import { ChromaClient, Collection } from 'chromadb'
+import { DefaultEmbeddingFunction } from '@chroma-core/default-embed'
 import { createModuleLogger } from '../../logging'
 import type { CodeChunk } from '../types'
 
 const log = createModuleLogger('chroma-client')
 
 const COLLECTION_PREFIX = 'proj'
+
+// Singleton embedding function — reused across all collections (model loads once)
+const embedFn = new DefaultEmbeddingFunction()
 
 /**
  * Produce a ChromaDB-safe collection name from a projectId.
@@ -66,6 +70,7 @@ export class ChromaVectorStore {
     try {
       const collection = await this.client.getOrCreateCollection({
         name,
+        embeddingFunction: embedFn,
         metadata: { projectId },
       })
       this.collectionCache.set(name, collection)
