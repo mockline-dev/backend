@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { countTokens, countMessages } from './token-counter'
-import type { LLMMessage } from '../types'
+import { countTokens, countMessages } from '../token-counter'
+import type { LLMMessage } from '../../types'
 
 describe('countTokens', () => {
   it('returns 0 for empty string', () => {

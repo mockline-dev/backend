@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { chunkText } from './text.chunker'
+import { chunkText } from '../text.chunker'
 
 const SAMPLE_CODE = Array.from({ length: 80 }, (_, i) => `line ${i + 1}: some content here`).join('\n')
 

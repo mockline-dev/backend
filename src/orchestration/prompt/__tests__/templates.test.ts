@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { getSystemPrompt } from './templates'
-import { Intent } from '../types'
+import { getSystemPrompt } from '../templates'
+import { Intent } from '../../types'
 
 describe('getSystemPrompt', () => {
   it('returns a non-empty string for every intent', () => {

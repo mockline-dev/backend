@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { LLMRouter } from './router'
-import { RateLimitError, ProviderTimeoutError, AllProvidersFailedError } from '../types'
-import type { ILLMProvider, LLMMessage, LLMResponse, LLMStreamChunk } from '../types'
+import { LLMRouter } from '../router'
+import { RateLimitError, ProviderTimeoutError, AllProvidersFailedError } from '../../types'
+import type { ILLMProvider, LLMMessage, LLMResponse, LLMStreamChunk } from '../../types'
 
 function mockProvider(name: string, response?: Partial<LLMResponse>): ILLMProvider {
   return {
