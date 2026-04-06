@@ -1,0 +1,83 @@
+version: "3.9"
+
+# ─── Mockline Dev Infrastructure ──────────────────────────────────────────────
+# All ports are bound to 127.0.0.1 so they are accessible from the host machine's
+# localhost only (not exposed to the external network).
+#
+# Usage:
+#   cd infra && docker compose up -d        # start everything
+#   cd infra && docker compose down         # stop and remove containers
+#   cd infra && docker compose logs -f      # tail all logs
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: mockline-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── ChromaDB ─────────────────────────────────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: mockline-chromadb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── OpenSandbox Server ───────────────────────────────────────────────────
+  # Manages sandboxed container execution for AI-generated code validation.
+  # Needs access to the host Docker daemon to spawn sibling containers.
+  opensandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.opensandbox
+    image: mockline-opensandbox:latest
+    container_name: mockline-opensandbox
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Mount Docker socket so OpenSandbox can spawn sibling containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount our TOML config
+      - ./sandbox.toml:/etc/sandbox/sandbox.toml:ro
+    # Needs access to Docker group to talk to the socket
+    group_add:
+      - "0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:
+    driver: local
+  chroma-data:
+    driver: local
