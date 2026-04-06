@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@alibaba-group/opensandbox':
+        specifier: ^0.1.5
+        version: 0.1.5
       '@aws-sdk/client-s3':
         specifier: ^3.826.0
         version: 3.984.0
@@ -182,6 +185,10 @@ importers:
         version: 4.1.2(@opentelemetry/api@1.9.0)(@types/node@22.19.9)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@22.19.9)(esbuild@0.27.3)(tsx@4.21.0))
 
 packages:
+
+  '@alibaba-group/opensandbox@0.1.5':
+    resolution: {integrity: sha512-NJOqqezZ7xXvSisJqail3kTirsfWMP/IM8H2iKnj8m1R9EEwRRutSTV/xDKaK+wkBnuv6cheu/8T6HJrXFw1Mw==}
+    engines: {node: '>=20'}
 
   '@aws-crypto/crc32@5.2.0':
     resolution: {integrity: sha512-nLbCWqQNgUiwwtFsen1AdzAtvuLRsQS8rYgMuxCrdKf9kOssamGLuPwyTY9wyYblNr9+1XM8v6zoDTPPSIeANg==}
@@ -3444,6 +3451,12 @@ packages:
       zod:
         optional: true
 
+  openapi-fetch@0.14.1:
+    resolution: {integrity: sha512-l7RarRHxlEZYjMLd/PR0slfMVse2/vvIAGm75/F7J6MlQ8/b9uUQmUF2kCPrQhJqMXSxmYWObVgeYXbFYzZR+A==}
+
+  openapi-typescript-helpers@0.0.15:
+    resolution: {integrity: sha512-opyTPaunsklCBpTK8JGef6mfPhLSnyy5a0IN9vKtx3+4aExf+KxEqYwIy3hqkedXIB97u357uLMJsOnm3GVjsw==}
+
   ora@5.4.1:
     resolution: {integrity: sha512-5b6Y85tPxZZ7QytO+BQzysW31HJku27cRIlkbAXaNx+BdcVi+LlRFmVXzeF6a7JCwJpyw5c4b+YSVImQIrBpuQ==}
     engines: {node: '>=10'}
@@ -4068,6 +4081,10 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
+  undici@7.24.7:
+    resolution: {integrity: sha512-H/nlJ/h0ggGC+uRL3ovD+G0i4bqhvsDOpbDv7At5eFLlj2b41L8QliGbnl2H7SnDiYhENphh1tQFJZf+MyfLsQ==}
+    engines: {node: '>=20.18.1'}
+
   unpipe@1.0.0:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
@@ -4332,6 +4349,11 @@ packages:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
 snapshots:
+
+  '@alibaba-group/opensandbox@0.1.5':
+    dependencies:
+      openapi-fetch: 0.14.1
+      undici: 7.24.7
 
   '@aws-crypto/crc32@5.2.0':
     dependencies:
@@ -8246,6 +8268,12 @@ snapshots:
       ws: 8.18.3
       zod: 4.3.6
 
+  openapi-fetch@0.14.1:
+    dependencies:
+      openapi-typescript-helpers: 0.0.15
+
+  openapi-typescript-helpers@0.0.15: {}
+
   ora@5.4.1:
     dependencies:
       bl: 4.1.0
@@ -8972,6 +9000,8 @@ snapshots:
   undefsafe@2.0.5: {}
 
   undici-types@6.21.0: {}
+
+  undici@7.24.7: {}
 
   unpipe@1.0.0: {}
 

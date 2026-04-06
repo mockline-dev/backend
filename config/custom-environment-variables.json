@@ -14,5 +14,11 @@
     "minimax": {
       "apiKey": "MINIMAX_API_KEY"
     }
+  },
+  "sandbox": {
+    "opensandbox": {
+      "domain": "OPENSANDBOX_DOMAIN",
+      $1REDACTED_API_KEY$2
+    }
   }
 }

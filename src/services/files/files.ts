@@ -18,6 +18,7 @@ import {
 import type { Application, HookContext } from '../../declarations'
 import { FilesService, getOptions } from './files.class'
 import { filesMethods, filesPath } from './files.shared'
+import { indexingQueue } from '../redis/queues/queues'
 
 export * from './files.class'
 export * from './files.schema'
@@ -90,6 +91,39 @@ export const files = (app: Application) => {
         async (context: HookContext) => {
           const result = context.result
           console.log(result)
+          // Trigger incremental re-index for the project (deduplicated by jobId)
+          const projectId = result?.projectId ?? context.data?.projectId
+          if (projectId) {
+            indexingQueue.add('sync', { projectId }, {
+              delay: 3000,
+              jobId: `sync-${projectId}`,
+              removeOnComplete: true,
+            }).catch(() => {/* non-fatal */})
+          }
+        }
+      ],
+      patch: [
+        async (context: HookContext) => {
+          const projectId = context.result?.projectId
+          if (projectId) {
+            indexingQueue.add('sync', { projectId }, {
+              delay: 3000,
+              jobId: `sync-${projectId}`,
+              removeOnComplete: true,
+            }).catch(() => {/* non-fatal */})
+          }
+        }
+      ],
+      remove: [
+        async (context: HookContext) => {
+          const projectId = context.result?.projectId
+          if (projectId) {
+            indexingQueue.add('sync', { projectId }, {
+              delay: 3000,
+              jobId: `sync-${projectId}`,
+              removeOnComplete: true,
+            }).catch(() => {/* non-fatal */})
+          }
         }
       ]
     },
