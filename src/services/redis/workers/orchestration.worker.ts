@@ -37,8 +37,7 @@ export function startOrchestrationWorker(app: any): Worker {
           .service('projects')
           .patch(projectId, {
             status: 'generating',
-            'generationProgress.currentStage': 'orchestrating',
-            'generationProgress.percentage': 5
+            generationProgress: { currentStage: 'orchestrating', percentage: 5 }
           })
           .catch(() => {
             /* non-fatal */
@@ -136,8 +135,7 @@ export function startOrchestrationWorker(app: any): Worker {
               await app
                 .service('projects')
                 .patch(projectId, {
-                  'generationProgress.currentStage': 'persisting',
-                  'generationProgress.percentage': 85
+                  generationProgress: { currentStage: 'persisting', percentage: 85 }
                 })
                 .catch(() => {
                   /* non-fatal */
@@ -160,7 +158,7 @@ export function startOrchestrationWorker(app: any): Worker {
               await app
                 .service('projects')
                 .patch(projectId, {
-                  'generationProgress.filesGenerated': uploadedCount
+                  generationProgress: { filesGenerated: uploadedCount }
                 })
                 .catch(() => {
                   /* non-fatal */
@@ -186,7 +184,7 @@ export function startOrchestrationWorker(app: any): Worker {
                       ...(result.enhancedPrompt ? { enhancedPrompt: result.enhancedPrompt } : {})
                     }
                   },
-                  { provider: 'server' }
+                  { provider: undefined }
                 )
                 .catch((err: unknown) => {
                   log.warn('Failed to save assistant message', {
@@ -227,7 +225,7 @@ export function startOrchestrationWorker(app: any): Worker {
                   ...(result.enhancedPrompt ? { enhancedPrompt: result.enhancedPrompt } : {})
                 }
               },
-              { provider: 'server' }
+              { provider: undefined }
             )
             .catch((err: unknown) => {
               log.warn('Failed to save assistant message', {
@@ -251,7 +249,7 @@ export function startOrchestrationWorker(app: any): Worker {
                   ...(result.enhancedPrompt ? { enhancedPrompt: result.enhancedPrompt } : {})
                 }
               },
-              { provider: 'server' }
+              { provider: undefined }
             )
             .catch((err: unknown) => {
               log.warn('Failed to save assistant message', {
@@ -266,8 +264,7 @@ export function startOrchestrationWorker(app: any): Worker {
           .service('projects')
           .patch(projectId, {
             status: 'ready',
-            'generationProgress.percentage': 100,
-            'generationProgress.currentStage': 'complete'
+            generationProgress: { percentage: 100, currentStage: 'complete' }
           })
           .catch(() => {
             /* non-fatal */
