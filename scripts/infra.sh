@@ -23,9 +23,15 @@ COMPOSE="docker compose -f $ROOT_DIR/docker-compose.yml --project-directory $ROO
 
 # Images that must be pre-pulled on the host before OpenSandbox can provision
 # sandbox containers. These are NOT pulled automatically by the compose services.
+#
+# python:3.11-slim  — primary sandbox image (~130MB). Used for Python code execution.
+# opensandbox/execd — lightweight agent (~50MB) injected into every sandbox container.
+#
+# To add a new language in future, add its image here and update
+# src/orchestration/sandbox/providers/opensandbox.provider.ts LANGUAGE_CONFIG.
 SANDBOX_IMAGES=(
   "opensandbox/execd:latest"
-  "opensandbox/code-interpreter:v1.0.2"
+  "python:3.11-slim"
 )
 
 # ── Colours ───────────────────────────────────────────────────────────────────

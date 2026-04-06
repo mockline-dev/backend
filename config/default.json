@@ -103,7 +103,7 @@
             "domain": "localhost:8080",
             "apiKey": "",
             "protocol": "http",
-            "defaultImage": "opensandbox/code-interpreter:v1.0.2"
+            "defaultImage": "python:3.11-slim"
         }
     },
     "indexing": {
