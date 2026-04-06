@@ -63,7 +63,13 @@ app.hooks({
   },
   before: {},
   after: {},
-  error: []
+  error: [
+    async (context) => {
+      const { error, path, method } = context
+      console.error(`[${path}] ${method} error:`, error?.message || error)
+      if (error?.data) console.info(`[${path}] error data:`, error.data)
+    }
+  ]
 })
 // Register application setup and teardown hooks here
 app.hooks({
