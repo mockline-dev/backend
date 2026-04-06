@@ -108,6 +108,11 @@ export class OpenSandboxProvider implements ISandboxProvider {
         apiKey: this.config.apiKey,
         protocol: this.config.protocol,
         requestTimeoutSeconds: Math.ceil(opts.timeoutMs / 1000),
+        // Required when the OpenSandbox server runs in Docker.
+        // Without this, sandbox containers try to call back to localhost:8080
+        // from inside their container network and fail with a health-check timeout.
+        // useServerProxy routes all container↔server traffic through the SDK instead.
+        useServerProxy: true,
       })
 
       sandbox = await Sandbox.create({

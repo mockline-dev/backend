@@ -13,10 +13,11 @@ type = "docker"
 execd_image = "opensandbox/execd:latest"
 
 [docker]
-# "host" shares the host network stack with sandbox containers so they can
-# reach services on 127.0.0.1 (Redis, ChromaDB, the backend itself).
-# Switch to "bridge" for stricter isolation in production.
-network_mode = "host"
+# "bridge" is correct when the OpenSandbox server itself runs in Docker.
+# The SDK's useServerProxy=true handles container↔server communication,
+# so sandbox containers don't need direct access to the server's hostname.
+# Switch to "host" only if running the server directly on bare metal.
+network_mode = "bridge"
 api_timeout = 30
 no_new_privileges = true
 pids_limit = 512
