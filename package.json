@@ -59,6 +59,7 @@
     "config": "4.1.1"
   },
   "dependencies": {
+    "@alibaba-group/opensandbox": "^0.1.5",
     "@aws-sdk/client-s3": "^3.826.0",
     "@aws-sdk/s3-request-presigner": "^3.826.0",
     "@bull-board/api": "^6.12.6",

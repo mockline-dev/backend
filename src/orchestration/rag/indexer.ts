@@ -1,8 +1,8 @@
-import * as path from 'path'
 import { createModuleLogger } from '../../logging'
 import { chunkCode, initTreeSitter, isCodeFile } from '../chunking/tree-sitter.chunker'
 import { chunkText } from '../chunking/text.chunker'
 import type { ChromaVectorStore } from './chroma.client'
+import { fetchFileContent } from './file-fetcher'
 
 const log = createModuleLogger('rag-indexer')
 
@@ -94,26 +94,3 @@ export async function indexProjectFiles(
   return { indexed, failed }
 }
 
-async function fetchFileContent(
-  key: string,
-  app: { service: (name: string) => any }
-): Promise<string | null> {
-  try {
-    // Get signed URL from file-stream service
-    const streamService = app.service('file-stream')
-    const signedUrl = await streamService.get(null, { query: { key } })
-    const url = typeof signedUrl === 'string' ? signedUrl : signedUrl?.url
-
-    if (!url) return null
-
-    const response = await fetch(url)
-    if (!response.ok) return null
-    return await response.text()
-  } catch (err: unknown) {
-    log.warn('Failed to fetch file content', {
-      key,
-      error: err instanceof Error ? err.message : String(err),
-    })
-    return null
-  }
-}

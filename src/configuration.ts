@@ -56,6 +56,22 @@ export const configurationSchema = Type.Intersect([
     }),
     firebase: Type.Object({
       serviceAccountPath: Type.String()
+    }),
+    sandbox: Type.Object({
+      provider: Type.String(),
+      timeoutMs: Type.Number(),
+      maxRetries: Type.Number(),
+      opensandbox: Type.Object({
+        domain: Type.String(),
+        apiKey: Type.String(),
+        protocol: Type.String(),
+        defaultImage: Type.String()
+      })
+    }),
+    indexing: Type.Object({
+      enabled: Type.Boolean(),
+      periodicSyncIntervalMs: Type.Number(),
+      maxFilesPerSync: Type.Number()
     })
   })
 ])
