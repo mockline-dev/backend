@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { classifyIntent } from './classifier'
-import { Intent } from '../types'
-import type { ILLMProvider, LLMResponse } from '../types'
+import { classifyIntent } from '../classifier'
+import { Intent } from '../../types'
+import type { ILLMProvider, LLMResponse } from '../../types'
 
 function mockProviderWithResponse(content: string): ILLMProvider {
   const response: LLMResponse = {
