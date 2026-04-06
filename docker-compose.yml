@@ -1,0 +1,104 @@
+# ─── Mockline Backend — Development Infrastructure ────────────────────────────
+#
+# Services:
+#   redis       — BullMQ job queue + Merkle tree cache  (127.0.0.1:6379)
+#   chromadb    — Vector store for RAG context          (127.0.0.1:8000)
+#   opensandbox — Sandboxed AI code execution           (127.0.0.1:8080)
+#
+# All ports are bound to 127.0.0.1 — accessible from the host only.
+#
+# Usage:
+#   ./scripts/infra.sh start    ← recommended (pre-pulls images, health checks)
+#   docker compose up -d        ← raw compose (skip image pre-pull)
+#   docker compose down         ← stop all
+#   docker compose logs -f      ← tail logs
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: mockline
+
+services:
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: mockline-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --save 60 1
+      --loglevel warning
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── ChromaDB ───────────────────────────────────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: mockline-chromadb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+      CHROMA_SERVER_AUTHN_CREDENTIALS: ""
+      CHROMA_SERVER_AUTHN_PROVIDER: ""
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v2/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── OpenSandbox ────────────────────────────────────────────────────────────
+  # Manages sandboxed container execution for AI-generated code validation.
+  # Spawns sibling Docker containers via the mounted host Docker socket.
+  #
+  # Required images (pre-pulled by ./scripts/infra.sh start):
+  #   opensandbox/execd:latest               — injected into every sandbox
+  #   opensandbox/code-interpreter:v1.0.2    — default execution environment
+  opensandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.opensandbox
+    image: mockline-opensandbox:latest
+    container_name: mockline-opensandbox
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Host Docker socket — required for spawning sandbox sibling containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # OpenSandbox server configuration
+      - ./sandbox.toml:/etc/sandbox/sandbox.toml:ro
+    environment:
+      # Propagate the Docker host so OpenSandbox can reach the daemon
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+    # Add the docker group so the process can write to the socket
+    group_add:
+      - "0"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:
+    driver: local
+  chroma-data:
+    driver: local
