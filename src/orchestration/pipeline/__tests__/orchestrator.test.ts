@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { orchestrate } from './orchestrator'
-import { Intent } from '../types'
+import { orchestrate } from '../orchestrator'
+import { Intent } from '../../types'
 import type {
   ILLMProvider,
   LLMResponse,
   OrchestrationJobData,
   CodeChunk,
-} from '../types'
-import type { OrchestratorDeps } from './orchestrator'
-import type { ChromaVectorStore } from '../rag/chroma.client'
+} from '../../types'
+import type { OrchestratorDeps } from '../orchestrator'
+import type { ChromaVectorStore } from '../../rag/chroma.client'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

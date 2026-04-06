@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { buildPrompt } from './builder'
-import { Intent } from '../types'
-import type { BuildPromptParams, CodeChunk, LLMMessage } from '../types'
+import { buildPrompt } from '../builder'
+import { Intent } from '../../types'
+import type { BuildPromptParams, CodeChunk, LLMMessage } from '../../types'
 
 function makeChunk(id: string, content: string): CodeChunk {
   return { id, filepath: 'src/main.py', content, startLine: 0, endLine: 10 }
