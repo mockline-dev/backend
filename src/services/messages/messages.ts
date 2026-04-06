@@ -9,7 +9,7 @@ import {
   messagesPatchValidator,
   messagesQueryResolver,
   messagesQueryValidator,
-  messagesResolver,
+  messagesResolver
 } from './messages.schema'
 
 import type { Application, HookContext } from '../../declarations'
@@ -23,7 +23,7 @@ export * from './messages.schema'
 export const messages = (app: Application) => {
   app.use(messagesPath, new MessagesService(getOptions(app)), {
     methods: messagesMethods,
-    events: [],
+    events: []
   })
 
   app.service(messagesPath).hooks({
@@ -31,22 +31,22 @@ export const messages = (app: Application) => {
       all: [
         authenticate('jwt'),
         schemaHooks.resolveExternal(messagesExternalResolver),
-        schemaHooks.resolveResult(messagesResolver),
-      ],
+        schemaHooks.resolveResult(messagesResolver)
+      ]
     },
     before: {
       all: [
         schemaHooks.validateQuery(messagesQueryValidator),
-        schemaHooks.resolveQuery(messagesQueryResolver),
+        schemaHooks.resolveQuery(messagesQueryResolver)
       ],
       create: [
         schemaHooks.validateData(messagesDataValidator),
-        schemaHooks.resolveData(messagesDataResolver),
+        schemaHooks.resolveData(messagesDataResolver)
       ],
       patch: [
         schemaHooks.validateData(messagesPatchValidator),
-        schemaHooks.resolveData(messagesPatchResolver),
-      ],
+        schemaHooks.resolveData(messagesPatchResolver)
+      ]
     },
     after: {
       create: [
@@ -64,38 +64,49 @@ export const messages = (app: Application) => {
             query: {
               projectId,
               $sort: { createdAt: 1 },
-              $limit: 50,
+              $limit: 50
             },
-            paginate: false,
+            paginate: false
           } as any)
 
-          const conversationHistory = (Array.isArray(history) ? history : history.data ?? []).map((m: any) => ({
-            role: m.role as 'user' | 'assistant' | 'system',
-            content: m.content,
-          }))
+          const conversationHistory = (Array.isArray(history) ? history : (history.data ?? [])).map(
+            (m: any) => ({
+              role: m.role as 'user' | 'assistant' | 'system',
+              content: m.content
+            })
+          )
 
-          const job = await orchestrationQueue.add('orchestrate', {
-            projectId,
-            userId,
-            prompt: msg.content,
-            conversationHistory,
-            messageId: msg._id?.toString(),
-          }, {
-            removeOnComplete: 100,
-            removeOnFail: 50,
-          })
+          const job = await orchestrationQueue.add(
+            'orchestrate',
+            {
+              projectId,
+              userId,
+              prompt: msg.content,
+              conversationHistory,
+              messageId: msg._id?.toString()
+            },
+            {
+              removeOnComplete: 100,
+              removeOnFail: 50
+            }
+          )
 
           // Track jobId on the project
-          await app.service('projects').patch(projectId, {
-            jobId: job.id,
-            status: 'generating',
-          }).catch(() => {/* non-fatal */})
-        },
-      ],
+          await app
+            .service('projects')
+            .patch(projectId, {
+              jobId: job.id,
+              status: 'generating'
+            })
+            .catch(() => {
+              /* non-fatal */
+            })
+        }
+      ]
     },
     error: {
-      all: [],
-    },
+      all: []
+    }
   })
 }
 

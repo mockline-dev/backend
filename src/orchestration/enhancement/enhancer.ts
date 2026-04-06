@@ -6,12 +6,7 @@ import { getEnhancementTemplate, interpolateTemplate, type EnhancementContext } 
 const log = createModuleLogger('prompt-enhancer')
 
 // Intents that benefit from enhancement
-const ENHANCE_INTENTS = new Set([
-  Intent.GenerateProject,
-  Intent.EditCode,
-  Intent.AddFeature,
-  Intent.FixBug,
-])
+const ENHANCE_INTENTS = new Set([Intent.GenerateProject, Intent.EditCode, Intent.AddFeature, Intent.FixBug])
 
 /**
  * Enhances a user prompt before it's sent to the main LLM.
@@ -25,7 +20,7 @@ export async function enhancePrompt(
   prompt: string,
   intent: Intent,
   projectMeta: EnhancementContext,
-  provider: ILLMProvider,
+  provider: ILLMProvider
 ): Promise<string> {
   if (!ENHANCE_INTENTS.has(intent)) {
     return prompt
@@ -44,10 +39,11 @@ export async function enhancePrompt(
   try {
     const systemPrompt = interpolateTemplate(template, { prompt, ...projectMeta })
 
-    const response = await provider.chat(
-      [{ role: 'user', content: systemPrompt }],
-      { temperature: 0.3, maxTokens: 1024, timeoutMs: 15000 },
-    )
+    const response = await provider.chat([{ role: 'user', content: systemPrompt }], {
+      temperature: 0.3,
+      maxTokens: 1024,
+      timeoutMs: 15000
+    })
 
     const enhanced = response.content.trim()
 
@@ -56,7 +52,7 @@ export async function enhancePrompt(
       log.warn('Enhancement produced suspiciously short result, using original', {
         original: prompt.length,
         enhanced: enhanced.length,
-        intent,
+        intent
       })
       return prompt
     }
@@ -64,14 +60,14 @@ export async function enhancePrompt(
     log.debug('Prompt enhanced', {
       intent,
       originalLength: prompt.length,
-      enhancedLength: enhanced.length,
+      enhancedLength: enhanced.length
     })
 
     return enhanced
   } catch (err: unknown) {
     log.warn('Prompt enhancement failed, using original', {
       error: err instanceof Error ? err.message : String(err),
-      intent,
+      intent
     })
     return prompt
   }

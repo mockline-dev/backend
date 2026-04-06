@@ -40,7 +40,7 @@ Keep changes minimal and focused.`,
   [Intent.General]: `You are a helpful backend programming assistant with expertise in modern web frameworks.
 Answer questions clearly and concisely.
 Provide code examples when helpful.
-Prefer practical, production-ready solutions.`,
+Prefer practical, production-ready solutions.`
 }
 
 /**
@@ -52,6 +52,6 @@ export function getSystemPrompt(intent: Intent, context: TemplateContext = {}): 
     framework: 'the framework',
     language: 'the language',
     name: 'the project',
-    ...context,
+    ...context
   })
 }

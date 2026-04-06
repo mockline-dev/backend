@@ -12,13 +12,13 @@ const BASE_PARAMS: BuildPromptParams = {
   userQuery: 'What does this function do?',
   retrievedContext: { chunks: [], totalTokens: 0 },
   conversationHistory: [],
-  modelContextWindow: 8192,
+  modelContextWindow: 8192
 }
 
 describe('buildPrompt', () => {
   it('always includes system and user messages', () => {
     const result = buildPrompt(BASE_PARAMS)
-    const roles = result.messages.map((m) => m.role)
+    const roles = result.messages.map(m => m.role)
     expect(roles).toContain('system')
     expect(roles[0]).toBe('system')
     expect(roles[roles.length - 1]).toBe('user')
@@ -46,26 +46,30 @@ describe('buildPrompt', () => {
       ...BASE_PARAMS,
       retrievedContext: {
         chunks: [makeChunk('c1', 'def foo():\n    return 42')],
-        totalTokens: 20,
-      },
+        totalTokens: 20
+      }
     }
     const result = buildPrompt(params)
     expect(result.metadata.chunksUsed).toBeGreaterThan(0)
-    const content = result.messages.map((m) => m.content).join(' ')
+    const content = result.messages.map(m => m.content).join(' ')
     expect(content).toContain('def foo()')
   })
 
   it('trims history to fit budget', () => {
     // Create a large history that exceeds budget
-    const longHistory: LLMMessage[] = Array.from({ length: 50 }, (_, i) => ({
-      role: i % 2 === 0 ? 'user' : 'assistant',
-      content: `Message ${i}: ${'word '.repeat(50)}`,
-    } as LLMMessage))
+    const longHistory: LLMMessage[] = Array.from(
+      { length: 50 },
+      (_, i) =>
+        ({
+          role: i % 2 === 0 ? 'user' : 'assistant',
+          content: `Message ${i}: ${'word '.repeat(50)}`
+        }) as LLMMessage
+    )
 
     const result = buildPrompt({
       ...BASE_PARAMS,
       conversationHistory: longHistory,
-      modelContextWindow: 2000,
+      modelContextWindow: 2000
     })
 
     // Should have trimmed history — less than 50 turns
@@ -79,17 +83,17 @@ describe('buildPrompt', () => {
       { role: 'user', content: 'second old message' },
       { role: 'assistant', content: 'second old reply' },
       { role: 'user', content: 'very recent message' },
-      { role: 'assistant', content: 'very recent reply' },
+      { role: 'assistant', content: 'very recent reply' }
     ]
 
     // Large enough to fit recent messages but not all
     const result = buildPrompt({
       ...BASE_PARAMS,
       conversationHistory: history,
-      modelContextWindow: 4096,
+      modelContextWindow: 4096
     })
 
-    const content = result.messages.map((m) => m.content).join(' ')
+    const content = result.messages.map(m => m.content).join(' ')
 
     if (result.metadata.historyTurns > 0 && result.metadata.historyTurns < 6) {
       // Trimmed: recent messages should be present, old ones may be dropped
@@ -115,9 +119,9 @@ describe('buildPrompt', () => {
     const result = buildPrompt({
       ...BASE_PARAMS,
       intent: Intent.EditCode,
-      projectMeta: { framework: 'FeathersJS', language: 'TypeScript', name: 'my-api' },
+      projectMeta: { framework: 'FeathersJS', language: 'TypeScript', name: 'my-api' }
     })
-    const systemMsg = result.messages.find((m) => m.role === 'system')!
+    const systemMsg = result.messages.find(m => m.role === 'system')!
     expect(systemMsg.content).toContain('FeathersJS')
   })
 })

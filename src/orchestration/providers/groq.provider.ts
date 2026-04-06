@@ -1,13 +1,7 @@
 import Groq from 'groq-sdk'
 import { createModuleLogger } from '../../logging'
 import { ProviderTimeoutError, RateLimitError } from '../types'
-import type {
-  ILLMProvider,
-  LLMCallOptions,
-  LLMMessage,
-  LLMResponse,
-  LLMStreamChunk,
-} from '../types'
+import type { ILLMProvider, LLMCallOptions, LLMMessage, LLMResponse, LLMStreamChunk } from '../types'
 
 const log = createModuleLogger('groq-provider')
 
@@ -39,7 +33,7 @@ export class GroqProvider implements ILLMProvider {
           messages: messages as Groq.Chat.Completions.ChatCompletionMessageParam[],
           temperature: opts.temperature ?? 0.7,
           max_tokens: opts.maxTokens,
-          response_format: opts.json ? { type: 'json_object' } : undefined,
+          response_format: opts.json ? { type: 'json_object' } : undefined
         },
         { signal: controller.signal }
       )
@@ -52,9 +46,9 @@ export class GroqProvider implements ILLMProvider {
         usage: {
           promptTokens: response.usage?.prompt_tokens ?? 0,
           completionTokens: response.usage?.completion_tokens ?? 0,
-          totalTokens: response.usage?.total_tokens ?? 0,
+          totalTokens: response.usage?.total_tokens ?? 0
         },
-        finishReason: choice.finish_reason ?? 'stop',
+        finishReason: choice.finish_reason ?? 'stop'
       }
     } catch (err: unknown) {
       this.handleError(err, timeoutMs)
@@ -76,7 +70,7 @@ export class GroqProvider implements ILLMProvider {
           messages: messages as Groq.Chat.Completions.ChatCompletionMessageParam[],
           temperature: opts.temperature ?? 0.7,
           max_tokens: opts.maxTokens,
-          stream: true,
+          stream: true
         },
         { signal: controller.signal }
       )

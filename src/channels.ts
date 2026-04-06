@@ -8,7 +8,6 @@ export const channels = (app: Application) => {
   app.on('connection', (connection: RealTimeConnection) => {
     // On a new real-time connection, add it to the anonymous channel
     app.channel('anonymous').join(connection)
-
   })
 
   app.on('login', (authResult: AuthenticationResult, { connection }: Params) => {
@@ -49,7 +48,6 @@ export const channels = (app: Application) => {
     const projectId = data?.projectId?.toString?.()
     return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
   })
-
 
   // eslint-disable-next-line no-unused-vars
   app.publish((_data: any, _context: HookContext) => {

@@ -26,9 +26,9 @@ const defaultConfig: Record<string, any> = JSON.parse(fs.readFileSync(configPath
 
 const CHROMA_HOST = process.env.CHROMA_HOST || defaultConfig?.chromadb?.host || 'localhost'
 const CHROMA_PORT = Number(process.env.CHROMA_PORT || defaultConfig?.chromadb?.port || 8000)
-const MONGO_URL   = process.env.MONGO_URL || defaultConfig?.mongodb || 'mongodb://127.0.0.1:27017/mockline-back'
-const REDIS_HOST  = process.env.REDIS_HOST || defaultConfig?.redisConfig?.host || '127.0.0.1'
-const REDIS_PORT  = Number(process.env.REDIS_PORT || defaultConfig?.redisConfig?.port || 6379)
+const MONGO_URL = process.env.MONGO_URL || defaultConfig?.mongodb || 'mongodb://127.0.0.1:27017/mockline-back'
+const REDIS_HOST = process.env.REDIS_HOST || defaultConfig?.redisConfig?.host || '127.0.0.1'
+const REDIS_PORT = Number(process.env.REDIS_PORT || defaultConfig?.redisConfig?.port || 6379)
 
 import { hashContent, computeRootHash } from '../src/orchestration/merkle/hash'
 import { buildTree, diffTrees, updateTree } from '../src/orchestration/merkle/tree'
@@ -38,15 +38,17 @@ import type { MerkleTreeDocument } from '../src/orchestration/merkle/types'
 
 // ─── Console helpers ─────────────────────────────────────────────────────────
 
-const GREEN  = '\x1b[32m'
-const RED    = '\x1b[31m'
+const GREEN = '\x1b[32m'
+const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
-const CYAN   = '\x1b[36m'
-const DIM    = '\x1b[2m'
-const RESET  = '\x1b[0m'
-const BOLD   = '\x1b[1m'
+const CYAN = '\x1b[36m'
+const DIM = '\x1b[2m'
+const RESET = '\x1b[0m'
+const BOLD = '\x1b[1m'
 
-let passCount = 0, failCount = 0, warnCount = 0
+let passCount = 0,
+  failCount = 0,
+  warnCount = 0
 
 function ok(label: string, detail?: string) {
   passCount++
@@ -92,7 +94,7 @@ function testHashUtils() {
 
     const files = [
       { path: 'b.ts', hash: hashContent('bbb') },
-      { path: 'a.ts', hash: hashContent('aaa') },
+      { path: 'a.ts', hash: hashContent('aaa') }
     ]
     const root1 = computeRootHash(files)
     const root2 = computeRootHash([...files].reverse())
@@ -115,12 +117,15 @@ function testTreeOperations() {
   try {
     const files = [
       { path: 'src/a.ts', content: 'export const a = 1', size: 18 },
-      { path: 'src/b.ts', content: 'export const b = 2', size: 18 },
+      { path: 'src/b.ts', content: 'export const b = 2', size: 18 }
     ]
 
     const tree = buildTree('test-proj', files)
     if (tree.fileCount === 2 && tree.rootHash.length === 64) {
-      ok('buildTree() builds correct tree', `fileCount=${tree.fileCount} rootHash=${tree.rootHash.slice(0,12)}...`)
+      ok(
+        'buildTree() builds correct tree',
+        `fileCount=${tree.fileCount} rootHash=${tree.rootHash.slice(0, 12)}...`
+      )
     } else {
       fail('buildTree() unexpected result', JSON.stringify({ fileCount: tree.fileCount }))
     }
@@ -128,7 +133,12 @@ function testTreeOperations() {
     // No changes
     const sameTree = buildTree('test-proj', files)
     const noDiff = diffTrees(tree, sameTree)
-    if (noDiff.added.length === 0 && noDiff.modified.length === 0 && noDiff.deleted.length === 0 && noDiff.unchanged === 2) {
+    if (
+      noDiff.added.length === 0 &&
+      noDiff.modified.length === 0 &&
+      noDiff.deleted.length === 0 &&
+      noDiff.unchanged === 2
+    ) {
       ok('diffTrees() detects no changes', `unchanged=${noDiff.unchanged}`)
     } else {
       fail('diffTrees() false positives', JSON.stringify(noDiff))
@@ -144,14 +154,17 @@ function testTreeOperations() {
 
     // Modify one file
     const updatedFiles = [
-      { path: 'src/a.ts', content: 'export const a = 999', size: 20 },  // changed
-      { path: 'src/b.ts', content: 'export const b = 2', size: 18 },     // same
-      { path: 'src/c.ts', content: 'export const c = 3', size: 18 },     // new
+      { path: 'src/a.ts', content: 'export const a = 999', size: 20 }, // changed
+      { path: 'src/b.ts', content: 'export const b = 2', size: 18 }, // same
+      { path: 'src/c.ts', content: 'export const c = 3', size: 18 } // new
     ]
     const updatedTree = buildTree('test-proj', updatedFiles)
     const diff = diffTrees(tree, updatedTree)
     if (diff.modified.includes('src/a.ts') && diff.added.includes('src/c.ts') && diff.unchanged === 1) {
-      ok('diffTrees() detects modified + added', `modified=[${diff.modified}] added=[${diff.added}] unchanged=${diff.unchanged}`)
+      ok(
+        'diffTrees() detects modified + added',
+        `modified=[${diff.modified}] added=[${diff.added}] unchanged=${diff.unchanged}`
+      )
     } else {
       fail('diffTrees() missed changes', JSON.stringify(diff))
     }
@@ -168,9 +181,15 @@ function testTreeOperations() {
     // updateTree()
     const updated = updateTree(tree, [{ path: 'src/a.ts', content: 'updated', size: 7 }], ['src/b.ts'])
     if (updated.fileCount === 1 && updated.version === 2) {
-      ok('updateTree() applies changes and bumps version', `fileCount=${updated.fileCount} version=${updated.version}`)
+      ok(
+        'updateTree() applies changes and bumps version',
+        `fileCount=${updated.fileCount} version=${updated.version}`
+      )
     } else {
-      fail('updateTree() unexpected result', JSON.stringify({ fileCount: updated.fileCount, version: updated.version }))
+      fail(
+        'updateTree() unexpected result',
+        JSON.stringify({ fileCount: updated.fileCount, version: updated.version })
+      )
     }
   } catch (err) {
     fail('Tree operations threw', err)
@@ -186,7 +205,10 @@ async function testChromaDeleteByFilepath(): Promise<ChromaVectorStore> {
   const alive = await store.ping()
 
   if (!alive) {
-    warn(`ChromaDB not reachable at ${CHROMA_HOST}:${CHROMA_PORT}`, 'skipping — start: ./scripts/infra.sh start')
+    warn(
+      `ChromaDB not reachable at ${CHROMA_HOST}:${CHROMA_PORT}`,
+      'skipping — start: ./scripts/infra.sh start'
+    )
     return store
   }
   ok(`ChromaDB reachable at ${CHROMA_HOST}:${CHROMA_PORT}`)
@@ -195,9 +217,27 @@ async function testChromaDeleteByFilepath(): Promise<ChromaVectorStore> {
   try {
     // Seed with chunks across two files
     await store.addChunks(testProject, [
-      { id: `${testProject}:file_a:0`, filepath: 'src/file_a.ts', content: 'function alpha() {}', startLine: 0, endLine: 1 },
-      { id: `${testProject}:file_a:1`, filepath: 'src/file_a.ts', content: 'function beta() {}',  startLine: 2, endLine: 3 },
-      { id: `${testProject}:file_b:0`, filepath: 'src/file_b.ts', content: 'function gamma() {}', startLine: 0, endLine: 1 },
+      {
+        id: `${testProject}:file_a:0`,
+        filepath: 'src/file_a.ts',
+        content: 'function alpha() {}',
+        startLine: 0,
+        endLine: 1
+      },
+      {
+        id: `${testProject}:file_a:1`,
+        filepath: 'src/file_a.ts',
+        content: 'function beta() {}',
+        startLine: 2,
+        endLine: 3
+      },
+      {
+        id: `${testProject}:file_b:0`,
+        filepath: 'src/file_b.ts',
+        content: 'function gamma() {}',
+        startLine: 0,
+        endLine: 1
+      }
     ])
     ok('Seeded 3 chunks across 2 files')
 
@@ -217,7 +257,10 @@ async function testChromaDeleteByFilepath(): Promise<ChromaVectorStore> {
     } else if (hasFileA) {
       fail('file_a chunks still present after delete', `remaining=${after.length}`)
     } else {
-      warn('Could not verify — query returned 0 results (ChromaDB may need warm-up)', `remaining=${after.length}`)
+      warn(
+        'Could not verify — query returned 0 results (ChromaDB may need warm-up)',
+        `remaining=${after.length}`
+      )
     }
   } finally {
     await store.deleteCollection(testProject)
@@ -266,7 +309,7 @@ async function testMerkleTreeStore(): Promise<MerkleTreeStore | null> {
     const projectId = '_merkle_store_test_'
     const tree: MerkleTreeDocument = buildTree(projectId, [
       { path: 'src/index.ts', content: 'console.log("hello")', size: 20 },
-      { path: 'src/utils.ts', content: 'export const add = (a:number, b:number) => a+b', size: 46 },
+      { path: 'src/utils.ts', content: 'export const add = (a:number, b:number) => a+b', size: 46 }
     ])
 
     // Save
@@ -327,18 +370,18 @@ async function testSyncProjectIndex(chromaStore: ChromaVectorStore, merkleStore:
   // Mock app that returns fake file records and content
   const fileRecords = [
     { _id: '1', name: 'src/hello.ts', key: 'proj/hello.ts', projectId },
-    { _id: '2', name: 'src/world.ts', key: 'proj/world.ts', projectId },
+    { _id: '2', name: 'src/world.ts', key: 'proj/world.ts', projectId }
   ]
   const fileContents: Record<string, string> = {
     'proj/hello.ts': 'export function hello() { return "hello"; }',
-    'proj/world.ts': 'export function world() { return "world"; }',
+    'proj/world.ts': 'export function world() { return "world"; }'
   }
 
   const mockApp = {
     service: (name: string) => {
       if (name === 'files') {
         return {
-          find: async () => fileRecords,
+          find: async () => fileRecords
         }
       }
       if (name === 'file-stream') {
@@ -348,11 +391,11 @@ async function testSyncProjectIndex(chromaStore: ChromaVectorStore, merkleStore:
             // Return a data URL so fetchFileContent can read it without HTTP
             const content = fileContents[key] ?? ''
             return `data:text/plain;base64,${Buffer.from(content).toString('base64')}`
-          },
+          }
         }
       }
       return {}
-    },
+    }
   }
 
   // file-fetcher needs to fetch via URL — patch it so data: URIs work in tests
@@ -389,7 +432,10 @@ async function testSyncProjectIndex(chromaStore: ChromaVectorStore, merkleStore:
     const result3 = await syncProjectIndex(projectId, mockApp, chromaStore, merkleStore)
     console.log(`${GREEN}done${RESET}`)
     if (result3.changes.modified.includes('src/hello.ts') && result3.changes.unchanged === 1) {
-      ok('Third sync detects modified file', `modified=[${result3.changes.modified}] unchanged=${result3.changes.unchanged}`)
+      ok(
+        'Third sync detects modified file',
+        `modified=[${result3.changes.modified}] unchanged=${result3.changes.unchanged}`
+      )
     } else {
       warn('Third sync — unexpected result', JSON.stringify(result3.changes))
     }
@@ -406,24 +452,30 @@ async function testSyncProjectIndex(chromaStore: ChromaVectorStore, merkleStore:
 
 async function main() {
   banner('Mockline Merkle Tree + Indexing Smoke Test')
-  console.log(`${DIM}  Layers: hash → tree → ChromaDB.deleteByFilepath → store (Redis+Mongo) → syncProjectIndex${RESET}`)
-  console.log(`${DIM}  Endpoints: ChromaDB=${CHROMA_HOST}:${CHROMA_PORT}  Redis=${REDIS_HOST}:${REDIS_PORT}  MongoDB=${MONGO_URL.split('@').pop() ?? MONGO_URL}${RESET}`)
+  console.log(
+    `${DIM}  Layers: hash → tree → ChromaDB.deleteByFilepath → store (Redis+Mongo) → syncProjectIndex${RESET}`
+  )
+  console.log(
+    `${DIM}  Endpoints: ChromaDB=${CHROMA_HOST}:${CHROMA_PORT}  Redis=${REDIS_HOST}:${REDIS_PORT}  MongoDB=${MONGO_URL.split('@').pop() ?? MONGO_URL}${RESET}`
+  )
 
   testHashUtils()
   testTreeOperations()
-  const chromaStore   = await testChromaDeleteByFilepath()
-  const merkleStore   = await testMerkleTreeStore()
+  const chromaStore = await testChromaDeleteByFilepath()
+  const merkleStore = await testMerkleTreeStore()
   await testSyncProjectIndex(chromaStore, merkleStore)
 
   const line = '─'.repeat(55)
   console.log(`\n${BOLD}${line}${RESET}`)
-  console.log(`  ${GREEN}${passCount} passed${RESET}  ${failCount > 0 ? RED : DIM}${failCount} failed${RESET}  ${warnCount > 0 ? YELLOW : DIM}${warnCount} warnings${RESET}`)
+  console.log(
+    `  ${GREEN}${passCount} passed${RESET}  ${failCount > 0 ? RED : DIM}${failCount} failed${RESET}  ${warnCount > 0 ? YELLOW : DIM}${warnCount} warnings${RESET}`
+  )
   console.log(`${BOLD}${line}${RESET}\n`)
 
   if (failCount > 0) process.exit(1)
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(`\n${RED}Fatal error:${RESET}`, err)
   process.exit(1)
 })

@@ -18,13 +18,13 @@ export async function schedulePeriodicIndexing(intervalMs: number): Promise<void
       {
         repeat: { every: intervalMs },
         removeOnComplete: true,
-        removeOnFail: 10,
+        removeOnFail: 10
       }
     )
     log.info('Periodic indexing job scheduled', { intervalMs })
   } catch (err) {
     log.warn('Failed to schedule periodic indexing job (non-fatal)', {
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
   }
 }

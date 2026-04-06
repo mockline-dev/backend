@@ -1,16 +1,6 @@
 import { createModuleLogger } from '../../logging'
-import {
-  AllProvidersFailedError,
-  ProviderTimeoutError,
-  RateLimitError,
-} from '../types'
-import type {
-  ILLMProvider,
-  LLMCallOptions,
-  LLMMessage,
-  LLMResponse,
-  LLMStreamChunk,
-} from '../types'
+import { AllProvidersFailedError, ProviderTimeoutError, RateLimitError } from '../types'
+import type { ILLMProvider, LLMCallOptions, LLMMessage, LLMResponse, LLMStreamChunk } from '../types'
 import { GroqProvider } from './groq.provider'
 import { MinimaxProvider } from './minimax.provider'
 
@@ -46,7 +36,7 @@ export class LLMRouter implements ILLMProvider {
         if (this.shouldFallback(error)) {
           log.warn(`Provider ${provider.name} failed, trying next`, {
             error: error.message,
-            provider: provider.name,
+            provider: provider.name
           })
           continue
         }
@@ -58,10 +48,7 @@ export class LLMRouter implements ILLMProvider {
     throw new AllProvidersFailedError(errors)
   }
 
-  async *chatStream(
-    messages: LLMMessage[],
-    opts: LLMCallOptions = {}
-  ): AsyncIterable<LLMStreamChunk> {
+  async *chatStream(messages: LLMMessage[], opts: LLMCallOptions = {}): AsyncIterable<LLMStreamChunk> {
     const providers = [this.primary, ...this.fallbacks]
     const errors: Error[] = []
 
@@ -76,7 +63,7 @@ export class LLMRouter implements ILLMProvider {
         if (this.shouldFallback(error)) {
           log.warn(`Provider ${provider.name} failed on stream, trying next`, {
             error: error.message,
-            provider: provider.name,
+            provider: provider.name
           })
           continue
         }
@@ -100,13 +87,13 @@ export function createRouter(app: { get: (key: string) => any }): LLMRouter {
 
   const groq = new GroqProvider({
     apiKey: llmConfig.groq.apiKey,
-    defaultModel: llmConfig.groq.defaultModel,
+    defaultModel: llmConfig.groq.defaultModel
   })
 
   const minimax = new MinimaxProvider({
     apiKey: llmConfig.minimax.apiKey,
     baseUrl: llmConfig.minimax.baseUrl,
-    defaultModel: llmConfig.minimax.defaultModel,
+    defaultModel: llmConfig.minimax.defaultModel
   })
 
   return new LLMRouter(groq, [minimax])

@@ -4,7 +4,10 @@ import type { Sessions, SessionsData, SessionsPatch, SessionsQuery, SessionsServ
 
 export type { Sessions, SessionsData, SessionsPatch, SessionsQuery }
 
-export type SessionsClientService = Pick<SessionsService<Params<SessionsQuery>>, (typeof sessionsMethods)[number]>
+export type SessionsClientService = Pick<
+  SessionsService<Params<SessionsQuery>>,
+  (typeof sessionsMethods)[number]
+>
 
 export const sessionsPath = 'sessions'
 

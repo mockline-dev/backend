@@ -11,7 +11,7 @@ const DEFAULT_OPTS: SandboxOptions = {
   timeoutMs: 30000,
   image: 'python:3.11-slim',
   language: 'python',
-  runTests: false,
+  runTests: false
 }
 
 /**
@@ -43,7 +43,7 @@ export async function runSandbox(
       testOutput: null,
       stdout: '',
       stderr: '',
-      durationMs: 0,
+      durationMs: 0
     }
     return { files: [], result: emptyResult }
   }
@@ -54,7 +54,7 @@ export async function runSandbox(
   try {
     emit('sandbox:executing', projectId, {
       stage: 'setup',
-      files: files.map((f) => f.path),
+      files: files.map(f => f.path)
     })
 
     const result = await provider.execute(files, mergedOpts)
@@ -62,7 +62,7 @@ export async function runSandbox(
     log.info('Sandbox execution complete', {
       projectId,
       success: result.success,
-      durationMs: result.durationMs,
+      durationMs: result.durationMs
     })
 
     return { files, result }
@@ -79,7 +79,7 @@ export async function runSandbox(
       stdout: '',
       stderr: error.message,
       durationMs: 0,
-      error: error.message,
+      error: error.message
     }
     emit('sandbox:error', projectId, { error: error.message })
     return { files, result: errorResult }
@@ -89,14 +89,11 @@ export async function runSandbox(
 /**
  * Build a prompt asking the LLM to fix code that failed sandbox validation.
  */
-export function buildFixPrompt(
-  originalCode: string,
-  sandboxResult: SandboxResult
-): string {
+export function buildFixPrompt(originalCode: string, sandboxResult: SandboxResult): string {
   const errorDetails = [
     sandboxResult.compilationOutput && `Compilation output:\n${sandboxResult.compilationOutput}`,
     sandboxResult.stderr && `Stderr:\n${sandboxResult.stderr}`,
-    sandboxResult.error && `Error: ${sandboxResult.error}`,
+    sandboxResult.error && `Error: ${sandboxResult.error}`
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -110,6 +107,6 @@ export function buildFixPrompt(
     'Original code:',
     originalCode,
     '',
-    'Please provide the complete fixed version of the code.',
+    'Please provide the complete fixed version of the code.'
   ].join('\n')
 }

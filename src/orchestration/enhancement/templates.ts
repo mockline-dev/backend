@@ -76,7 +76,7 @@ export function getEnhancementTemplate(intent: Intent): string | null {
     [Intent.GenerateProject]: GENERATE_PROJECT_TEMPLATE,
     [Intent.EditCode]: EDIT_CODE_TEMPLATE,
     [Intent.AddFeature]: ADD_FEATURE_TEMPLATE,
-    [Intent.FixBug]: FIX_BUG_TEMPLATE,
+    [Intent.FixBug]: FIX_BUG_TEMPLATE
   }
   return templateMap[intent as string] ?? null
 }

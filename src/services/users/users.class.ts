@@ -21,10 +21,13 @@ export class UsersService<ServiceParams extends Params = UsersParams> extends Mo
 export const getOptions = (app: Application): MongoDBAdapterOptions => {
   return {
     paginate: app.get('paginate'),
-    Model: app.get('mongodbClient').then((db) => db.collection('users')).then(async collection => {
-      await collection.createIndex({ firebaseUid: 1 }, { unique: true })
+    Model: app
+      .get('mongodbClient')
+      .then(db => db.collection('users'))
+      .then(async collection => {
+        await collection.createIndex({ firebaseUid: 1 }, { unique: true })
 
-      return collection
-    })
+        return collection
+      })
   }
 }

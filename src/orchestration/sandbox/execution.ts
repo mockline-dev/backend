@@ -13,31 +13,31 @@ export interface ExecutionResult {
 const START_COMMANDS: Record<string, string[]> = {
   python: [
     // Try uvicorn (FastAPI), then flask, then plain python
-    'cd /workspace && (uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 || python3 main.py > /tmp/server.log 2>&1) &',
+    'cd /workspace && (uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 || python3 main.py > /tmp/server.log 2>&1) &'
   ],
   typescript: [
     'cd /workspace && npm install --silent 2>/dev/null || true',
-    'cd /workspace && (npx ts-node src/index.ts > /tmp/server.log 2>&1 || node dist/index.js > /tmp/server.log 2>&1) &',
+    'cd /workspace && (npx ts-node src/index.ts > /tmp/server.log 2>&1 || node dist/index.js > /tmp/server.log 2>&1) &'
   ],
   javascript: [
     'cd /workspace && npm install --silent 2>/dev/null || true',
-    'cd /workspace && node index.js > /tmp/server.log 2>&1 &',
-  ],
+    'cd /workspace && node index.js > /tmp/server.log 2>&1 &'
+  ]
 }
 
 const DEP_INSTALL_COMMANDS: Record<string, { manifest: string; cmd: string }> = {
   python: {
     manifest: 'requirements.txt',
-    cmd: 'pip install --quiet -r /workspace/requirements.txt 2>&1 || true',
+    cmd: 'pip install --quiet -r /workspace/requirements.txt 2>&1 || true'
   },
   typescript: {
     manifest: 'package.json',
-    cmd: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true',
+    cmd: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true'
   },
   javascript: {
     manifest: 'package.json',
-    cmd: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true',
-  },
+    cmd: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true'
+  }
 }
 
 const SERVER_PORT = 8000
@@ -50,7 +50,7 @@ const SERVER_PORT = 8000
 export async function startProjectExecution(
   projectId: string,
   language: string,
-  sandboxConfig: any,
+  sandboxConfig: any
 ): Promise<ExecutionResult & { sandbox: Sandbox }> {
   log.info('Starting project execution sandbox', { projectId, language })
 
@@ -77,7 +77,7 @@ export async function startProjectExecution(
     } catch (err: unknown) {
       log.warn('Failed to fetch file from R2', {
         key: obj.key,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
     }
   }
@@ -92,7 +92,7 @@ export async function startProjectExecution(
     apiKey: sandboxConfig.opensandbox.apiKey,
     protocol: sandboxConfig.opensandbox.protocol,
     requestTimeoutSeconds: Math.ceil(executionTimeout / 1000),
-    useServerProxy: true,
+    useServerProxy: true
   })
 
   const sandbox = await Sandbox.create({
@@ -102,8 +102,8 @@ export async function startProjectExecution(
     env: {
       PYTHONDONTWRITEBYTECODE: '1',
       PYTHONUNBUFFERED: '1',
-      PORT: String(SERVER_PORT),
-    },
+      PORT: String(SERVER_PORT)
+    }
   })
 
   log.debug('Execution sandbox created', { projectId, fileCount: files.length })
@@ -116,13 +116,17 @@ export async function startProjectExecution(
   const hasManifest = files.some(f => f.path.endsWith(`/${depConfig.manifest}`))
   if (hasManifest) {
     log.debug('Installing dependencies', { projectId, language })
-    await sandbox.commands.run(depConfig.cmd, {}, {}).catch(() => {/* non-fatal */})
+    await sandbox.commands.run(depConfig.cmd, {}, {}).catch(() => {
+      /* non-fatal */
+    })
   }
 
   // Start server in background
   const startCmds = START_COMMANDS[language] ?? START_COMMANDS['python']
   for (const cmd of startCmds) {
-    await sandbox.commands.run(cmd, {}, {}).catch(() => {/* non-fatal */})
+    await sandbox.commands.run(cmd, {}, {}).catch(() => {
+      /* non-fatal */
+    })
   }
 
   // Poll for server readiness (max 30s)
@@ -167,8 +171,12 @@ async function waitForServer(sandbox: Sandbox, port: number, timeoutMs: number):
 export async function stopProjectExecution(sandbox: Sandbox): Promise<void> {
   try {
     await sandbox.kill()
-  } catch {/* non-fatal */}
+  } catch {
+    /* non-fatal */
+  }
   try {
     await sandbox.close()
-  } catch {/* non-fatal */}
+  } catch {
+    /* non-fatal */
+  }
 }

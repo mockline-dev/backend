@@ -58,14 +58,11 @@ export const projects = (app: Application) => {
     },
     after: {
       all: [],
-      patch: [
-      ],
-      create: [
-      ]
+      patch: [],
+      create: []
     },
     error: {
-      all: [
-      ]
+      all: []
     }
   })
 }

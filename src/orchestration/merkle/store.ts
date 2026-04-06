@@ -6,7 +6,7 @@ import type { MerkleTreeDocument } from './types'
 const log = createModuleLogger('merkle-store')
 
 const COLLECTION = 'merkle-trees'
-const REDIS_TTL_SECONDS = 3600  // 1 hour cache TTL
+const REDIS_TTL_SECONDS = 3600 // 1 hour cache TTL
 
 function redisKey(projectId: string): string {
   return `merkle:${projectId}`
@@ -33,7 +33,7 @@ export class MerkleTreeStore {
     } catch (err) {
       log.warn('Redis get failed, falling through to MongoDB', {
         projectId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
     }
 
@@ -44,12 +44,14 @@ export class MerkleTreeStore {
       if (!doc) return null
 
       // Warm Redis cache
-      this._cacheInRedis(projectId, doc).catch(() => {/* non-fatal */})
+      this._cacheInRedis(projectId, doc).catch(() => {
+        /* non-fatal */
+      })
       return doc
     } catch (err) {
       log.warn('MongoDB get failed', {
         projectId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
       return null
     }
@@ -61,21 +63,21 @@ export class MerkleTreeStore {
     // 1. Persist to MongoDB (upsert)
     try {
       const db = await this.getDb()
-      await db.collection<MerkleTreeDocument>(COLLECTION).replaceOne(
-        { projectId },
-        { ...tree, lastSyncAt: new Date() },
-        { upsert: true }
-      )
+      await db
+        .collection<MerkleTreeDocument>(COLLECTION)
+        .replaceOne({ projectId }, { ...tree, lastSyncAt: new Date() }, { upsert: true })
     } catch (err) {
       log.error('MongoDB save failed', {
         projectId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
       throw err
     }
 
     // 2. Write-through to Redis cache
-    await this._cacheInRedis(projectId, tree).catch(() => {/* non-fatal */})
+    await this._cacheInRedis(projectId, tree).catch(() => {
+      /* non-fatal */
+    })
   }
 
   async delete(projectId: string): Promise<void> {
@@ -91,7 +93,10 @@ export class MerkleTreeStore {
       const db = await this.getDb()
       await db.collection(COLLECTION).deleteOne({ projectId })
     } catch (err) {
-      log.warn('MongoDB delete failed', { projectId, error: err instanceof Error ? err.message : String(err) })
+      log.warn('MongoDB delete failed', {
+        projectId,
+        error: err instanceof Error ? err.message : String(err)
+      })
     }
   }
 
@@ -113,7 +118,7 @@ export async function createMerkleTreeStore(app: any, redis: Redis): Promise<Mer
     await db.collection(COLLECTION).createIndex({ projectId: 1 }, { unique: true, background: true })
   } catch (err) {
     log.warn('Failed to create merkle-trees index (non-fatal)', {
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
   }
 

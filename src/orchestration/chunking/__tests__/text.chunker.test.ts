@@ -29,7 +29,7 @@ describe('chunkText', () => {
 
   it('chunk IDs are unique', () => {
     const chunks = chunkText(SAMPLE_CODE, 'test.ts')
-    const ids = chunks.map((c) => c.id)
+    const ids = chunks.map(c => c.id)
     const unique = new Set(ids)
     expect(unique.size).toBe(ids.length)
   })
@@ -52,7 +52,7 @@ describe('chunkText', () => {
     const lines = SAMPLE_CODE.split('\n')
     const chunks = chunkText(SAMPLE_CODE, 'test.py', 200)
     // All lines should appear somewhere in the chunks (may overlap)
-    const allContent = chunks.map((c) => c.content).join('\n')
+    const allContent = chunks.map(c => c.content).join('\n')
     // First and last lines should be present
     expect(allContent).toContain(lines[0])
     expect(allContent).toContain(lines[lines.length - 1])

@@ -9,7 +9,7 @@ import { logger } from './logger'
 import { authentication } from './authentication'
 import { channels } from './channels'
 import { configurationValidator } from './configuration'
-import type { Application } from './declarations'
+import type { Application, HookContext } from './declarations'
 import { initializeFirebase } from './firebase'
 import { mongodb } from './mongodb'
 import { services } from './services/index'
@@ -43,13 +43,11 @@ app.use(createApiProxyMiddleware(app))
 // Configure services and transports
 app.configure(rest())
 app.configure(
-  socketio(
-    {
-      cors: {
-        origin: app.get('origins')
-      }
+  socketio({
+    cors: {
+      origin: app.get('origins')
     }
-  )
+  })
 )
 app.configure(mongodb)
 app.configure(authentication)
@@ -64,7 +62,7 @@ app.hooks({
   before: {},
   after: {},
   error: [
-    async (context) => {
+    async (context: HookContext) => {
       const { error, path, method } = context
       console.error(`[${path}] ${method} error:`, error?.message || error)
       if (error?.data) console.info(`[${path}] error data:`, error.data)

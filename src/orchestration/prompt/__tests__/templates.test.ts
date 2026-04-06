@@ -34,7 +34,7 @@ describe('getSystemPrompt', () => {
     const prompt = getSystemPrompt(Intent.FixBug, {
       framework: 'FeathersJS',
       language: 'TypeScript',
-      name: 'backend',
+      name: 'backend'
     })
     expect(prompt).not.toMatch(/\{\{\w+\}\}/)
   })
