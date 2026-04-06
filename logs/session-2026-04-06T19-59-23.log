@@ -1,30 +1,4 @@
-{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-06T19-41-08","timestamp":"2026-04-06T19:41:09.711Z"}
-{"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-06T19:41:09.761Z"}
-{"level":"info","message":"Redis connected successfully","timestamp":"2026-04-06T19:41:09.778Z"}
-{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-06T19:41:09.792Z"}
-{"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-06T19-41-08","timestamp":"2026-04-06T19:41:09.794Z"}
-{"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-06T19:41:09.792Z"}
-{"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-06T19:41:09.793Z"}
-{"level":"info","message":"Validation worker started","module":"validation-worker","sessionId":"2026-04-06T19-41-08","timestamp":"2026-04-06T19:41:09.795Z"}
-{"level":"info","message":"Indexing worker started","module":"indexing-worker","sessionId":"2026-04-06T19-41-08","timestamp":"2026-04-06T19:41:09.795Z"}
-{"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-06T19-41-08","timestamp":"2026-04-06T19:41:09.809Z"}
-{"level":"info","message":"Worker service started successfully","timestamp":"2026-04-06T19:41:09.809Z"}
-{"level":"info","message":"[projects] error stack:","module":"app-ts","sessionId":"2026-04-06T19-41-08","timestamp":"2026-04-06T19:41:17.162Z"}
-{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-06T19-42-38","timestamp":"2026-04-06T19:42:40.356Z"}
-{"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-06T19:42:40.397Z"}
-{"level":"info","message":"Redis connected successfully","timestamp":"2026-04-06T19:42:40.411Z"}
-{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-06T19:42:40.421Z"}
-{"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-06T19-42-38","timestamp":"2026-04-06T19:42:40.422Z"}
-{"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-06T19:42:40.421Z"}
-{"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-06T19:42:40.422Z"}
-{"level":"info","message":"Validation worker started","module":"validation-worker","sessionId":"2026-04-06T19-42-38","timestamp":"2026-04-06T19:42:40.423Z"}
-{"level":"info","message":"Indexing worker started","module":"indexing-worker","sessionId":"2026-04-06T19-42-38","timestamp":"2026-04-06T19:42:40.423Z"}
-{"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-06T19-42-38","timestamp":"2026-04-06T19:42:40.443Z"}
-{"level":"info","message":"Worker service started successfully","timestamp":"2026-04-06T19:42:40.443Z"}
-{"level":"info","message":"[projects] error stack:","module":"app-ts","sessionId":"2026-04-06T19-42-38","timestamp":"2026-04-06T19:42:44.250Z"}
-{"data":[{"instancePath":"","keyword":"required","message":"must have required property 'status'","params":{"missingProperty":"status"},"schemaPath":"#/required"}],"level":"error","message":"[projects] create error: validation failed","module":"app-ts","sessionId":"2026-04-06T19-42-38","stack":"BadRequest: validation failed\n    at ProjectsService.<anonymous> (/Users/shakhboz/Projects/mockline.dev/back/node_modules/.pnpm/@feathersjs+schema@5.0.40_typescript@5.9.3/node_modules/@feathersjs/schema/src/hooks/validate.ts:52:27)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)","timestamp":"2026-04-06T19:42:44.250Z"}
-{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775504700000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-06T19-42-38","timestamp":"2026-04-06T19:45:00.125Z"}
-{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:24.714Z"}
+{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:24.713Z"}
 {"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-06T19:59:24.751Z"}
 {"level":"info","message":"Redis connected successfully","timestamp":"2026-04-06T19:59:24.762Z"}
 {"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-06T19:59:24.775Z"}
@@ -39,7 +13,11 @@
 {"level":"info","message":"[projects] error stack:","module":"app-ts","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:35.705Z"}
 {"data":[{"instancePath":"","keyword":"additionalProperties","message":"must NOT have additional properties","params":{"additionalProperty":"generationProgress.currentStage"},"schemaPath":"#/additionalProperties"}],"level":"error","message":"[projects] patch error: validation failed","module":"app-ts","sessionId":"2026-04-06T19-59-23","stack":"BadRequest: validation failed\n    at ProjectsService.<anonymous> (/Users/shakhboz/Projects/mockline.dev/back/node_modules/.pnpm/@feathersjs+schema@5.0.40_typescript@5.9.3/node_modules/@feathersjs/schema/src/hooks/validate.ts:52:27)\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)","timestamp":"2026-04-06T19:59:35.705Z"}
 {"level":"info","message":"Orchestration started","module":"orchestrator","projectId":"69d410a7803e987dbc19f1c9","promptLength":208,"sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:35.707Z","userId":"69b6afc50c0af9bb788722cb"}
+{"confidence":1,"intent":"generate_project","level":"debug","message":"Intent classified","model":"llama-3.1-8b-instant","module":"intent-classifier","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:36.619Z"}
 {"confidence":1,"intent":"generate_project","level":"info","message":"Intent classified","module":"orchestrator","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:36.619Z"}
+{"enhancedLength":2256,"intent":"generate_project","level":"debug","message":"Prompt enhanced","module":"prompt-enhancer","originalLength":208,"sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:37.455Z"}
+{"budget":{"history":40,"responseReserve":2048,"retrievedContext":0,"systemPrompt":61,"total":131072,"userQuery":520},"chunksUsed":0,"historyTurns":1,"level":"debug","message":"Prompt built","messages":3,"module":"orchestrator","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:37.469Z"}
+{"level":"debug","message":"Trying provider (stream): groq","module":"llm-router","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:37.469Z"}
 {"contentLength":15078,"intent":"generate_project","level":"info","message":"Orchestration complete","module":"orchestrator","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:43.892Z"}
 {"fileCount":14,"level":"info","message":"Persisting sandbox files to R2","module":"persist-files","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:43.894Z"}
 {"jobId":"sync-69d410a7803e987dbc19f1c9","level":"info","message":"Indexing job started","module":"indexing-worker","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:48.039Z"}
@@ -47,6 +25,19 @@
 {"fileCount":11,"level":"info","message":"First sync: running full index","module":"merkle-sync","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:48.814Z"}
 {"error":"Parser.init is not a function","level":"warn","message":"Tree-sitter WASM init failed — will use text chunker fallback","module":"tree-sitter-chunker","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:48.815Z"}
 {"count":13,"level":"info","message":"Indexing project files","module":"rag-indexer","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:48.818Z"}
+{"count":2,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:50.735Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.363Z"}
+{"count":2,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.363Z"}
+{"count":3,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.363Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.363Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.363Z"}
+{"count":3,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.364Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.364Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.364Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:51.399Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:52.157Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:52.157Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:52.169Z"}
 {"failed":0,"indexed":13,"level":"info","message":"Indexing complete","module":"rag-indexer","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:52.169Z"}
 {"added":11,"deleted":0,"indexed":13,"jobId":"sync-69d410a7803e987dbc19f1c9","level":"info","message":"Indexing job complete","modified":0,"module":"indexing-worker","projectId":"69d410a7803e987dbc19f1c9","removed":0,"sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:52.175Z"}
 {"jobId":"sync-69d410a7803e987dbc19f1c9","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:52.178Z"}
@@ -63,7 +54,11 @@
 {"jobId":"sync-69d410a7803e987dbc19f1c9","level":"info","message":"Indexing job started","module":"indexing-worker","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:58.900Z"}
 {"error":"Parser.init is not a function","level":"warn","message":"Tree-sitter WASM init failed — will use text chunker fallback","module":"tree-sitter-chunker","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:58.903Z"}
 {"added":3,"deleted":0,"level":"info","message":"Sync detected changes","modified":0,"module":"merkle-sync","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:59.345Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:59.681Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:59.682Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d410a7803e987dbc19f1c9","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:59.683Z"}
 {"indexed":3,"level":"info","message":"Sync complete","module":"merkle-sync","projectId":"69d410a7803e987dbc19f1c9","removed":0,"sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:59.689Z"}
 {"added":3,"deleted":0,"indexed":3,"jobId":"sync-69d410a7803e987dbc19f1c9","level":"info","message":"Indexing job complete","modified":0,"module":"indexing-worker","projectId":"69d410a7803e987dbc19f1c9","removed":0,"sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:59.689Z"}
 {"jobId":"sync-69d410a7803e987dbc19f1c9","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T19:59:59.691Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T20:00:00.037Z"}
 {"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775505600000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-06T19-59-23","timestamp":"2026-04-06T20:00:00.038Z"}
