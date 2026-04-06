@@ -1,0 +1,10 @@
+{"fileCount":2,"level":"info","message":"Starting sandbox execution","module":"sandbox","projectId":"test-proj-py","provider":"opensandbox","sessionId":"2026-04-06T08-46-20","timestamp":"2026-04-06T08:46:21.047Z"}
+{"fileCount":2,"language":"python","level":"debug","message":"Sandbox created","module":"opensandbox-provider","sessionId":"2026-04-06T08-46-20","timestamp":"2026-04-06T08:46:22.578Z"}
+{"durationMs":2668,"level":"info","message":"Sandbox execution complete","module":"sandbox","projectId":"test-proj-py","sessionId":"2026-04-06T08-46-20","success":true,"timestamp":"2026-04-06T08:46:24.019Z"}
+{"fileCount":1,"level":"info","message":"Starting sandbox execution","module":"sandbox","projectId":"test-fix","provider":"opensandbox","sessionId":"2026-04-06T08-46-20","timestamp":"2026-04-06T08:46:24.019Z"}
+{"fileCount":1,"language":"python","level":"debug","message":"Sandbox created","module":"opensandbox-provider","sessionId":"2026-04-06T08-46-20","timestamp":"2026-04-06T08:46:24.558Z"}
+{"exitCode":1,"langKey":"python","level":"debug","message":"Compilation failed","module":"opensandbox-provider","output":"  File \"/workspace/src/broken.py\", line 2    def greet(name: str) -> str                               ^SyntaxError: expected ':'","sessionId":"2026-04-06T08-46-20","timestamp":"2026-04-06T08:46:25.676Z"}
+{"durationMs":1657,"level":"info","message":"Sandbox execution complete","module":"sandbox","projectId":"test-fix","sessionId":"2026-04-06T08-46-20","success":false,"timestamp":"2026-04-06T08:46:25.952Z"}
+{"fileCount":1,"level":"info","message":"Starting sandbox execution","module":"sandbox","projectId":"test-fix","provider":"opensandbox","sessionId":"2026-04-06T08-46-20","timestamp":"2026-04-06T08:46:25.952Z"}
+{"fileCount":1,"language":"python","level":"debug","message":"Sandbox created","module":"opensandbox-provider","sessionId":"2026-04-06T08-46-20","timestamp":"2026-04-06T08:46:26.415Z"}
+{"durationMs":1572,"level":"info","message":"Sandbox execution complete","module":"sandbox","projectId":"test-fix","sessionId":"2026-04-06T08-46-20","success":true,"timestamp":"2026-04-06T08:46:27.755Z"}
