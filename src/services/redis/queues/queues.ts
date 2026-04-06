@@ -23,8 +23,14 @@ export interface OrchestrationJobData {
   model?: string
 }
 
+export interface IndexingJobData {
+  /** If absent, the worker syncs all stale projects */
+  projectId?: string
+}
+
 // ─── Queue Instances ─────────────────────────────────────────────────────────
 
 export const generationQueue = createQueue<GenerationJobData>('generation')
 export const validationQueue = createQueue<ValidationJobData>('validation')
 export const orchestrationQueue = createQueue<OrchestrationJobData>('orchestration')
+export const indexingQueue = createQueue<IndexingJobData>('indexing')

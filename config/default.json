@@ -94,5 +94,21 @@
     "chromadb": {
         "host": "localhost",
         "port": 8000
+    },
+    "sandbox": {
+        "provider": "opensandbox",
+        "timeoutMs": 30000,
+        "maxRetries": 2,
+        "opensandbox": {
+            "domain": "localhost:8080",
+            "apiKey": "",
+            "protocol": "http",
+            "defaultImage": "opensandbox/code-interpreter:v1.0.2"
+        }
+    },
+    "indexing": {
+        "enabled": true,
+        "periodicSyncIntervalMs": 300000,
+        "maxFilesPerSync": 200
     }
 }

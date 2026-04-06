@@ -156,6 +156,25 @@ export class ChromaVectorStore {
   }
 
   /**
+   * Delete all chunks belonging to a specific file within a project.
+   * Used by the merkle sync layer to remove stale chunks before re-indexing.
+   */
+  async deleteByFilepath(projectId: string, filepath: string): Promise<void> {
+    const collection = await this.getCollection(projectId)
+    if (!collection) return
+    try {
+      await collection.delete({ where: { filepath } })
+      log.debug('Deleted chunks for file', { projectId, filepath })
+    } catch (err: unknown) {
+      log.warn('ChromaDB deleteByFilepath failed', {
+        projectId,
+        filepath,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  /**
    * Delete all chunks for a project (e.g. when project is deleted).
    */
   async deleteCollection(projectId: string): Promise<void> {
