@@ -4,13 +4,13 @@ import { feathers } from '@feathersjs/feathers'
 import { bodyParser, cors, errorHandler, koa, parseAuthentication, rest, serveStatic } from '@feathersjs/koa'
 import socketio from '@feathersjs/socketio'
 
-import { configureSessionLogger } from './logging'
-import { logger } from './logger'
 import { authentication } from './authentication'
 import { channels } from './channels'
 import { configurationValidator } from './configuration'
 import type { Application, HookContext } from './declarations'
 import { initializeFirebase } from './firebase'
+import { logger } from './logger'
+import { configureSessionLogger, createModuleLogger } from './logging'
 import { mongodb } from './mongodb'
 import { services } from './services/index'
 import { startWorkerService } from './services/redis'
@@ -20,6 +20,8 @@ const app: Application = koa(feathers())
 
 // Load our app configuration (see config/ folder)
 app.configure(configuration(configurationValidator))
+
+const log = createModuleLogger('app-ts')
 
 // Configure session-based file logging
 configureSessionLogger(logger)
@@ -65,7 +67,13 @@ app.hooks({
     async (context: HookContext) => {
       const { error, path, method } = context
       console.error(`[${path}] ${method} error:`, error?.message || error)
+      log.info(`[${path}] error stack:`, error?.stack)
       if (error?.data) console.info(`[${path}] error data:`, error.data)
+      log.error(`[${path}] ${method} error:`, {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
+        data: error?.data
+      })
     }
   ]
 })
