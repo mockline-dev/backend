@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+# Install uv for fast dependency installation
+RUN pip install --no-cache-dir uv
+
+# Install opensandbox-server
+RUN uv pip install --system --no-cache opensandbox-server
+
+# The server reads config from this path by default
+ENV SANDBOX_CONFIG_PATH=/etc/sandbox/sandbox.toml
+
+EXPOSE 8080
+
+# Docker socket must be bind-mounted at runtime:
+#   -v /var/run/docker.sock:/var/run/docker.sock
+CMD ["opensandbox-server", "--config", "/etc/sandbox/sandbox.toml"]

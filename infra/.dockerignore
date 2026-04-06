@@ -1,0 +1,14 @@
+node_modules
+lib
+logs
+.git
+*.md
+src
+test
+config
+public
+scripts
+package*.json
+pnpm-lock.yaml
+tsconfig*.json
+vitest.config.ts
