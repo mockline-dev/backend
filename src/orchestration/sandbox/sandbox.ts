@@ -9,8 +9,8 @@ type EmitFn = (event: string, projectId: string, payload: unknown) => void
 
 const DEFAULT_OPTS: SandboxOptions = {
   timeoutMs: 30000,
-  image: 'opensandbox/code-interpreter:v1.0.2',
-  language: 'typescript',
+  image: 'python:3.11-slim',
+  language: 'python',
   runTests: false,
 }
 

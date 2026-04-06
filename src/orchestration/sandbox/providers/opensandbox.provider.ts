@@ -5,18 +5,75 @@ import type { SandboxFile, SandboxOptions, SandboxResult } from '../types'
 
 const log = createModuleLogger('opensandbox-provider')
 
-// Commands run after writing files to /workspace
-const BUILD_COMMANDS: Record<string, string[]> = {
-  typescript: ['cd /workspace && npx tsc --noEmit 2>&1 || true'],
-  javascript: ['cd /workspace && node --check src/index.js 2>&1 || true'],
-  python: ['cd /workspace && python3 -m py_compile $(find . -name "*.py") 2>&1 || true'],
+// ─── Language Configuration ───────────────────────────────────────────────────
+// Each entry defines how to validate and test code in a given language.
+// To add a new language: add an entry here — no other code needs changing.
+
+interface LanguageConfig {
+  /** Commands to check syntax / compile. Exit code 0 = success. */
+  buildCommands: string[]
+  /** Command to run tests (only used when opts.runTests = true). */
+  testCommand: string
+  /** Install dependencies if a manifest file is present. */
+  depInstall?: {
+    manifestFile: string   // e.g. "requirements.txt", "package.json"
+    command: string        // e.g. "pip install -r /workspace/requirements.txt"
+  }
+  /** Patterns that indicate a failed test run in stdout/stderr. */
+  failurePatterns: string[]
 }
 
-const TEST_COMMANDS: Record<string, string> = {
-  typescript: 'cd /workspace && npm test 2>&1 || true',
-  javascript: 'cd /workspace && npm test 2>&1 || true',
-  python: 'cd /workspace && python3 -m pytest 2>&1 || true',
+const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
+  // ── Python (primary) ────────────────────────────────────────────────────────
+  python: {
+    buildCommands: [
+      // Syntax-check every .py file — fast, no execution
+      'python3 -m py_compile $(find /workspace -name "*.py" | head -50) 2>&1',
+    ],
+    testCommand: 'cd /workspace && python3 -m pytest --tb=short -q 2>&1 || true',
+    depInstall: {
+      manifestFile: 'requirements.txt',
+      command: 'pip install --quiet -r /workspace/requirements.txt 2>&1 || true',
+    },
+    failurePatterns: ['FAILED', 'ERROR', 'error:', 'SyntaxError', 'IndentationError'],
+  },
+
+  // ── TypeScript (future) ─────────────────────────────────────────────────────
+  typescript: {
+    buildCommands: [
+      'cd /workspace && npx --yes tsc --noEmit --strict 2>&1 || true',
+    ],
+    testCommand: 'cd /workspace && npm test 2>&1 || true',
+    depInstall: {
+      manifestFile: 'package.json',
+      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true',
+    },
+    failurePatterns: ['error TS', 'FAIL', 'Error:'],
+  },
+
+  // ── JavaScript (future) ─────────────────────────────────────────────────────
+  javascript: {
+    buildCommands: [
+      'node --check /workspace/index.js 2>&1 || node --check /workspace/src/index.js 2>&1 || true',
+    ],
+    testCommand: 'cd /workspace && npm test 2>&1 || true',
+    depInstall: {
+      manifestFile: 'package.json',
+      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true',
+    },
+    failurePatterns: ['SyntaxError', 'FAIL', 'Error:'],
+  },
 }
+
+// Fallback for any unlisted language — just try to list the files so we know
+// the sandbox is working, and report success.
+const FALLBACK_CONFIG: LanguageConfig = {
+  buildCommands: ['ls /workspace 2>&1'],
+  testCommand: 'echo "no test runner configured" 2>&1',
+  failurePatterns: [],
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export interface OpenSandboxConfig {
   domain: string
@@ -32,17 +89,18 @@ export class OpenSandboxProvider implements ISandboxProvider {
 
   async execute(files: SandboxFile[], opts: SandboxOptions): Promise<SandboxResult> {
     const start = Date.now()
-
     let sandbox: Sandbox | null = null
     let stdout = ''
     let stderr = ''
 
-    const handleStdout = (msg: any) => {
-      stdout += typeof msg === 'string' ? msg : (msg?.text ?? '')
+    const capture = (target: 'stdout' | 'stderr') => (msg: any) => {
+      const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
+      if (target === 'stdout') stdout += text
+      else stderr += text
     }
-    const handleStderr = (msg: any) => {
-      stderr += typeof msg === 'string' ? msg : (msg?.text ?? '')
-    }
+
+    const langKey = opts.language || 'python'
+    const lang = LANGUAGE_CONFIG[langKey] ?? FALLBACK_CONFIG
 
     try {
       const connectionConfig = new ConnectionConfig({
@@ -56,10 +114,10 @@ export class OpenSandboxProvider implements ISandboxProvider {
         connectionConfig,
         image: opts.image || this.config.defaultImage,
         timeoutSeconds: Math.ceil(opts.timeoutMs / 1000) + 30,
-        env: { NODE_ENV: 'sandbox' },
+        env: { PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1' },
       })
 
-      log.debug('Sandbox created', { sandboxId: (sandbox as any).sandboxId, fileCount: files.length })
+      log.debug('Sandbox created', { language: langKey, fileCount: files.length })
 
       // 1. Write all generated files to /workspace
       await sandbox.files.writeFiles(
@@ -70,29 +128,31 @@ export class OpenSandboxProvider implements ISandboxProvider {
         }))
       )
 
-      // 2. Install dependencies if package.json exists
-      const hasPackageJson = files.some((f) => f.path === 'package.json' || f.path.endsWith('/package.json'))
-      if (hasPackageJson) {
-        await sandbox.commands.run(
-          'cd /workspace && npm install --prefer-offline 2>&1 || true',
-          {},
-          { onStdout: handleStdout, onStderr: handleStderr }
+      // 2. Install dependencies if manifest file is present
+      if (lang.depInstall) {
+        const hasManifest = files.some((f) =>
+          f.path === lang.depInstall!.manifestFile ||
+          f.path.endsWith(`/${lang.depInstall!.manifestFile}`)
         )
+        if (hasManifest) {
+          log.debug('Installing dependencies', { langKey, manifest: lang.depInstall.manifestFile })
+          await sandbox.commands.run(lang.depInstall.command, {}, {
+            onStdout: capture('stdout'),
+            onStderr: capture('stderr'),
+          })
+        }
       }
 
-      // 3. Run build/compile check
-      const language = opts.language || 'typescript'
-      const buildCmds = BUILD_COMMANDS[language] ?? BUILD_COMMANDS['typescript']
+      // 3. Syntax / compile check
       let compilationOutput = ''
-
-      for (const cmd of buildCmds) {
-        const execResult = await sandbox.commands.run(cmd, {}, {
+      for (const cmd of lang.buildCommands) {
+        const result = await sandbox.commands.run(cmd, {}, {
           onStdout: (msg: any) => { compilationOutput += typeof msg === 'string' ? msg : (msg?.text ?? '') },
           onStderr: (msg: any) => { compilationOutput += typeof msg === 'string' ? msg : (msg?.text ?? '') },
         })
-        // execResult.exitCode: 0 = success
-        const compilationSuccess = (execResult as any).exitCode === 0
-        if (!compilationSuccess) {
+        const exitCode = (result as any).exitCode ?? 0
+        if (exitCode !== 0) {
+          log.debug('Compilation failed', { langKey, exitCode, output: compilationOutput.slice(0, 200) })
           return {
             success: false,
             files,
@@ -106,16 +166,16 @@ export class OpenSandboxProvider implements ISandboxProvider {
         }
       }
 
-      // 4. Optionally run tests
+      // 4. Run tests (optional)
       let testOutput: string | null = null
       let testsPassed = true
-      if (opts.runTests && TEST_COMMANDS[language]) {
-        const testCmd = TEST_COMMANDS[language]
-        await sandbox.commands.run(testCmd, {}, {
+      if (opts.runTests) {
+        await sandbox.commands.run(lang.testCommand, {}, {
           onStdout: (msg: any) => { testOutput = (testOutput ?? '') + (typeof msg === 'string' ? msg : (msg?.text ?? '')) },
-          onStderr: (msg: any) => { stderr += typeof msg === 'string' ? msg : (msg?.text ?? '') },
+          onStderr: capture('stderr'),
         })
-        testsPassed = !(testOutput ?? '').includes('FAIL') && !(testOutput ?? '').includes('ERROR')
+        const combined = (testOutput ?? '') + stderr
+        testsPassed = !lang.failurePatterns.some((p) => combined.includes(p))
       }
 
       return {
@@ -144,10 +204,8 @@ export class OpenSandboxProvider implements ISandboxProvider {
       }
     } finally {
       if (sandbox) {
-        try {
-          await sandbox.kill()
-          await sandbox.close()
-        } catch {/* non-fatal cleanup */}
+        try { await sandbox.kill() } catch {/* non-fatal */}
+        try { await sandbox.close() } catch {/* non-fatal */}
       }
     }
   }
