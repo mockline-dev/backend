@@ -53,7 +53,10 @@
     "test": "npm run mocha",
     "bundle:client": "npm run compile && npm pack --pack-destination ./public",
     "test:unit": "vitest run",
-    "test:smoke": "ts-node --project tsconfig.scripts.json scripts/test-orchestration.ts"
+    "test:smoke": "ts-node --project tsconfig.scripts.json scripts/test-orchestration.ts",
+    "test:merkle": "ts-node --project tsconfig.scripts.json scripts/test-merkle.ts",
+    "test:sandbox": "ts-node --project tsconfig.scripts.json scripts/test-sandbox.ts",
+    "test:all": "pnpm run test:smoke && pnpm run test:merkle && pnpm run test:sandbox"
   },
   "overrides": {
     "config": "4.1.1"
