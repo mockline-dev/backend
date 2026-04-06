@@ -21,6 +21,8 @@ export interface OrchestrationJobData {
   prompt: string
   conversationHistory?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
   model?: string
+  /** ID of the user message that triggered this job */
+  messageId?: string
 }
 
 export interface IndexingJobData {

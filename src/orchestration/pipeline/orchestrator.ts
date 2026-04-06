@@ -3,6 +3,7 @@ import { classifyIntent } from '../intent/classifier'
 import { INTENT_CONFIG } from '../intent/intents'
 import { buildPrompt } from '../prompt/builder'
 import { retrieveContext } from '../rag/retriever'
+import { enhancePrompt } from '../enhancement/enhancer'
 import type { ChromaVectorStore } from '../rag/chroma.client'
 import type {
   ILLMProvider,
@@ -51,6 +52,26 @@ export async function orchestrate(
   const llmConfig = app.get('llm')
   const contextWindow: number = llmConfig?.contextWindow ?? 131072
 
+  // 1.5 Enhance prompt (fast Groq 8B call — non-fatal on failure)
+  let activePrompt = prompt
+  try {
+    const projectMeta = await app.service('projects').get(projectId).catch(() => ({}))
+    activePrompt = await enhancePrompt(prompt, classified.intent, {
+      framework: projectMeta?.framework,
+      language: projectMeta?.language,
+      name: projectMeta?.name,
+    }, classifierProvider)
+
+    if (activePrompt !== prompt) {
+      emit('orchestration:enhanced', projectId, {
+        originalLength: prompt.length,
+        enhancedLength: activePrompt.length,
+      })
+    }
+  } catch {
+    activePrompt = prompt
+  }
+
   // Budget for RAG: 60% of non-system space (rough estimate before full build)
   const ragBudget = Math.floor(contextWindow * 0.35)
 
@@ -58,7 +79,7 @@ export async function orchestrate(
   let retrieved = { chunks: [] as any[], totalTokens: 0 }
   if (intentConfig.needsRAG && projectId) {
     try {
-      retrieved = await retrieveContext(projectId, prompt, ragBudget, vectorStore)
+      retrieved = await retrieveContext(projectId, activePrompt, ragBudget, vectorStore)
       log.debug('RAG context retrieved', { projectId, chunks: retrieved.chunks.length, tokens: retrieved.totalTokens })
       emit('orchestration:context', projectId, { chunksFound: retrieved.chunks.length, tokensUsed: retrieved.totalTokens })
     } catch (err: unknown) {
@@ -85,7 +106,7 @@ export async function orchestrate(
   // 4. Build prompt
   const built = buildPrompt({
     intent: classified.intent,
-    userQuery: prompt,
+    userQuery: activePrompt,
     retrievedContext: retrieved,
     conversationHistory: conversationHistory as LLMMessage[],
     projectMeta,
@@ -146,5 +167,6 @@ export async function orchestrate(
     model: finalModel,
     provider: finalProvider,
     usage,
+    enhancedPrompt: activePrompt !== prompt ? activePrompt : undefined,
   }
 }

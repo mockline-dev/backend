@@ -1,14 +1,14 @@
 import { Worker } from 'bullmq'
 import { createModuleLogger } from '../../../logging'
 import { orchestrate } from '../../../orchestration/pipeline/orchestrator'
+import { persistFiles } from '../../../orchestration/pipeline/persist-files'
 import { createRouter } from '../../../orchestration/providers/router'
 import { GroqProvider } from '../../../orchestration/providers/groq.provider'
 import { getVectorStore } from '../../../orchestration/rag/chroma.client'
 import { Intent } from '../../../orchestration/types'
 import { runSandbox, buildFixPrompt } from '../../../orchestration/sandbox/sandbox'
 import { OpenSandboxProvider } from '../../../orchestration/sandbox/providers/opensandbox.provider'
-import { detectPrimaryLanguage } from '../../../orchestration/sandbox/code-extractor'
-import { extractCodeBlocks } from '../../../orchestration/sandbox/code-extractor'
+import { detectPrimaryLanguage, extractCodeBlocks } from '../../../orchestration/sandbox/code-extractor'
 import { indexingQueue } from '../queues/queues'
 import { getRedisClient } from '../client'
 import type { OrchestrationJobData } from '../queues/queues'
@@ -32,7 +32,7 @@ export function startOrchestrationWorker(app: any): Worker {
   orchestrationWorker = new Worker<OrchestrationJobData>(
     'orchestration',
     async (job) => {
-      const { projectId, userId, prompt, conversationHistory, model } = job.data
+      const { projectId, userId, prompt, conversationHistory, model, messageId } = job.data
 
       log.info('Orchestration job started', { jobId: job.id, projectId, userId })
 
@@ -61,18 +61,19 @@ export function startOrchestrationWorker(app: any): Worker {
         }
 
         // ── Step 1: Run the orchestration pipeline ────────────────────────────
+        // (includes intent classification, prompt enhancement, RAG, LLM streaming)
         let result = await orchestrate(
-          { projectId, userId, prompt, conversationHistory, model },
+          { projectId, userId, prompt, conversationHistory, model, messageId },
           { router, classifierProvider, classifierModel: llmConfig.groq.classifierModel, vectorStore, app, emit }
         )
 
         // ── Step 2: Sandbox validation (blocking, code intents only) ──────────
         const sandboxConfig = app.get('sandbox')
-        if (CODE_INTENTS.has(result.intent) && sandboxConfig?.opensandbox?.apiKey) {
-          const codeBlocks = extractCodeBlocks(result.content)
+        let sandboxFiles = extractCodeBlocks(result.content)
 
-          if (codeBlocks.length > 0) {
-            const language = detectPrimaryLanguage(codeBlocks)
+        if (CODE_INTENTS.has(result.intent) && sandboxConfig?.opensandbox?.apiKey) {
+          if (sandboxFiles.length > 0) {
+            const language = detectPrimaryLanguage(sandboxFiles)
             const provider = new OpenSandboxProvider(sandboxConfig.opensandbox)
             const maxRetries = sandboxConfig.maxRetries ?? 2
 
@@ -93,6 +94,7 @@ export function startOrchestrationWorker(app: any): Worker {
                 { router, classifierProvider, classifierModel: llmConfig.groq.classifierModel, vectorStore, app, emit }
               )
               result = fixResult
+              sandboxFiles = extractCodeBlocks(result.content)
 
               const retryRun = await runSandbox(
                 result.content, provider, emit, projectId,
@@ -107,23 +109,107 @@ export function startOrchestrationWorker(app: any): Worker {
               compilationOutput: sandboxResult.compilationOutput,
               durationMs: sandboxResult.durationMs,
             })
+
+            // ── Step 3: Persist validated files to R2 ─────────────────────────
+            if (sandboxFiles.length > 0) {
+              await app.service('projects').patch(projectId, {
+                'generationProgress.currentStage': 'persisting',
+                'generationProgress.percentage': 85,
+              }).catch(() => {/* non-fatal */})
+
+              const { fileIds, snapshotId, uploadedCount } = await persistFiles(
+                projectId, sandboxFiles, messageId ?? null, app
+              )
+
+              emit('files:persisted', projectId, {
+                fileIds,
+                snapshotId,
+                uploadedCount,
+                filePaths: sandboxFiles.map(f => f.path),
+              })
+
+              await app.service('projects').patch(projectId, {
+                'generationProgress.filesGenerated': uploadedCount,
+              }).catch(() => {/* non-fatal */})
+
+              // ── Step 4: Save assistant message with result metadata ──────────
+              await app.service('messages').create({
+                projectId,
+                role: 'assistant',
+                content: result.content,
+                intent: result.intent,
+                model: result.model,
+                metadata: {
+                  usage: result.usage,
+                  sandboxResult: {
+                    success: sandboxResult.success,
+                    durationMs: sandboxResult.durationMs,
+                  },
+                  filesGenerated: sandboxFiles.map(f => f.path),
+                  ...(result.enhancedPrompt ? { enhancedPrompt: result.enhancedPrompt } : {}),
+                },
+              }, { provider: 'server' }).catch((err: unknown) => {
+                log.warn('Failed to save assistant message', { projectId, error: err instanceof Error ? err.message : String(err) })
+              })
+            }
           }
+        } else if (CODE_INTENTS.has(result.intent) && sandboxFiles.length > 0) {
+          // No sandbox API key — persist files without validation
+          const { fileIds, snapshotId, uploadedCount } = await persistFiles(
+            projectId, sandboxFiles, messageId ?? null, app
+          )
+
+          emit('files:persisted', projectId, {
+            fileIds,
+            snapshotId,
+            uploadedCount,
+            filePaths: sandboxFiles.map(f => f.path),
+          })
+
+          await app.service('messages').create({
+            projectId,
+            role: 'assistant',
+            content: result.content,
+            intent: result.intent,
+            model: result.model,
+            metadata: {
+              usage: result.usage,
+              filesGenerated: sandboxFiles.map(f => f.path),
+              ...(result.enhancedPrompt ? { enhancedPrompt: result.enhancedPrompt } : {}),
+            },
+          }, { provider: 'server' }).catch((err: unknown) => {
+            log.warn('Failed to save assistant message', { projectId, error: err instanceof Error ? err.message : String(err) })
+          })
+        } else {
+          // Non-code intent — save assistant message without files
+          await app.service('messages').create({
+            projectId,
+            role: 'assistant',
+            content: result.content,
+            intent: result.intent,
+            model: result.model,
+            metadata: {
+              usage: result.usage,
+              ...(result.enhancedPrompt ? { enhancedPrompt: result.enhancedPrompt } : {}),
+            },
+          }, { provider: 'server' }).catch((err: unknown) => {
+            log.warn('Failed to save assistant message', { projectId, error: err instanceof Error ? err.message : String(err) })
+          })
         }
 
-        // ── Step 3: Update project with result ────────────────────────────────
+        // ── Step 5: Update project with result ────────────────────────────────
         await app.service('projects').patch(projectId, {
           status: 'ready',
           'generationProgress.percentage': 100,
           'generationProgress.currentStage': 'complete',
         }).catch(() => {/* non-fatal */})
 
-        // ── Step 4: Trigger async incremental re-index ────────────────────────
-        // Deduplicated by jobId so rapid successive orchestrations don't pile up
+        // ── Step 6: Trigger async incremental re-index ────────────────────────
         indexingQueue.add('sync', { projectId }, {
           delay: 2000,
           jobId: `sync-${projectId}`,
           removeOnComplete: true,
-        }).catch(() => {/* non-fatal: Redis unavailability shouldn't break the response */})
+        }).catch(() => {/* non-fatal */})
 
         log.info('Orchestration job completed', { jobId: job.id, projectId, intent: result.intent })
         return result

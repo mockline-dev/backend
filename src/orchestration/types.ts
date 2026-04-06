@@ -108,6 +108,8 @@ export interface OrchestrationJobData {
   prompt: string
   conversationHistory?: LLMMessage[]
   model?: string
+  /** ID of the user message that triggered this job */
+  messageId?: string
 }
 
 export interface OrchestrationResult {
@@ -116,6 +118,7 @@ export interface OrchestrationResult {
   model: string
   provider: string
   usage: LLMResponse['usage']
+  enhancedPrompt?: string
 }
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
