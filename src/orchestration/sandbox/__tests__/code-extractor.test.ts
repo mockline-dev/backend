@@ -48,11 +48,11 @@ describe('extractCodeBlocks', () => {
     const md = [
       '```ts // filepath: src/a.ts\nexport const a = 1\n```',
       '',
-      '```ts // filepath: src/b.ts\nexport const b = 2\n```',
+      '```ts // filepath: src/b.ts\nexport const b = 2\n```'
     ].join('\n')
     const files = extractCodeBlocks(md)
     expect(files).toHaveLength(2)
-    expect(files.map((f) => f.path)).toEqual(['src/a.ts', 'src/b.ts'])
+    expect(files.map(f => f.path)).toEqual(['src/a.ts', 'src/b.ts'])
   })
 
   it('skips empty code blocks', () => {
@@ -65,7 +65,7 @@ describe('detectPrimaryLanguage', () => {
   it('returns typescript for ts files', () => {
     const files = [
       { path: 'a.ts', content: '', language: 'typescript' },
-      { path: 'b.ts', content: '', language: 'typescript' },
+      { path: 'b.ts', content: '', language: 'typescript' }
     ]
     expect(detectPrimaryLanguage(files)).toBe('typescript')
   })
@@ -74,7 +74,7 @@ describe('detectPrimaryLanguage', () => {
     const files = [
       { path: 'a.py', content: '', language: 'python' },
       { path: 'b.py', content: '', language: 'python' },
-      { path: 'c.ts', content: '', language: 'typescript' },
+      { path: 'c.ts', content: '', language: 'typescript' }
     ]
     expect(detectPrimaryLanguage(files)).toBe('python')
   })

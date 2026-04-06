@@ -36,19 +36,19 @@ export interface UploadFileToR2Result {
  */
 async function generateSecureFileName(originalFilename: string): Promise<string> {
   const crypto = await import('crypto')
-  
+
   // Extract file extension
   const fileExtension = originalFilename.split('.').pop() || ''
-  
+
   // Generate a random salt using Node.js crypto
   const salt = crypto.randomBytes(16).toString('hex')
-  
+
   // Combine filename, salt, and timestamp for better uniqueness
   const data = `${originalFilename}-${Date.now()}-${salt}`
-  
+
   // Hash the data using SHA-256
   const hash = crypto.createHash('sha256').update(data).digest('hex')
-  
+
   return `${hash}-${salt}.${fileExtension}`
 }
 
@@ -61,13 +61,11 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Uploads a file to R2 storage using multipart upload.
- * 
+ *
  * @param options - Upload options including content, filename, and metadata
  * @returns Upload result with file ID, URL, and status
  */
-export async function uploadFileToR2(
-  options: UploadFileToR2Options
-): Promise<UploadFileToR2Result> {
+export async function uploadFileToR2(options: UploadFileToR2Options): Promise<UploadFileToR2Result> {
   const {
     app,
     content,
@@ -161,7 +159,9 @@ export async function uploadFileToR2(
           )
 
           if (retries >= MAX_RETRIES) {
-            throw new Error(`Failed to upload part ${partNumber} after ${MAX_RETRIES} retries: ${error.message}`)
+            throw new Error(
+              `Failed to upload part ${partNumber} after ${MAX_RETRIES} retries: ${error.message}`
+            )
           }
 
           // Wait before retrying with exponential backoff
@@ -191,7 +191,7 @@ export async function uploadFileToR2(
     })
 
     // The uploads service returns the file ID directly as a string
-    const fileId = typeof completeResponse === 'string' ? completeResponse : completeResponse._id as string
+    const fileId = typeof completeResponse === 'string' ? completeResponse : (completeResponse._id as string)
     if (!fileId) {
       throw new Error('Failed to complete multipart upload - no file ID returned')
     }
@@ -248,7 +248,7 @@ function generatePublicUrl(app: Application, key: string): string {
 
 /**
  * Uploads multiple files to R2 storage.
- * 
+ *
  * @param app - Feathers application instance
  * @param files - Array of file objects with content, filename, and contentType
  * @param projectId - Project ID for the files
@@ -279,12 +279,12 @@ export async function uploadMultipleFilesToR2(
       projectId,
       messageId: options?.messageId,
       userId: options?.userId,
-      onProgress: (progress) => {
+      onProgress: progress => {
         if (options?.onFileProgress) {
           options.onFileProgress(file.filename, progress)
         }
         if (options?.onOverallProgress) {
-          const overallProgress = Math.round(((i + (progress / 100)) / files.length) * 100)
+          const overallProgress = Math.round(((i + progress / 100) / files.length) * 100)
           options.onOverallProgress(overallProgress)
         }
       }

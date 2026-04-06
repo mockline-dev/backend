@@ -22,8 +22,8 @@ export interface MerkleTreeDocument {
 }
 
 export interface ChangeSet {
-  added: string[]      // paths new in current tree
-  modified: string[]   // paths present in both trees with different hash
-  deleted: string[]    // paths present in old tree but not new
-  unchanged: number    // count of files with identical hash
+  added: string[] // paths new in current tree
+  modified: string[] // paths present in both trees with different hash
+  deleted: string[] // paths present in old tree but not new
+  unchanged: number // count of files with identical hash
 }

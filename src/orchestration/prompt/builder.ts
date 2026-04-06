@@ -24,15 +24,14 @@ export function buildPrompt(params: BuildPromptParams): BuiltPrompt {
     retrievedContext,
     conversationHistory,
     projectMeta,
-    modelContextWindow = DEFAULT_CONTEXT_WINDOW,
+    modelContextWindow = DEFAULT_CONTEXT_WINDOW
   } = params
 
   const systemContent = getSystemPrompt(intent, projectMeta)
   const systemTokens = countTokens(systemContent) + 4
   const queryTokens = countTokens(userQuery) + 4
 
-  const available =
-    modelContextWindow - systemTokens - queryTokens - RESPONSE_RESERVE
+  const available = modelContextWindow - systemTokens - queryTokens - RESPONSE_RESERVE
   const ragBudget = Math.floor(Math.max(0, available) * RAG_BUDGET_RATIO)
   const historyBudget = Math.floor(Math.max(0, available) * HISTORY_BUDGET_RATIO)
 
@@ -68,10 +67,7 @@ export function buildPrompt(params: BuildPromptParams): BuiltPrompt {
   }
 
   // Assemble messages
-  const messages: LLMMessage[] = [
-    { role: 'system', content: systemContent },
-    ...trimmedHistory,
-  ]
+  const messages: LLMMessage[] = [{ role: 'system', content: systemContent }, ...trimmedHistory]
 
   if (ragContent) {
     messages.push({ role: 'user', content: ragContent })
@@ -86,7 +82,7 @@ export function buildPrompt(params: BuildPromptParams): BuiltPrompt {
     history: historyTokensUsed,
     userQuery: queryTokens,
     responseReserve: RESPONSE_RESERVE,
-    total: modelContextWindow,
+    total: modelContextWindow
   }
 
   return {
@@ -95,12 +91,18 @@ export function buildPrompt(params: BuildPromptParams): BuiltPrompt {
     metadata: {
       intent,
       chunksUsed,
-      historyTurns: trimmedHistory.length,
-    },
+      historyTurns: trimmedHistory.length
+    }
   }
 }
 
-function formatChunk(chunk: { filepath: string; content: string; symbolName?: string; startLine: number; endLine: number }): string {
+function formatChunk(chunk: {
+  filepath: string
+  content: string
+  symbolName?: string
+  startLine: number
+  endLine: number
+}): string {
   const location = chunk.symbolName
     ? `${chunk.filepath} — ${chunk.symbolName} (lines ${chunk.startLine}-${chunk.endLine})`
     : `${chunk.filepath} (lines ${chunk.startLine}-${chunk.endLine})`

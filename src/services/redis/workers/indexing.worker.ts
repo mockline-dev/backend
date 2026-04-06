@@ -17,7 +17,7 @@ export function startIndexingWorker(app: any): Worker {
 
   indexingWorker = new Worker<IndexingJobData>(
     'indexing',
-    async (job) => {
+    async job => {
       const { projectId } = job.data
 
       if (!projectId) {
@@ -42,7 +42,7 @@ export function startIndexingWorker(app: any): Worker {
           modified: changes.modified.length,
           deleted: changes.deleted.length,
           indexed,
-          removed,
+          removed
         })
 
         // Emit sync result to connected clients
@@ -53,8 +53,8 @@ export function startIndexingWorker(app: any): Worker {
           changes: {
             added: changes.added.length,
             modified: changes.modified.length,
-            deleted: changes.deleted.length,
-          },
+            deleted: changes.deleted.length
+          }
         })
 
         return result
@@ -68,11 +68,11 @@ export function startIndexingWorker(app: any): Worker {
     },
     {
       connection: connection as any,
-      concurrency: 1,  // single-threaded: ChromaDB can't handle concurrent bulk writes well
+      concurrency: 1 // single-threaded: ChromaDB can't handle concurrent bulk writes well
     }
   )
 
-  indexingWorker.on('completed', (job) => {
+  indexingWorker.on('completed', job => {
     log.info('Job completed', { jobId: job.id })
   })
 

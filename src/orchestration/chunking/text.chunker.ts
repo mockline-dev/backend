@@ -9,11 +9,7 @@ const OVERLAP_LINES = 3
  * Fallback text chunker — sliding-window line-based splitting.
  * Used for markdown, JSON, YAML, config files, and any non-code files.
  */
-export function chunkText(
-  content: string,
-  filepath: string,
-  maxTokens = DEFAULT_MAX_TOKENS
-): CodeChunk[] {
+export function chunkText(content: string, filepath: string, maxTokens = DEFAULT_MAX_TOKENS): CodeChunk[] {
   if (!content.trim()) return []
 
   const lines = content.split('\n')
@@ -46,7 +42,7 @@ export function chunkText(
       startLine,
       endLine,
       symbolKind: 'block',
-      symbolName: path.basename(filepath),
+      symbolName: path.basename(filepath)
     })
 
     chunkIndex++

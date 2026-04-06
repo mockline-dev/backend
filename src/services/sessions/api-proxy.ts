@@ -44,9 +44,10 @@ export function createApiProxyMiddleware(app: Application) {
       ctx.body = {
         error: 'Session not running',
         status: session.status,
-        message: session.status === 'starting'
-          ? 'Container is still starting — try again in a few seconds'
-          : 'Start a session first via POST /sessions',
+        message:
+          session.status === 'starting'
+            ? 'Container is still starting — try again in a few seconds'
+            : 'Start a session first via POST /sessions'
       }
       return
     }
@@ -73,7 +74,7 @@ export function createApiProxyMiddleware(app: Application) {
       const fetchInit: RequestInit = {
         method: ctx.method,
         headers,
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(30000)
       }
 
       if (!['GET', 'HEAD'].includes(ctx.method) && ctx.request.rawBody) {
@@ -84,7 +85,13 @@ export function createApiProxyMiddleware(app: Application) {
 
       ctx.status = response.status
 
-      const hopByHop = new Set(['transfer-encoding', 'connection', 'keep-alive', 'upgrade', 'proxy-authenticate'])
+      const hopByHop = new Set([
+        'transfer-encoding',
+        'connection',
+        'keep-alive',
+        'upgrade',
+        'proxy-authenticate'
+      ])
       response.headers.forEach((val, key) => {
         if (!hopByHop.has(key.toLowerCase())) ctx.set(key, val)
       })

@@ -38,9 +38,12 @@ interface UploadPartData extends UploadsPatch {
 }
 
 // This is a skeleton for a custom service class. Remove or add the methods you need here
-export class UploadsService<ServiceParams extends UploadsParams = UploadsParams>
-  implements ServiceInterface<Uploads, UploadsData, ServiceParams, UploadsPatch>
-{
+export class UploadsService<ServiceParams extends UploadsParams = UploadsParams> implements ServiceInterface<
+  Uploads,
+  UploadsData,
+  ServiceParams,
+  UploadsPatch
+> {
   constructor(public options: UploadsServiceOptions) {}
 
   private getS3Client(): S3 {
@@ -75,7 +78,7 @@ export class UploadsService<ServiceParams extends UploadsParams = UploadsParams>
   async create(data: UploadsData[], params?: ServiceParams): Promise<Uploads[]>
   async create(data: UploadsData | UploadsData[], params?: ServiceParams): Promise<Uploads | Uploads[]> {
     if (Array.isArray(data)) {
-      return Promise.all(data.map((current) => this.create(current, params)))
+      return Promise.all(data.map(current => this.create(current, params)))
     }
 
     const createData = data as CreateMultipartUploadData
@@ -84,11 +87,13 @@ export class UploadsService<ServiceParams extends UploadsParams = UploadsParams>
     const s3 = this.getS3Client()
     const awsConfig = this.options.app.get('aws')
 
-    const result = await s3.createMultipartUpload({
-      Bucket: awsConfig.bucket,
-      Key: createData.key,
-      ContentType: createData.contentType
-    }).promise()
+    const result = await s3
+      .createMultipartUpload({
+        Bucket: awsConfig.bucket,
+        Key: createData.key,
+        ContentType: createData.contentType
+      })
+      .promise()
 
     return {
       _id: '',
@@ -102,19 +107,21 @@ export class UploadsService<ServiceParams extends UploadsParams = UploadsParams>
   // This method has to be added to the 'methods' option to make it available to clients
   async update(id: NullableId, data: UploadsData, _params?: ServiceParams): Promise<Uploads> {
     const completeData = data as CompleteMultipartUploadData
-    
+
     // Complete multipart upload
     const s3 = this.getS3Client()
     const awsConfig = this.options.app.get('aws')
 
-    const result = await s3.completeMultipartUpload({
-      Bucket: awsConfig.bucket,
-      Key: completeData.key,
-      UploadId: completeData.uploadId,
-      MultipartUpload: {
-        Parts: completeData.parts
-      }
-    }).promise()
+    const result = await s3
+      .completeMultipartUpload({
+        Bucket: awsConfig.bucket,
+        Key: completeData.key,
+        UploadId: completeData.uploadId,
+        MultipartUpload: {
+          Parts: completeData.parts
+        }
+      })
+      .promise()
 
     // Return an Uploads object with the file key as _id
     return {
@@ -129,18 +136,20 @@ export class UploadsService<ServiceParams extends UploadsParams = UploadsParams>
 
   async patch(id: NullableId, data: UploadsPatch, _params?: ServiceParams): Promise<Uploads> {
     const patchData = data as UploadPartData
-    
+
     // Upload a part
     const s3 = this.getS3Client()
     const awsConfig = this.options.app.get('aws')
 
-    const result = await s3.uploadPart({
-      Bucket: awsConfig.bucket,
-      Key: patchData.key,
-      UploadId: patchData.uploadId,
-      PartNumber: patchData.partNumber,
-      Body: patchData.content
-    }).promise()
+    const result = await s3
+      .uploadPart({
+        Bucket: awsConfig.bucket,
+        Key: patchData.key,
+        UploadId: patchData.uploadId,
+        PartNumber: patchData.partNumber,
+        Body: patchData.content
+      })
+      .promise()
 
     return {
       _id: '',
@@ -153,17 +162,19 @@ export class UploadsService<ServiceParams extends UploadsParams = UploadsParams>
 
   async remove(id: NullableId, _params?: ServiceParams): Promise<Uploads> {
     const query = _params?.query as any
-    
+
     if (query?.uploadId && query?.key) {
       // Abort multipart upload
       const s3 = this.getS3Client()
       const awsConfig = this.options.app.get('aws')
 
-      await s3.abortMultipartUpload({
-        Bucket: awsConfig.bucket,
-        Key: query.key,
-        UploadId: query.uploadId
-      }).promise()
+      await s3
+        .abortMultipartUpload({
+          Bucket: awsConfig.bucket,
+          Key: query.key,
+          UploadId: query.uploadId
+        })
+        .promise()
     }
 
     return {

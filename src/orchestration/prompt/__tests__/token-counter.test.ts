@@ -38,9 +38,7 @@ describe('countMessages', () => {
   })
 
   it('includes per-message overhead', () => {
-    const messages: LLMMessage[] = [
-      { role: 'user', content: 'hi' }
-    ]
+    const messages: LLMMessage[] = [{ role: 'user', content: 'hi' }]
     // Should be content tokens + 4 overhead
     const contentTokens = countTokens('hi')
     expect(countMessages(messages)).toBe(contentTokens + 4)
@@ -50,7 +48,7 @@ describe('countMessages', () => {
     const messages: LLMMessage[] = [
       { role: 'system', content: 'You are an assistant.' },
       { role: 'user', content: 'What is 2+2?' },
-      { role: 'assistant', content: 'The answer is 4.' },
+      { role: 'assistant', content: 'The answer is 4.' }
     ]
     const single = countMessages([messages[0]])
     const all = countMessages(messages)

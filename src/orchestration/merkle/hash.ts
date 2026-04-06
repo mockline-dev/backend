@@ -13,6 +13,6 @@ export function hashContent(content: string): string {
 export function computeRootHash(files: Array<Pick<MerkleFileNode, 'path' | 'hash'>>): string {
   if (files.length === 0) return hashContent('')
   const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path))
-  const combined = sorted.map((f) => `${f.path}:${f.hash}`).join('\n')
+  const combined = sorted.map(f => `${f.path}:${f.hash}`).join('\n')
   return hashContent(combined)
 }

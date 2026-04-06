@@ -39,9 +39,9 @@ export async function indexProjectFiles(
     const filesService = app.service('files')
     const result = await filesService.find({
       query: { projectId, $limit: 200 },
-      paginate: false,
+      paginate: false
     })
-    const files: FileRecord[] = Array.isArray(result) ? result : result.data ?? []
+    const files: FileRecord[] = Array.isArray(result) ? result : (result.data ?? [])
 
     if (files.length === 0) {
       log.debug('No files to index', { projectId })
@@ -55,7 +55,7 @@ export async function indexProjectFiles(
     for (let i = 0; i < files.length; i += BATCH_SIZE) {
       const batch = files.slice(i, i + BATCH_SIZE)
       await Promise.all(
-        batch.map(async (file) => {
+        batch.map(async file => {
           try {
             const content = await fetchFileContent(file.key, app)
             if (!content) return
@@ -65,9 +65,9 @@ export async function indexProjectFiles(
               : chunkText(content, file.name)
 
             // Prefix chunk IDs with projectId to avoid collisions
-            const prefixedChunks = chunks.map((c) => ({
+            const prefixedChunks = chunks.map(c => ({
               ...c,
-              id: `${projectId}:${c.id}`,
+              id: `${projectId}:${c.id}`
             }))
 
             await vectorStore.addChunks(projectId, prefixedChunks)
@@ -76,7 +76,7 @@ export async function indexProjectFiles(
             failed++
             log.warn('Failed to index file', {
               file: file.name,
-              error: err instanceof Error ? err.message : String(err),
+              error: err instanceof Error ? err.message : String(err)
             })
           }
         })
@@ -87,10 +87,9 @@ export async function indexProjectFiles(
   } catch (err: unknown) {
     log.error('Project indexing failed', {
       projectId,
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
   }
 
   return { indexed, failed }
 }
-

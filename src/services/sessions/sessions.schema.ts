@@ -16,7 +16,7 @@ export const sessionsSchema = Type.Object(
       Type.Literal('starting'),
       Type.Literal('running'),
       Type.Literal('stopped'),
-      Type.Literal('error'),
+      Type.Literal('error')
     ]),
     containerId: Type.Optional(Type.String()),
     proxyUrl: Type.Optional(Type.String()),
@@ -26,7 +26,7 @@ export const sessionsSchema = Type.Object(
     stoppedAt: Type.Optional(Type.Number()),
     errorMessage: Type.Optional(Type.String()),
     createdAt: Type.Number(),
-    updatedAt: Type.Number(),
+    updatedAt: Type.Number()
   },
   { $id: 'Sessions', additionalProperties: false }
 )
@@ -36,11 +36,10 @@ export const sessionsResolver = resolve<SessionsQuery, HookContext<SessionsServi
 
 export const sessionsExternalResolver = resolve<Sessions, HookContext<SessionsService>>({})
 
-export const sessionsDataSchema = Type.Pick(
-  sessionsSchema,
-  ['projectId', 'userId', 'language'],
-  { $id: 'SessionsData', additionalProperties: false }
-)
+export const sessionsDataSchema = Type.Pick(sessionsSchema, ['projectId', 'userId', 'language'], {
+  $id: 'SessionsData',
+  additionalProperties: false
+})
 export type SessionsData = Static<typeof sessionsDataSchema>
 export const sessionsDataValidator = getValidator(sessionsDataSchema, dataValidator)
 export const sessionsDataResolver = resolve<Sessions, HookContext<SessionsService>>({
@@ -56,24 +55,27 @@ export const sessionsDataResolver = resolve<Sessions, HookContext<SessionsServic
   },
   status: async () => 'starting' as const,
   createdAt: async () => Date.now(),
-  updatedAt: async () => Date.now(),
+  updatedAt: async () => Date.now()
 })
 
 export const sessionsPatchSchema = Type.Partial(sessionsSchema, { $id: 'SessionsPatch' })
 export type SessionsPatch = Static<typeof sessionsPatchSchema>
 export const sessionsPatchValidator = getValidator(sessionsPatchSchema, dataValidator)
 export const sessionsPatchResolver = resolve<SessionsPatch, HookContext<SessionsService>>({
-  updatedAt: async () => Date.now(),
+  updatedAt: async () => Date.now()
 })
 
 export const sessionsQueryProperties = Type.Pick(sessionsSchema, [
-  '_id', 'projectId', 'userId', 'status', 'language', 'createdAt', 'updatedAt',
+  '_id',
+  'projectId',
+  'userId',
+  'status',
+  'language',
+  'createdAt',
+  'updatedAt'
 ])
 export const sessionsQuerySchema = Type.Intersect(
-  [
-    querySyntax(sessionsQueryProperties),
-    Type.Object({}, { additionalProperties: false }),
-  ],
+  [querySyntax(sessionsQueryProperties), Type.Object({}, { additionalProperties: false })],
   { additionalProperties: false }
 )
 export type SessionsQuery = Static<typeof sessionsQuerySchema>

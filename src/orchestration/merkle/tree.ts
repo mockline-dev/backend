@@ -6,10 +6,10 @@ export function buildTree(
   projectId: string,
   files: Array<{ path: string; content: string; size: number }>
 ): MerkleTreeDocument {
-  const nodes: MerkleFileNode[] = files.map((f) => ({
+  const nodes: MerkleFileNode[] = files.map(f => ({
     path: f.path,
     hash: hashContent(f.content),
-    size: f.size,
+    size: f.size
   }))
 
   return {
@@ -18,7 +18,7 @@ export function buildTree(
     files: nodes,
     fileCount: nodes.length,
     lastSyncAt: new Date(),
-    version: 1,
+    version: 1
   }
 }
 
@@ -26,10 +26,7 @@ export function buildTree(
  * Diff two trees and return what changed.
  * If oldTree is null (first sync), every file in newTree is "added".
  */
-export function diffTrees(
-  oldTree: MerkleTreeDocument | null,
-  newTree: MerkleTreeDocument
-): ChangeSet {
+export function diffTrees(oldTree: MerkleTreeDocument | null, newTree: MerkleTreeDocument): ChangeSet {
   const oldMap = new Map<string, string>()
   if (oldTree) {
     for (const f of oldTree.files) oldMap.set(f.path, f.hash)
@@ -70,21 +67,19 @@ export function updateTree(
   deletedPaths: string[]
 ): MerkleTreeDocument {
   const deletedSet = new Set(deletedPaths)
-  const changedMap = new Map(
-    changedFiles.map((f) => [f.path, { hash: hashContent(f.content), size: f.size }])
-  )
+  const changedMap = new Map(changedFiles.map(f => [f.path, { hash: hashContent(f.content), size: f.size }]))
 
   // Keep unchanged files, drop deleted
-  const keptFiles = existing.files.filter((f) => !deletedSet.has(f.path) && !changedMap.has(f.path))
+  const keptFiles = existing.files.filter(f => !deletedSet.has(f.path) && !changedMap.has(f.path))
 
   // Add/update changed files
   const updatedNodes: MerkleFileNode[] = [
     ...keptFiles,
-    ...changedFiles.map((f) => ({
+    ...changedFiles.map(f => ({
       path: f.path,
       hash: changedMap.get(f.path)!.hash,
-      size: changedMap.get(f.path)!.size,
-    })),
+      size: changedMap.get(f.path)!.size
+    }))
   ]
 
   return {
@@ -93,6 +88,6 @@ export function updateTree(
     files: updatedNodes,
     fileCount: updatedNodes.length,
     lastSyncAt: new Date(),
-    version: existing.version + 1,
+    version: existing.version + 1
   }
 }

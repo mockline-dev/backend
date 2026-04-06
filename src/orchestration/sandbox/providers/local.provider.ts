@@ -11,7 +11,7 @@ export class LocalSandboxProvider implements ISandboxProvider {
   async execute(_files: SandboxFile[], _opts: SandboxOptions): Promise<SandboxResult> {
     throw new Error(
       'LocalSandboxProvider is not implemented. ' +
-      'Set sandbox.provider to "opensandbox" in config/default.json.'
+        'Set sandbox.provider to "opensandbox" in config/default.json.'
     )
   }
 }

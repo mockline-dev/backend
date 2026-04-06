@@ -4,7 +4,10 @@ import type { Messages, MessagesData, MessagesPatch, MessagesQuery, MessagesServ
 
 export type { Messages, MessagesData, MessagesPatch, MessagesQuery }
 
-export type MessagesClientService = Pick<MessagesService<Params<MessagesQuery>>, (typeof messagesMethods)[number]>
+export type MessagesClientService = Pick<
+  MessagesService<Params<MessagesQuery>>,
+  (typeof messagesMethods)[number]
+>
 
 export const messagesPath = 'messages'
 

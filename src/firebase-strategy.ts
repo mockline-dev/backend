@@ -94,7 +94,7 @@ class FirebaseStrategy extends AuthenticationBaseStrategy {
         // Sanitize input data
         const sanitizedFirstName = firstName?.trim().slice(0, 50) || ''
         const sanitizedLastName = lastName?.trim().slice(0, 50) || ''
-        
+
         return await app.service('users').create({
           firebaseUid: uid,
           email: email || '',

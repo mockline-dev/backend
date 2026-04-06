@@ -43,7 +43,13 @@ export const usersPatchValidator = getValidator(usersPatchSchema, dataValidator)
 export const usersPatchResolver = resolve<UsersPatch, HookContext<UsersService>>({})
 
 // Schema for allowed query properties
-export const usersQueryProperties = Type.Pick(usersSchema, ['_id', 'firebaseUid', 'firstName', 'lastName', 'email'])
+export const usersQueryProperties = Type.Pick(usersSchema, [
+  '_id',
+  'firebaseUid',
+  'firstName',
+  'lastName',
+  'email'
+])
 export const usersQuerySchema = Type.Intersect(
   [
     querySyntax(usersQueryProperties),

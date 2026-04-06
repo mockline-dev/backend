@@ -9,12 +9,12 @@ function mockProviderWithResponse(content: string): ILLMProvider {
     model: 'test-model',
     provider: 'test',
     usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 },
-    finishReason: 'stop',
+    finishReason: 'stop'
   }
   return {
     name: 'mock',
     chat: vi.fn().mockResolvedValue(response),
-    chatStream: vi.fn(),
+    chatStream: vi.fn()
   }
 }
 
@@ -40,7 +40,7 @@ describe('classifyIntent', () => {
     const provider: ILLMProvider = {
       name: 'failing',
       chat: vi.fn().mockRejectedValue(new Error('network error')),
-      chatStream: vi.fn(),
+      chatStream: vi.fn()
     }
     const result = await classifyIntent('some query', provider)
     expect(result.intent).toBe(Intent.General)
@@ -66,9 +66,7 @@ describe('classifyIntent', () => {
 
   it('recognizes all valid intent values', async () => {
     for (const intent of Object.values(Intent)) {
-      const provider = mockProviderWithResponse(
-        JSON.stringify({ intent, confidence: 0.9, entities: {} })
-      )
+      const provider = mockProviderWithResponse(JSON.stringify({ intent, confidence: 0.9, entities: {} }))
       const result = await classifyIntent('test query', provider)
       expect(result.intent).toBe(intent)
     }

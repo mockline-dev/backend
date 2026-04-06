@@ -47,7 +47,7 @@ export async function retrieveContext(
     projectId,
     candidates: results.length,
     selected: selectedChunks.length,
-    totalTokens,
+    totalTokens
   })
 
   return { chunks: selectedChunks, totalTokens }

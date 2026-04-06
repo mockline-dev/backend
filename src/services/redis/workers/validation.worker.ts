@@ -17,7 +17,7 @@ export function startValidationWorker(app: any): Worker {
 
   validationWorker = new Worker<ValidationJobData>(
     'validation',
-    async (job) => {
+    async job => {
       const { projectId, files } = job.data
 
       log.info('Validation job started', { jobId: job.id, projectId, fileCount: files.length })
@@ -28,25 +28,27 @@ export function startValidationWorker(app: any): Worker {
       const emit = (event: string, pid: string, payload: unknown) => {
         try {
           app.service('projects').emit(event, { projectId: pid, ...(payload as object) })
-        } catch {/* non-fatal */}
+        } catch {
+          /* non-fatal */
+        }
       }
 
-      const sandboxFiles: SandboxFile[] = files.map((f) => ({
+      const sandboxFiles: SandboxFile[] = files.map(f => ({
         path: f.path,
-        content: f.content,
+        content: f.content
       }))
 
       try {
         const { result } = await runSandbox(
           // Wrap files in markdown fences so the extractor can parse them
-          sandboxFiles.map((f) => `\`\`\`\n// ${f.path}\n${f.content}\n\`\`\``).join('\n'),
+          sandboxFiles.map(f => `\`\`\`\n// ${f.path}\n${f.content}\n\`\`\``).join('\n'),
           provider,
           emit,
           projectId,
           {
             timeoutMs: sandboxConfig.timeoutMs,
             language: 'typescript',
-            runTests: false,
+            runTests: false
           }
         )
 
@@ -55,7 +57,7 @@ export function startValidationWorker(app: any): Worker {
           syntaxValid: result.syntaxValid,
           compilationOutput: result.compilationOutput,
           testOutput: result.testOutput,
-          durationMs: result.durationMs,
+          durationMs: result.durationMs
         })
 
         log.info('Validation job complete', { jobId: job.id, projectId, success: result.success })
@@ -68,11 +70,11 @@ export function startValidationWorker(app: any): Worker {
     },
     {
       connection: connection as any,
-      concurrency: 2,
+      concurrency: 2
     }
   )
 
-  validationWorker.on('completed', (job) => {
+  validationWorker.on('completed', job => {
     log.info('Job completed', { jobId: job.id })
   })
 

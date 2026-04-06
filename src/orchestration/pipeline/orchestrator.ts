@@ -5,12 +5,7 @@ import { buildPrompt } from '../prompt/builder'
 import { retrieveContext } from '../rag/retriever'
 import { enhancePrompt } from '../enhancement/enhancer'
 import type { ChromaVectorStore } from '../rag/chroma.client'
-import type {
-  ILLMProvider,
-  LLMMessage,
-  OrchestrationJobData,
-  OrchestrationResult,
-} from '../types'
+import type { ILLMProvider, LLMMessage, OrchestrationJobData, OrchestrationResult } from '../types'
 
 const log = createModuleLogger('orchestrator')
 
@@ -46,7 +41,11 @@ export async function orchestrate(
   // 1. Classify intent
   const classified = await classifyIntent(prompt, classifierProvider, classifierModel)
   log.info('Intent classified', { projectId, intent: classified.intent, confidence: classified.confidence })
-  emit('orchestration:intent', projectId, { intent: classified.intent, confidence: classified.confidence, entities: classified.entities })
+  emit('orchestration:intent', projectId, {
+    intent: classified.intent,
+    confidence: classified.confidence,
+    entities: classified.entities
+  })
 
   const intentConfig = INTENT_CONFIG[classified.intent]
   const llmConfig = app.get('llm')
@@ -55,17 +54,25 @@ export async function orchestrate(
   // 1.5 Enhance prompt (fast Groq 8B call — non-fatal on failure)
   let activePrompt = prompt
   try {
-    const projectMeta = await app.service('projects').get(projectId).catch(() => ({}))
-    activePrompt = await enhancePrompt(prompt, classified.intent, {
-      framework: projectMeta?.framework,
-      language: projectMeta?.language,
-      name: projectMeta?.name,
-    }, classifierProvider)
+    const projectMeta = await app
+      .service('projects')
+      .get(projectId)
+      .catch(() => ({}))
+    activePrompt = await enhancePrompt(
+      prompt,
+      classified.intent,
+      {
+        framework: projectMeta?.framework,
+        language: projectMeta?.language,
+        name: projectMeta?.name
+      },
+      classifierProvider
+    )
 
     if (activePrompt !== prompt) {
       emit('orchestration:enhanced', projectId, {
         originalLength: prompt.length,
-        enhancedLength: activePrompt.length,
+        enhancedLength: activePrompt.length
       })
     }
   } catch {
@@ -80,12 +87,19 @@ export async function orchestrate(
   if (intentConfig.needsRAG && projectId) {
     try {
       retrieved = await retrieveContext(projectId, activePrompt, ragBudget, vectorStore)
-      log.debug('RAG context retrieved', { projectId, chunks: retrieved.chunks.length, tokens: retrieved.totalTokens })
-      emit('orchestration:context', projectId, { chunksFound: retrieved.chunks.length, tokensUsed: retrieved.totalTokens })
+      log.debug('RAG context retrieved', {
+        projectId,
+        chunks: retrieved.chunks.length,
+        tokens: retrieved.totalTokens
+      })
+      emit('orchestration:context', projectId, {
+        chunksFound: retrieved.chunks.length,
+        tokensUsed: retrieved.totalTokens
+      })
     } catch (err: unknown) {
       log.warn('RAG retrieval failed, continuing without context', {
         projectId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
     }
   }
@@ -97,7 +111,7 @@ export async function orchestrate(
     projectMeta = {
       framework: project?.framework,
       language: project?.language,
-      name: project?.name,
+      name: project?.name
     }
   } catch {
     // Non-fatal — continue without project meta
@@ -110,7 +124,7 @@ export async function orchestrate(
     retrievedContext: retrieved,
     conversationHistory: conversationHistory as LLMMessage[],
     projectMeta,
-    modelContextWindow: contextWindow,
+    modelContextWindow: contextWindow
   })
 
   log.debug('Prompt built', {
@@ -118,7 +132,7 @@ export async function orchestrate(
     messages: built.messages.length,
     chunksUsed: built.metadata.chunksUsed,
     historyTurns: built.metadata.historyTurns,
-    budget: built.budget,
+    budget: built.budget
   })
 
   // 5. Stream response
@@ -138,9 +152,13 @@ export async function orchestrate(
     // Get usage via non-streaming call metadata is not available on stream
     // We do a best-effort token estimate
     usage = {
-      promptTokens: built.budget.systemPrompt + built.budget.retrievedContext + built.budget.history + built.budget.userQuery,
+      promptTokens:
+        built.budget.systemPrompt +
+        built.budget.retrievedContext +
+        built.budget.history +
+        built.budget.userQuery,
       completionTokens: Math.ceil(fullContent.length / 4),
-      totalTokens: 0,
+      totalTokens: 0
     }
     usage.totalTokens = usage.promptTokens + usage.completionTokens
 
@@ -154,11 +172,15 @@ export async function orchestrate(
     throw error
   }
 
-  log.info('Orchestration complete', { projectId, contentLength: fullContent.length, intent: classified.intent })
+  log.info('Orchestration complete', {
+    projectId,
+    contentLength: fullContent.length,
+    intent: classified.intent
+  })
   emit('orchestration:completed', projectId, {
     intent: classified.intent,
     contentLength: fullContent.length,
-    usage,
+    usage
   })
 
   return {
@@ -167,6 +189,6 @@ export async function orchestrate(
     model: finalModel,
     provider: finalProvider,
     usage,
-    enhancedPrompt: activePrompt !== prompt ? activePrompt : undefined,
+    enhancedPrompt: activePrompt !== prompt ? activePrompt : undefined
   }
 }
