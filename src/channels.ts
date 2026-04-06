@@ -40,6 +40,16 @@ export const channels = (app: Application) => {
     return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
   })
 
+  app.service('messages').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
+  app.service('sessions').publish((data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
+  })
+
 
   // eslint-disable-next-line no-unused-vars
   app.publish((_data: any, _context: HookContext) => {

@@ -14,6 +14,7 @@ import { initializeFirebase } from './firebase'
 import { mongodb } from './mongodb'
 import { services } from './services/index'
 import { startWorkerService } from './services/redis'
+import { createApiProxyMiddleware } from './services/sessions/api-proxy'
 
 const app: Application = koa(feathers())
 
@@ -35,6 +36,9 @@ app.use(
     jsonLimit: '50mb'
   })
 )
+
+// API proxy for testing running sandbox containers
+app.use(createApiProxyMiddleware(app))
 
 // Configure services and transports
 app.configure(rest())
