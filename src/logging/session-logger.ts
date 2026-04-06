@@ -12,11 +12,7 @@ if (!fs.existsSync(LOG_DIR)) {
   fs.mkdirSync(LOG_DIR, { recursive: true })
 }
 
-const jsonFormat = format.combine(
-  format.timestamp(),
-  format.errors({ stack: true }),
-  format.json()
-)
+const jsonFormat = format.combine(format.timestamp(), format.errors({ stack: true }), format.json())
 
 /**
  * Session-aware file logger.
@@ -33,7 +29,7 @@ export const sessionLogger = createLogger({
     // Per-session log file
     new transports.File({
       filename: path.join(LOG_DIR, `session-${SESSION_ID}.log`),
-      level: 'debug',
+      level: 'debug'
     }),
     // Daily rotating combined log
     new DailyRotateFile({
@@ -42,9 +38,9 @@ export const sessionLogger = createLogger({
       datePattern: 'YYYY-MM-DD',
       maxFiles: '14d',
       level: 'info',
-      zippedArchive: false,
-    }),
-  ],
+      zippedArchive: false
+    })
+  ]
 })
 
 /**
@@ -68,7 +64,7 @@ export function configureSessionLogger(appLogger: ReturnType<typeof createLogger
     new transports.File({
       filename: path.join(LOG_DIR, `session-${SESSION_ID}.log`),
       level: 'debug',
-      format: jsonFormat,
+      format: jsonFormat
     })
   )
   appLogger.add(
@@ -79,7 +75,7 @@ export function configureSessionLogger(appLogger: ReturnType<typeof createLogger
       maxFiles: '14d',
       level: 'info',
       zippedArchive: false,
-      format: jsonFormat,
+      format: jsonFormat
     })
   )
 

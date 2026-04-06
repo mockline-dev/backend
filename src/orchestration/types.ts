@@ -44,7 +44,7 @@ export enum Intent {
   ExplainCode = 'explain_code',
   FixBug = 'fix_bug',
   AddFeature = 'add_feature',
-  General = 'general',
+  General = 'general'
 }
 
 export interface ClassifiedIntent {
@@ -144,7 +144,7 @@ export class ProviderTimeoutError extends Error {
 export class AllProvidersFailedError extends Error {
   readonly errors: Error[]
   constructor(errors: Error[]) {
-    super(`All LLM providers failed: ${errors.map((e) => e.message).join('; ')}`)
+    super(`All LLM providers failed: ${errors.map(e => e.message).join('; ')}`)
     this.name = 'AllProvidersFailedError'
     this.errors = errors
   }

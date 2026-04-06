@@ -12,7 +12,7 @@ declare module './declarations' {
 export const mongodb = (app: Application) => {
   const connection = app.get('mongodb') as string
   const database = new URL(connection).pathname.substring(1)
-  const mongoClient = MongoClient.connect(connection).then((client) => client.db(database))
+  const mongoClient = MongoClient.connect(connection).then(client => client.db(database))
 
   app.set('mongodbClient', mongoClient)
 }

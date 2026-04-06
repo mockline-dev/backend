@@ -52,13 +52,13 @@ import type { OrchestratorDeps } from '../src/orchestration/pipeline/orchestrato
 
 // ─── Console helpers ─────────────────────────────────────────────────────────
 
-const GREEN  = '\x1b[32m'
-const RED    = '\x1b[31m'
+const GREEN = '\x1b[32m'
+const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
-const CYAN   = '\x1b[36m'
-const DIM    = '\x1b[2m'
-const RESET  = '\x1b[0m'
-const BOLD   = '\x1b[1m'
+const CYAN = '\x1b[36m'
+const DIM = '\x1b[2m'
+const RESET = '\x1b[0m'
+const BOLD = '\x1b[1m'
 
 let passCount = 0
 let failCount = 0
@@ -146,12 +146,15 @@ async function testGroqProvider(): Promise<boolean> {
 
   try {
     process.stdout.write(`  Calling ${GROQ_MODEL}... `)
-    const response = await provider.chat(
-      [{ role: 'user', content: 'Reply with exactly the word: OK' }],
-      { maxTokens: 10, temperature: 0 }
-    )
+    const response = await provider.chat([{ role: 'user', content: 'Reply with exactly the word: OK' }], {
+      maxTokens: 10,
+      temperature: 0
+    })
     console.log(`${GREEN}done${RESET}`)
-    ok('chat() works', `"${response.content.trim()}"  [${response.usage.totalTokens} tokens, model=${response.model}]`)
+    ok(
+      'chat() works',
+      `"${response.content.trim()}"  [${response.usage.totalTokens} tokens, model=${response.model}]`
+    )
     return true
   } catch (err) {
     console.log(`${RED}failed${RESET}`)
@@ -171,15 +174,15 @@ async function testMinimaxProvider(): Promise<boolean> {
   const provider = new MinimaxProvider({
     apiKey: MINIMAX_API_KEY,
     baseUrl: MINIMAX_BASE_URL,
-    defaultModel: MINIMAX_MODEL,
+    defaultModel: MINIMAX_MODEL
   })
 
   try {
     process.stdout.write(`  Calling ${MINIMAX_MODEL}... `)
-    const response = await provider.chat(
-      [{ role: 'user', content: 'Reply with exactly the word: OK' }],
-      { maxTokens: 10, temperature: 0 }
-    )
+    const response = await provider.chat([{ role: 'user', content: 'Reply with exactly the word: OK' }], {
+      maxTokens: 10,
+      temperature: 0
+    })
     console.log(`${GREEN}done${RESET}`)
     ok('chat() works', `"${response.content.trim()}"  [${response.usage.totalTokens} tokens]`)
     return true
@@ -200,7 +203,13 @@ async function testRouter(groqOk: boolean, minimaxOk: boolean): Promise<LLMRoute
 
   const primary = new GroqProvider({ apiKey: GROQ_API_KEY, defaultModel: GROQ_MODEL })
   const fallbacks = minimaxOk
-    ? [new MinimaxProvider({ apiKey: MINIMAX_API_KEY, baseUrl: MINIMAX_BASE_URL, defaultModel: MINIMAX_MODEL })]
+    ? [
+        new MinimaxProvider({
+          apiKey: MINIMAX_API_KEY,
+          baseUrl: MINIMAX_BASE_URL,
+          defaultModel: MINIMAX_MODEL
+        })
+      ]
     : []
   const router = new LLMRouter(primary, fallbacks)
 
@@ -233,7 +242,7 @@ async function testIntentClassifier(router: LLMRouter | null) {
     { prompt: 'Build a REST API for a blog with users and posts', expected: Intent.GenerateProject },
     { prompt: 'Fix the login endpoint it returns 500', expected: Intent.FixBug },
     { prompt: 'Explain how the user model works', expected: Intent.ExplainCode },
-    { prompt: 'Add a search endpoint to the posts service', expected: Intent.AddFeature },
+    { prompt: 'Add a search endpoint to the posts service', expected: Intent.AddFeature }
   ]
 
   // Run all cases in parallel — cuts serial latency from N×400ms to ~400ms
@@ -275,13 +284,22 @@ async function testChromaDB(): Promise<ChromaVectorStore> {
   const testProjectId = '_smoke_test_'
   try {
     await store.addChunks(testProjectId, [
-      { id: 'test:0', filepath: 'test.py', content: 'def greet(name): return f"Hello {name}"', startLine: 0, endLine: 1 },
-      { id: 'test:1', filepath: 'test.py', content: 'def add(a, b): return a + b', startLine: 2, endLine: 3 },
+      {
+        id: 'test:0',
+        filepath: 'test.py',
+        content: 'def greet(name): return f"Hello {name}"',
+        startLine: 0,
+        endLine: 1
+      },
+      { id: 'test:1', filepath: 'test.py', content: 'def add(a, b): return a + b', startLine: 2, endLine: 3 }
     ])
     ok('addChunks() — upserted 2 chunks')
 
     const results = await store.query(testProjectId, 'greeting function', 5)
-    ok(`query() — found ${results.length} result(s)`, results.length > 0 ? `top score=${results[0].score.toFixed(3)}` : '')
+    ok(
+      `query() — found ${results.length} result(s)`,
+      results.length > 0 ? `top score=${results[0].score.toFixed(3)}` : ''
+    )
 
     await store.deleteCollection(testProjectId)
     ok('deleteCollection() — cleaned up')
@@ -319,13 +337,13 @@ async function testFullPipeline(router: LLMRouter | null, vectorStore: ChromaVec
     service: (_name: string) => ({
       get: async (_id: string) => ({ framework: 'FastAPI', language: 'Python', name: 'test-project' }),
       patch: async () => ({}),
-      emit: () => {},
+      emit: () => {}
     }),
     get: (key: string) => {
       if (key === 'llm') return defaultConfig.llm
       if (key === 'chromadb') return defaultConfig.chromadb
       return null
-    },
+    }
   }
 
   const deps: OrchestratorDeps = {
@@ -334,7 +352,7 @@ async function testFullPipeline(router: LLMRouter | null, vectorStore: ChromaVec
     classifierModel: CLASSIFIER_MODEL,
     vectorStore,
     app: mockApp as any,
-    emit,
+    emit
   }
 
   console.log(`\n  ${DIM}Prompt: "${TEST_PROMPT}"${RESET}`)
@@ -353,7 +371,10 @@ async function testFullPipeline(router: LLMRouter | null, vectorStore: ChromaVec
     ok('Intent detected', result.intent)
     ok('Content generated', `${result.content.length} chars`)
     ok('Events fired', events.join(' → '))
-    ok('Token usage', `prompt=${result.usage.promptTokens} + completion=${result.usage.completionTokens} = ${result.usage.totalTokens} total`)
+    ok(
+      'Token usage',
+      `prompt=${result.usage.promptTokens} + completion=${result.usage.completionTokens} = ${result.usage.totalTokens} total`
+    )
   } catch (err) {
     console.log()
     fail('Pipeline failed', err)
@@ -364,13 +385,15 @@ async function testFullPipeline(router: LLMRouter | null, vectorStore: ChromaVec
 
 async function main() {
   banner('Mockline Orchestration Smoke Test')
-  console.log(`${DIM}  Tests each layer: config → tokens → Groq → MiniMax → router → intent → ChromaDB → full pipeline${RESET}`)
+  console.log(
+    `${DIM}  Tests each layer: config → tokens → Groq → MiniMax → router → intent → ChromaDB → full pipeline${RESET}`
+  )
 
   await testConfig()
   await testTokenCounter()
-  const groqOk     = await testGroqProvider()
-  const minimaxOk  = await testMinimaxProvider()
-  const router     = await testRouter(groqOk, minimaxOk)
+  const groqOk = await testGroqProvider()
+  const minimaxOk = await testMinimaxProvider()
+  const router = await testRouter(groqOk, minimaxOk)
   await testIntentClassifier(router)
   const vectorStore = await testChromaDB()
   await testFullPipeline(router, vectorStore)
@@ -378,13 +401,15 @@ async function main() {
   // ─── Summary ─────────────────────────────────────────────────────────────
   const line = '─'.repeat(55)
   console.log(`\n${BOLD}${line}${RESET}`)
-  console.log(`  ${GREEN}${passCount} passed${RESET}  ${failCount > 0 ? RED : DIM}${failCount} failed${RESET}  ${warnCount > 0 ? YELLOW : DIM}${warnCount} warnings${RESET}`)
+  console.log(
+    `  ${GREEN}${passCount} passed${RESET}  ${failCount > 0 ? RED : DIM}${failCount} failed${RESET}  ${warnCount > 0 ? YELLOW : DIM}${warnCount} warnings${RESET}`
+  )
   console.log(`${BOLD}${line}${RESET}\n`)
 
   if (failCount > 0) process.exit(1)
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(`\n${RED}Fatal error:${RESET}`, err)
   process.exit(1)
 })

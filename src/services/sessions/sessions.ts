@@ -10,7 +10,7 @@ import {
   sessionsPatchValidator,
   sessionsQueryResolver,
   sessionsQueryValidator,
-  sessionsResolver,
+  sessionsResolver
 } from './sessions.schema'
 
 import type { Application, HookContext } from '../../declarations'
@@ -30,7 +30,7 @@ export * from './sessions.schema'
 export const sessions = (app: Application) => {
   app.use(sessionsPath, new SessionsService(getOptions(app)), {
     methods: sessionsMethods,
-    events: [],
+    events: []
   })
 
   app.service(sessionsPath).hooks({
@@ -38,22 +38,22 @@ export const sessions = (app: Application) => {
       all: [
         authenticate('jwt'),
         schemaHooks.resolveExternal(sessionsExternalResolver),
-        schemaHooks.resolveResult(sessionsResolver),
-      ],
+        schemaHooks.resolveResult(sessionsResolver)
+      ]
     },
     before: {
       all: [
         schemaHooks.validateQuery(sessionsQueryValidator),
-        schemaHooks.resolveQuery(sessionsQueryResolver),
+        schemaHooks.resolveQuery(sessionsQueryResolver)
       ],
       create: [
         schemaHooks.validateData(sessionsDataValidator),
-        schemaHooks.resolveData(sessionsDataResolver),
+        schemaHooks.resolveData(sessionsDataResolver)
       ],
       patch: [
         schemaHooks.validateData(sessionsPatchValidator),
-        schemaHooks.resolveData(sessionsPatchResolver),
-      ],
+        schemaHooks.resolveData(sessionsPatchResolver)
+      ]
     },
     after: {
       create: [
@@ -68,7 +68,7 @@ export const sessions = (app: Application) => {
             log.warn('No sandbox API key configured — cannot start execution container', { sessionId })
             await app.service(sessionsPath).patch(sessionId, {
               status: 'error',
-              errorMessage: 'Sandbox not configured',
+              errorMessage: 'Sandbox not configured'
             })
             return
           }
@@ -83,13 +83,18 @@ export const sessions = (app: Application) => {
                 containerId,
                 proxyUrl,
                 port,
-                startedAt: Date.now(),
+                startedAt: Date.now()
               })
 
               // Update project status
-              await app.service('projects').patch(session.projectId.toString(), {
-                status: 'running',
-              }).catch(() => {/* non-fatal */})
+              await app
+                .service('projects')
+                .patch(session.projectId.toString(), {
+                  status: 'running'
+                })
+                .catch(() => {
+                  /* non-fatal */
+                })
 
               log.info('Execution sandbox started', { sessionId, containerId, proxyUrl })
             })
@@ -97,12 +102,17 @@ export const sessions = (app: Application) => {
               const message = err instanceof Error ? err.message : String(err)
               log.error('Failed to start execution sandbox', { sessionId, error: message })
 
-              await app.service(sessionsPath).patch(sessionId, {
-                status: 'error',
-                errorMessage: message,
-              }).catch(() => {/* non-fatal */})
+              await app
+                .service(sessionsPath)
+                .patch(sessionId, {
+                  status: 'error',
+                  errorMessage: message
+                })
+                .catch(() => {
+                  /* non-fatal */
+                })
             })
-        },
+        }
       ],
       remove: [
         // Stop the sandbox container when session is removed
@@ -119,15 +129,20 @@ export const sessions = (app: Application) => {
           }
 
           // Revert project status to ready
-          await app.service('projects').patch(session.projectId.toString(), {
-            status: 'ready',
-          }).catch(() => {/* non-fatal */})
-        },
-      ],
+          await app
+            .service('projects')
+            .patch(session.projectId.toString(), {
+              status: 'ready'
+            })
+            .catch(() => {
+              /* non-fatal */
+            })
+        }
+      ]
     },
     error: {
-      all: [],
-    },
+      all: []
+    }
   })
 }
 

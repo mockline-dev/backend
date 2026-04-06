@@ -14,7 +14,7 @@ const LANG_EXT: Record<string, string> = {
   yaml: 'yaml',
   yml: 'yml',
   sh: 'sh',
-  bash: 'sh',
+  bash: 'sh'
 }
 
 // File path comment patterns (checked in order):
@@ -42,7 +42,7 @@ export function extractCodeBlocks(markdown: string): SandboxFile[] {
   let fallbackIndex = 0
 
   while ((match = fenceRegex.exec(markdown)) !== null) {
-    const fenceLine = match[1].trim()  // e.g. "ts // filepath: src/index.ts"
+    const fenceLine = match[1].trim() // e.g. "ts // filepath: src/index.ts"
     const body = match[2]
 
     if (!body.trim()) continue
@@ -95,6 +95,12 @@ export function detectPrimaryLanguage(files: SandboxFile[]): string {
 }
 
 function extensionToLanguage(ext: string): string {
-  const map: Record<string, string> = { ts: 'typescript', js: 'javascript', py: 'python', tsx: 'typescript', jsx: 'javascript' }
+  const map: Record<string, string> = {
+    ts: 'typescript',
+    js: 'javascript',
+    py: 'python',
+    tsx: 'typescript',
+    jsx: 'javascript'
+  }
   return map[ext.toLowerCase()] ?? 'unknown'
 }

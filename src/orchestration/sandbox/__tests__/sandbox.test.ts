@@ -11,7 +11,7 @@ const mockSuccessResult: SandboxResult = {
   testOutput: null,
   stdout: '',
   stderr: '',
-  durationMs: 100,
+  durationMs: 100
 }
 
 const mockFailResult: SandboxResult = {
@@ -22,13 +22,13 @@ const mockFailResult: SandboxResult = {
   testOutput: null,
   stdout: '',
   stderr: 'Type error',
-  durationMs: 50,
+  durationMs: 50
 }
 
 function makeProvider(result: SandboxResult): ISandboxProvider {
   return {
     name: 'mock',
-    execute: vi.fn().mockResolvedValue(result),
+    execute: vi.fn().mockResolvedValue(result)
   }
 }
 
@@ -71,7 +71,7 @@ describe('runSandbox', () => {
   it('handles provider throwing exception gracefully', async () => {
     const provider: ISandboxProvider = {
       name: 'throwing',
-      execute: vi.fn().mockRejectedValue(new Error('Connection refused')),
+      execute: vi.fn().mockRejectedValue(new Error('Connection refused'))
     }
     const md = '```ts // filepath: src/a.ts\nconst x = 1\n```'
     const { result } = await runSandbox(md, provider, emit, projectId)
@@ -85,7 +85,7 @@ describe('buildFixPrompt', () => {
   it('includes error details in the prompt', () => {
     const prompt = buildFixPrompt('const x = ???', {
       ...mockFailResult,
-      compilationOutput: 'SyntaxError: Unexpected token',
+      compilationOutput: 'SyntaxError: Unexpected token'
     })
     expect(prompt).toContain('SyntaxError: Unexpected token')
     expect(prompt).toContain('const x = ???')

@@ -18,7 +18,7 @@ const FILE_TYPE_MAP: Record<string, string> = {
   env: 'env',
   sh: 'shell',
   html: 'html',
-  css: 'css',
+  css: 'css'
 }
 
 function inferFileType(filePath: string): string {
@@ -41,7 +41,7 @@ export async function persistFiles(
   projectId: string,
   sandboxFiles: SandboxFile[],
   messageId: string | null,
-  app: any,
+  app: any
 ): Promise<PersistFilesResult> {
   if (sandboxFiles.length === 0) {
     return { fileIds: [], snapshotId: null, uploadedCount: 0 }
@@ -62,7 +62,7 @@ export async function persistFiles(
       // Upsert files service record
       const existing = await app.service('files').find({
         query: { projectId, name: file.path, $limit: 1 },
-        paginate: false,
+        paginate: false
       } as any)
 
       const fileList = Array.isArray(existing) ? existing : (existing.data ?? [])
@@ -71,7 +71,7 @@ export async function persistFiles(
         const patched = await app.service('files').patch(fileList[0]._id, {
           size: Buffer.byteLength(content, 'utf8'),
           currentVersion: (fileList[0].currentVersion ?? 1) + 1,
-          ...(messageId ? { messageId } : {}),
+          ...(messageId ? { messageId } : {})
         })
         fileIds.push(patched._id.toString())
       } else {
@@ -81,7 +81,7 @@ export async function persistFiles(
           key: r2Key,
           fileType: file.language ?? inferFileType(file.path),
           size: Buffer.byteLength(content, 'utf8'),
-          ...(messageId ? { messageId } : {}),
+          ...(messageId ? { messageId } : {})
         })
         fileIds.push(created._id.toString())
       }
@@ -89,7 +89,7 @@ export async function persistFiles(
       log.error('Failed to persist file', {
         projectId,
         path: file.path,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
       // Continue with other files — partial persistence is better than none
     }
@@ -99,7 +99,7 @@ export async function persistFiles(
   let snapshotId: string | null = null
   try {
     const latestResult = await app.service('snapshots').find({
-      query: { projectId, $sort: { version: -1 }, $limit: 1 },
+      query: { projectId, $sort: { version: -1 }, $limit: 1 }
     })
     const latestData = Array.isArray(latestResult) ? latestResult : (latestResult.data ?? [])
     const nextVersion = (latestData[0]?.version ?? 0) + 1
@@ -108,14 +108,14 @@ export async function persistFiles(
       projectId,
       version: nextVersion,
       label: messageId ? `AI edit v${nextVersion}` : `Auto-generation v${nextVersion}`,
-      trigger: messageId ? 'auto-ai-edit' : 'auto-generation',
+      trigger: messageId ? 'auto-ai-edit' : 'auto-generation'
     })
     snapshotId = snapshot._id?.toString() ?? null
     log.info('Snapshot created', { projectId, snapshotId, version: nextVersion })
   } catch (err: unknown) {
     log.warn('Snapshot creation failed (non-fatal)', {
       projectId,
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
   }
 

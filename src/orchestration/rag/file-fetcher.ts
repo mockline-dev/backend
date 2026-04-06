@@ -23,7 +23,7 @@ export async function fetchFileContent(
   } catch (err: unknown) {
     log.warn('Failed to fetch file content', {
       key,
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
     return null
   }

@@ -15,7 +15,7 @@ const LANGUAGE_MAP: Record<string, string> = {
   '.ts': 'typescript',
   '.tsx': 'tsx',
   '.js': 'javascript',
-  '.jsx': 'javascript',
+  '.jsx': 'javascript'
 }
 
 const CODE_EXTENSIONS = new Set(Object.keys(LANGUAGE_MAP))
@@ -37,7 +37,7 @@ export async function initTreeSitter(): Promise<void> {
       python: require.resolve('tree-sitter-wasms/out/tree-sitter-python.wasm'),
       typescript: require.resolve('tree-sitter-wasms/out/tree-sitter-typescript.wasm'),
       tsx: require.resolve('tree-sitter-wasms/out/tree-sitter-tsx.wasm'),
-      javascript: require.resolve('tree-sitter-wasms/out/tree-sitter-javascript.wasm'),
+      javascript: require.resolve('tree-sitter-wasms/out/tree-sitter-javascript.wasm')
     }
 
     for (const [lang, grammarPath] of Object.entries(grammarPaths)) {
@@ -48,7 +48,7 @@ export async function initTreeSitter(): Promise<void> {
         parsers.set(lang, parser)
       } catch (langErr: unknown) {
         log.warn(`Failed to load tree-sitter grammar for ${lang}`, {
-          error: langErr instanceof Error ? langErr.message : String(langErr),
+          error: langErr instanceof Error ? langErr.message : String(langErr)
         })
       }
     }
@@ -57,7 +57,7 @@ export async function initTreeSitter(): Promise<void> {
     log.info('Tree-sitter initialized', { languages: [...parsers.keys()] })
   } catch (err: unknown) {
     log.warn('Tree-sitter WASM init failed — will use text chunker fallback', {
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
   }
 }
@@ -92,7 +92,7 @@ export async function chunkCode(content: string, filepath: string): Promise<Code
   } catch (err: unknown) {
     log.warn('Tree-sitter parse failed, falling back to text chunker', {
       filepath,
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
     return chunkText(content, filepath)
   }
@@ -116,7 +116,7 @@ function extractChunks(rootNode: any, content: string, filepath: string): CodeCh
     'decorated_definition',
     'export_statement',
     'lexical_declaration',
-    'expression_statement',
+    'expression_statement'
   ])
 
   function walk(node: any, depth = 0) {
@@ -138,7 +138,7 @@ function extractChunks(rootNode: any, content: string, filepath: string): CodeCh
         startLine,
         endLine,
         symbolName,
-        symbolKind,
+        symbolKind
       })
       chunkIndex++
       return // Don't recurse into already-extracted nodes

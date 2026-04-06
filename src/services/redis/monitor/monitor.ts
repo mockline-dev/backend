@@ -34,7 +34,8 @@ function basicAuth(ctx: any, next: any) {
 }
 
 export async function initBullBoard(app: any) {
-  if (!generationQueue && !validationQueue && !orchestrationQueue && !indexingQueue) throw new Error('Queues not initialized')
+  if (!generationQueue && !validationQueue && !orchestrationQueue && !indexingQueue)
+    throw new Error('Queues not initialized')
 
   const serverAdapter = new KoaAdapter()
   serverAdapter.setBasePath('/admin/queues')
@@ -44,7 +45,7 @@ export async function initBullBoard(app: any) {
       new BullMQAdapter(generationQueue),
       new BullMQAdapter(validationQueue),
       new BullMQAdapter(orchestrationQueue),
-      new BullMQAdapter(indexingQueue),
+      new BullMQAdapter(indexingQueue)
     ],
     serverAdapter
   })

@@ -11,11 +11,7 @@ export const messagesSchema = Type.Object(
   {
     _id: ObjectIdSchema(),
     projectId: ObjectIdSchema(),
-    role: Type.Union([
-      Type.Literal('user'),
-      Type.Literal('assistant'),
-      Type.Literal('system'),
-    ]),
+    role: Type.Union([Type.Literal('user'), Type.Literal('assistant'), Type.Literal('system')]),
     content: Type.String(),
     intent: Type.Optional(Type.String()),
     model: Type.Optional(Type.String()),
@@ -25,21 +21,21 @@ export const messagesSchema = Type.Object(
           Type.Object({
             promptTokens: Type.Number(),
             completionTokens: Type.Number(),
-            totalTokens: Type.Number(),
+            totalTokens: Type.Number()
           })
         ),
         sandboxResult: Type.Optional(
           Type.Object({
             success: Type.Boolean(),
-            durationMs: Type.Number(),
+            durationMs: Type.Number()
           })
         ),
         filesGenerated: Type.Optional(Type.Array(Type.String())),
-        enhancedPrompt: Type.Optional(Type.String()),
+        enhancedPrompt: Type.Optional(Type.String())
       })
     ),
     createdAt: Type.Number(),
-    updatedAt: Type.Number(),
+    updatedAt: Type.Number()
   },
   { $id: 'Messages', additionalProperties: false }
 )
@@ -63,24 +59,27 @@ export const messagesDataResolver = resolve<Messages, HookContext<MessagesServic
     return value
   },
   createdAt: async () => Date.now(),
-  updatedAt: async () => Date.now(),
+  updatedAt: async () => Date.now()
 })
 
 export const messagesPatchSchema = Type.Partial(messagesSchema, { $id: 'MessagesPatch' })
 export type MessagesPatch = Static<typeof messagesPatchSchema>
 export const messagesPatchValidator = getValidator(messagesPatchSchema, dataValidator)
 export const messagesPatchResolver = resolve<MessagesPatch, HookContext<MessagesService>>({
-  updatedAt: async () => Date.now(),
+  updatedAt: async () => Date.now()
 })
 
 export const messagesQueryProperties = Type.Pick(messagesSchema, [
-  '_id', 'projectId', 'role', 'intent', 'model', 'createdAt', 'updatedAt',
+  '_id',
+  'projectId',
+  'role',
+  'intent',
+  'model',
+  'createdAt',
+  'updatedAt'
 ])
 export const messagesQuerySchema = Type.Intersect(
-  [
-    querySyntax(messagesQueryProperties),
-    Type.Object({}, { additionalProperties: false }),
-  ],
+  [querySyntax(messagesQueryProperties), Type.Object({}, { additionalProperties: false })],
   { additionalProperties: false }
 )
 export type MessagesQuery = Static<typeof messagesQuerySchema>

@@ -39,11 +39,14 @@ export async function syncProjectIndex(
   try {
     const result = await app.service('files').find({
       query: { projectId, $limit: 200 },
-      paginate: false,
+      paginate: false
     })
-    files = Array.isArray(result) ? result : result.data ?? []
+    files = Array.isArray(result) ? result : (result.data ?? [])
   } catch (err) {
-    log.error('Failed to fetch file records', { projectId, error: err instanceof Error ? err.message : String(err) })
+    log.error('Failed to fetch file records', {
+      projectId,
+      error: err instanceof Error ? err.message : String(err)
+    })
     return { changes: noChanges, indexed: 0, removed: 0 }
   }
 
@@ -54,12 +57,12 @@ export async function syncProjectIndex(
 
   // Fetch all file contents
   const fileContents = await Promise.all(
-    files.map(async (f) => {
+    files.map(async f => {
       const content = await fetchFileContent(f.key, app)
       return { file: f, content }
     })
   )
-  const available = fileContents.filter((fc) => fc.content !== null) as Array<{
+  const available = fileContents.filter(fc => fc.content !== null) as Array<{
     file: FileRecord
     content: string
   }>
@@ -67,7 +70,7 @@ export async function syncProjectIndex(
   // Build new tree from current state
   const newTree = buildTree(
     projectId,
-    available.map((fc) => ({ path: fc.file.name, content: fc.content, size: fc.content.length }))
+    available.map(fc => ({ path: fc.file.name, content: fc.content, size: fc.content.length }))
   )
 
   // Load existing tree
@@ -80,10 +83,10 @@ export async function syncProjectIndex(
     newTree.version = 1
     await store.save(newTree)
     const changes: ChangeSet = {
-      added: available.map((fc) => fc.file.name),
+      added: available.map(fc => fc.file.name),
       modified: [],
       deleted: [],
-      unchanged: 0,
+      unchanged: 0
     }
     return { changes, indexed, removed: 0 }
   }
@@ -100,7 +103,7 @@ export async function syncProjectIndex(
     projectId,
     added: changes.added.length,
     modified: changes.modified.length,
-    deleted: changes.deleted.length,
+    deleted: changes.deleted.length
   })
 
   let indexed = 0
@@ -115,13 +118,13 @@ export async function syncProjectIndex(
 
   // Re-index added and modified files
   const toIndex = [...changes.added, ...changes.modified]
-  const contentMap = new Map(available.map((fc) => [fc.file.name, { content: fc.content, file: fc.file }]))
+  const contentMap = new Map(available.map(fc => [fc.file.name, { content: fc.content, file: fc.file }]))
 
   const BATCH_SIZE = 10
   for (let i = 0; i < toIndex.length; i += BATCH_SIZE) {
     const batch = toIndex.slice(i, i + BATCH_SIZE)
     await Promise.all(
-      batch.map(async (filepath) => {
+      batch.map(async filepath => {
         const entry = contentMap.get(filepath)
         if (!entry) return
         try {
@@ -129,13 +132,13 @@ export async function syncProjectIndex(
             ? await chunkCode(entry.content, entry.file.name)
             : chunkText(entry.content, entry.file.name)
 
-          const prefixed = chunks.map((c) => ({ ...c, id: `${projectId}:${c.id}` }))
+          const prefixed = chunks.map(c => ({ ...c, id: `${projectId}:${c.id}` }))
           await vectorStore.addChunks(projectId, prefixed)
           indexed++
         } catch (err) {
           log.warn('Failed to re-index file', {
             filepath,
-            error: err instanceof Error ? err.message : String(err),
+            error: err instanceof Error ? err.message : String(err)
           })
         }
       })

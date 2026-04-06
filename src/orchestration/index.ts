@@ -49,7 +49,7 @@ export type {
   OrchestrationResult,
   RateLimitError,
   ProviderTimeoutError,
-  AllProvidersFailedError,
+  AllProvidersFailedError
 } from './types'
 
 export type { MerkleFileNode, MerkleTreeDocument, ChangeSet } from './merkle/types'

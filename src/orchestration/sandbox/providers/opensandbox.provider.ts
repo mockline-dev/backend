@@ -16,8 +16,8 @@ interface LanguageConfig {
   testCommand: string
   /** Install dependencies if a manifest file is present. */
   depInstall?: {
-    manifestFile: string   // e.g. "requirements.txt", "package.json"
-    command: string        // e.g. "pip install -r /workspace/requirements.txt"
+    manifestFile: string // e.g. "requirements.txt", "package.json"
+    command: string // e.g. "pip install -r /workspace/requirements.txt"
   }
   /** Patterns that indicate a failed test run in stdout/stderr. */
   failurePatterns: string[]
@@ -28,41 +28,39 @@ const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
   python: {
     buildCommands: [
       // Syntax-check every .py file — fast, no execution
-      'python3 -m py_compile $(find /workspace -name "*.py" | head -50) 2>&1',
+      'python3 -m py_compile $(find /workspace -name "*.py" | head -50) 2>&1'
     ],
     testCommand: 'cd /workspace && python3 -m pytest --tb=short -q 2>&1 || true',
     depInstall: {
       manifestFile: 'requirements.txt',
-      command: 'pip install --quiet -r /workspace/requirements.txt 2>&1 || true',
+      command: 'pip install --quiet -r /workspace/requirements.txt 2>&1 || true'
     },
-    failurePatterns: ['FAILED', 'ERROR', 'error:', 'SyntaxError', 'IndentationError'],
+    failurePatterns: ['FAILED', 'ERROR', 'error:', 'SyntaxError', 'IndentationError']
   },
 
   // ── TypeScript (future) ─────────────────────────────────────────────────────
   typescript: {
-    buildCommands: [
-      'cd /workspace && npx --yes tsc --noEmit --strict 2>&1 || true',
-    ],
+    buildCommands: ['cd /workspace && npx --yes tsc --noEmit --strict 2>&1 || true'],
     testCommand: 'cd /workspace && npm test 2>&1 || true',
     depInstall: {
       manifestFile: 'package.json',
-      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true',
+      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true'
     },
-    failurePatterns: ['error TS', 'FAIL', 'Error:'],
+    failurePatterns: ['error TS', 'FAIL', 'Error:']
   },
 
   // ── JavaScript (future) ─────────────────────────────────────────────────────
   javascript: {
     buildCommands: [
-      'node --check /workspace/index.js 2>&1 || node --check /workspace/src/index.js 2>&1 || true',
+      'node --check /workspace/index.js 2>&1 || node --check /workspace/src/index.js 2>&1 || true'
     ],
     testCommand: 'cd /workspace && npm test 2>&1 || true',
     depInstall: {
       manifestFile: 'package.json',
-      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true',
+      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true'
     },
-    failurePatterns: ['SyntaxError', 'FAIL', 'Error:'],
-  },
+    failurePatterns: ['SyntaxError', 'FAIL', 'Error:']
+  }
 }
 
 // Fallback for any unlisted language — just try to list the files so we know
@@ -70,7 +68,7 @@ const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
 const FALLBACK_CONFIG: LanguageConfig = {
   buildCommands: ['ls /workspace 2>&1'],
   testCommand: 'echo "no test runner configured" 2>&1',
-  failurePatterns: [],
+  failurePatterns: []
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,49 +110,61 @@ export class OpenSandboxProvider implements ISandboxProvider {
         // Without this, sandbox containers try to call back to localhost:8080
         // from inside their container network and fail with a health-check timeout.
         // useServerProxy routes all container↔server traffic through the SDK instead.
-        useServerProxy: true,
+        useServerProxy: true
       })
 
       sandbox = await Sandbox.create({
         connectionConfig,
         image: opts.image || this.config.defaultImage,
         timeoutSeconds: Math.ceil(opts.timeoutMs / 1000) + 30,
-        env: { PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1' },
+        env: { PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1' }
       })
 
       log.debug('Sandbox created', { language: langKey, fileCount: files.length })
 
       // 1. Write all generated files to /workspace
       await sandbox.files.writeFiles(
-        files.map((f) => ({
+        files.map(f => ({
           path: `/workspace/${f.path}`,
           data: f.content,
-          mode: 0o644,
+          mode: 0o644
         }))
       )
 
       // 2. Install dependencies if manifest file is present
       if (lang.depInstall) {
-        const hasManifest = files.some((f) =>
-          f.path === lang.depInstall!.manifestFile ||
-          f.path.endsWith(`/${lang.depInstall!.manifestFile}`)
+        const hasManifest = files.some(
+          f =>
+            f.path === lang.depInstall!.manifestFile || f.path.endsWith(`/${lang.depInstall!.manifestFile}`)
         )
         if (hasManifest) {
           log.debug('Installing dependencies', { langKey, manifest: lang.depInstall.manifestFile })
-          await sandbox.commands.run(lang.depInstall.command, {}, {
-            onStdout: capture('stdout'),
-            onStderr: capture('stderr'),
-          })
+          await sandbox.commands.run(
+            lang.depInstall.command,
+            {},
+            {
+              onStdout: capture('stdout'),
+              onStderr: capture('stderr')
+            }
+          )
         }
       }
 
       // 3. Syntax / compile check
       let compilationOutput = ''
       for (const cmd of lang.buildCommands) {
-        const result = await sandbox.commands.run(cmd, {}, {
-          onStdout: (msg: any) => { compilationOutput += typeof msg === 'string' ? msg : (msg?.text ?? '') },
-          onStderr: (msg: any) => { compilationOutput += typeof msg === 'string' ? msg : (msg?.text ?? '') },
-        })
+        const result = await sandbox.commands.run(
+          cmd,
+          {},
+          {
+            onStdout: (msg: any) => {
+              compilationOutput += typeof msg === 'string' ? msg : (msg?.text ?? '')
+            },
+            onStderr: (msg: any) => {
+              compilationOutput += typeof msg === 'string' ? msg : (msg?.text ?? '')
+            }
+          }
+        )
         const exitCode = (result as any).exitCode ?? 0
         if (exitCode !== 0) {
           log.debug('Compilation failed', { langKey, exitCode, output: compilationOutput.slice(0, 200) })
@@ -166,7 +176,7 @@ export class OpenSandboxProvider implements ISandboxProvider {
             testOutput: null,
             stdout,
             stderr,
-            durationMs: Date.now() - start,
+            durationMs: Date.now() - start
           }
         }
       }
@@ -175,12 +185,18 @@ export class OpenSandboxProvider implements ISandboxProvider {
       let testOutput: string | null = null
       let testsPassed = true
       if (opts.runTests) {
-        await sandbox.commands.run(lang.testCommand, {}, {
-          onStdout: (msg: any) => { testOutput = (testOutput ?? '') + (typeof msg === 'string' ? msg : (msg?.text ?? '')) },
-          onStderr: capture('stderr'),
-        })
+        await sandbox.commands.run(
+          lang.testCommand,
+          {},
+          {
+            onStdout: (msg: any) => {
+              testOutput = (testOutput ?? '') + (typeof msg === 'string' ? msg : (msg?.text ?? ''))
+            },
+            onStderr: capture('stderr')
+          }
+        )
         const combined = (testOutput ?? '') + stderr
-        testsPassed = !lang.failurePatterns.some((p) => combined.includes(p))
+        testsPassed = !lang.failurePatterns.some(p => combined.includes(p))
       }
 
       return {
@@ -191,7 +207,7 @@ export class OpenSandboxProvider implements ISandboxProvider {
         testOutput,
         stdout,
         stderr,
-        durationMs: Date.now() - start,
+        durationMs: Date.now() - start
       }
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err))
@@ -205,12 +221,20 @@ export class OpenSandboxProvider implements ISandboxProvider {
         stdout,
         stderr,
         durationMs: Date.now() - start,
-        error: error.message,
+        error: error.message
       }
     } finally {
       if (sandbox) {
-        try { await sandbox.kill() } catch {/* non-fatal */}
-        try { await sandbox.close() } catch {/* non-fatal */}
+        try {
+          await sandbox.kill()
+        } catch {
+          /* non-fatal */
+        }
+        try {
+          await sandbox.close()
+        } catch {
+          /* non-fatal */
+        }
       }
     }
   }

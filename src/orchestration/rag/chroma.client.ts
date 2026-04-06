@@ -71,14 +71,14 @@ export class ChromaVectorStore {
       const collection = await this.client.getOrCreateCollection({
         name,
         embeddingFunction: embedFn,
-        metadata: { projectId },
+        metadata: { projectId }
       })
       this.collectionCache.set(name, collection)
       return collection
     } catch (err: unknown) {
       log.warn('ChromaDB collection access failed', {
         projectId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
       return null
     }
@@ -95,22 +95,22 @@ export class ChromaVectorStore {
 
     try {
       await collection.upsert({
-        ids: chunks.map((c) => c.id),
-        documents: chunks.map((c) => c.content),
-        metadatas: chunks.map((c) => ({
+        ids: chunks.map(c => c.id),
+        documents: chunks.map(c => c.content),
+        metadatas: chunks.map(c => ({
           filepath: c.filepath,
           startLine: c.startLine,
           endLine: c.endLine,
           symbolName: c.symbolName ?? '',
-          symbolKind: c.symbolKind ?? 'block',
-        })),
+          symbolKind: c.symbolKind ?? 'block'
+        }))
       })
       log.debug('Indexed chunks', { projectId, count: chunks.length })
     } catch (err: unknown) {
       log.warn('ChromaDB upsert failed', {
         projectId,
         count: chunks.length,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
     }
   }
@@ -125,7 +125,7 @@ export class ChromaVectorStore {
     try {
       const results = await collection.query({
         queryTexts: [queryText],
-        nResults: Math.min(limit, 50),
+        nResults: Math.min(limit, 50)
       })
 
       const ids = results.ids[0] ?? []
@@ -141,15 +141,15 @@ export class ChromaVectorStore {
           startLine: Number((metadatas[i] as any)?.startLine ?? 0),
           endLine: Number((metadatas[i] as any)?.endLine ?? 0),
           symbolName: (metadatas[i] as any)?.symbolName || undefined,
-          symbolKind: ((metadatas[i] as any)?.symbolKind as CodeChunk['symbolKind']) ?? 'block',
+          symbolKind: ((metadatas[i] as any)?.symbolKind as CodeChunk['symbolKind']) ?? 'block'
         },
         // ChromaDB returns L2 distance; convert to similarity score (lower distance = higher score)
-        score: 1 / (1 + (distances[i] ?? 1)),
+        score: 1 / (1 + (distances[i] ?? 1))
       }))
     } catch (err: unknown) {
       log.warn('ChromaDB query failed', {
         projectId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
       return []
     }
@@ -169,7 +169,7 @@ export class ChromaVectorStore {
       log.warn('ChromaDB deleteByFilepath failed', {
         projectId,
         filepath,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
     }
   }
@@ -186,7 +186,7 @@ export class ChromaVectorStore {
     } catch (err: unknown) {
       log.warn('ChromaDB delete collection failed', {
         projectId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err instanceof Error ? err.message : String(err)
       })
     }
   }

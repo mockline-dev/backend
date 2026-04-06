@@ -29,7 +29,7 @@ describe('computeRootHash', () => {
   it('is order-independent', () => {
     const files = [
       { path: 'b.ts', hash: 'bbb' },
-      { path: 'a.ts', hash: 'aaa' },
+      { path: 'a.ts', hash: 'aaa' }
     ]
     const reversed = [...files].reverse()
     expect(computeRootHash(files)).toBe(computeRootHash(reversed))

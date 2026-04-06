@@ -52,14 +52,14 @@ export async function classifyIntent(
     temperature: 0.1,
     maxTokens: 200,
     json: true,
-    timeoutMs: 15_000,
+    timeoutMs: 15_000
   }
 
   try {
     const response = await provider.chat(
       [
         { role: 'system', content: CLASSIFIER_PROMPT },
-        { role: 'user', content: query },
+        { role: 'user', content: query }
       ],
       opts
     )
@@ -77,22 +77,22 @@ export async function classifyIntent(
     log.debug('Intent classified', {
       intent,
       confidence: parsed.confidence,
-      model: response.model,
+      model: response.model
     })
 
     return {
       intent,
       confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.8,
-      entities: parsed.entities ?? {},
+      entities: parsed.entities ?? {}
     }
   } catch (err: unknown) {
     log.warn('Intent classification failed, defaulting to General', {
-      error: err instanceof Error ? err.message : String(err),
+      error: err instanceof Error ? err.message : String(err)
     })
     return {
       intent: Intent.General,
       confidence: 0.5,
-      entities: {},
+      entities: {}
     }
   }
 }

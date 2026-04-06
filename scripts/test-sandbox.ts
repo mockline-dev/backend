@@ -24,16 +24,12 @@ import * as path from 'path'
 const configPath = path.resolve(__dirname, '../config/default.json')
 const defaultConfig: Record<string, any> = JSON.parse(fs.readFileSync(configPath, 'utf8'))
 
-const SANDBOX_DOMAIN = process.env.OPENSANDBOX_DOMAIN
-  || defaultConfig?.sandbox?.opensandbox?.domain
-  || 'localhost:8080'
-const SANDBOX_API_KEY = process.env.OPENSANDBOX_API_KEY
-  || defaultConfig?.sandbox?.opensandbox?.apiKey
-  || ''
+const SANDBOX_DOMAIN =
+  process.env.OPENSANDBOX_DOMAIN || defaultConfig?.sandbox?.opensandbox?.domain || 'localhost:8080'
+const SANDBOX_API_KEY = process.env.OPENSANDBOX_API_KEY || defaultConfig?.sandbox?.opensandbox?.apiKey || ''
 const SANDBOX_PROTOCOL = defaultConfig?.sandbox?.opensandbox?.protocol || 'http'
-const SANDBOX_IMAGE = process.env.OPENSANDBOX_IMAGE
-  || defaultConfig?.sandbox?.opensandbox?.defaultImage
-  || 'python:3.11-slim'
+const SANDBOX_IMAGE =
+  process.env.OPENSANDBOX_IMAGE || defaultConfig?.sandbox?.opensandbox?.defaultImage || 'python:3.11-slim'
 const SANDBOX_TIMEOUT = defaultConfig?.sandbox?.timeoutMs || 30000
 
 import { extractCodeBlocks, detectPrimaryLanguage } from '../src/orchestration/sandbox/code-extractor'
@@ -43,15 +39,17 @@ import type { SandboxResult } from '../src/orchestration/sandbox/types'
 
 // ─── Console helpers ─────────────────────────────────────────────────────────
 
-const GREEN  = '\x1b[32m'
-const RED    = '\x1b[31m'
+const GREEN = '\x1b[32m'
+const RED = '\x1b[31m'
 const YELLOW = '\x1b[33m'
-const CYAN   = '\x1b[36m'
-const DIM    = '\x1b[2m'
-const RESET  = '\x1b[0m'
-const BOLD   = '\x1b[1m'
+const CYAN = '\x1b[36m'
+const DIM = '\x1b[2m'
+const RESET = '\x1b[0m'
+const BOLD = '\x1b[1m'
 
-let passCount = 0, failCount = 0, warnCount = 0
+let passCount = 0,
+  failCount = 0,
+  warnCount = 0
 
 function ok(label: string, detail?: string) {
   passCount++
@@ -116,7 +114,7 @@ function testCodeExtractor() {
     const md5 = [
       '```ts // filepath: src/a.ts\nexport const a = 1\n```',
       '```ts // filepath: src/b.ts\nexport const b = 2\n```',
-      '```ts // filepath: src/c.ts\nexport const c = 3\n```',
+      '```ts // filepath: src/c.ts\nexport const c = 3\n```'
     ].join('\n\n')
     const f5 = extractCodeBlocks(md5)
     if (f5.length === 3 && f5.map(f => f.path).join(',') === 'src/a.ts,src/b.ts,src/c.ts') {
@@ -133,12 +131,11 @@ function testCodeExtractor() {
     const files = [
       { path: 'a.py', content: '', language: 'python' },
       { path: 'b.py', content: '', language: 'python' },
-      { path: 'c.ts', content: '', language: 'typescript' },
+      { path: 'c.ts', content: '', language: 'typescript' }
     ]
     const lang = detectPrimaryLanguage(files)
     if (lang === 'python') ok('detectPrimaryLanguage() returns most frequent', `detected=${lang}`)
     else fail('detectPrimaryLanguage() wrong result', lang)
-
   } catch (err) {
     fail('Code extractor threw', err)
   }
@@ -158,7 +155,7 @@ function testBuildFixPrompt() {
       testOutput: null,
       stdout: '',
       stderr: 'Type checking failed',
-      durationMs: 50,
+      durationMs: 50
     }
 
     const prompt = buildFixPrompt('const x = foo()', broken)
@@ -173,11 +170,14 @@ function testBuildFixPrompt() {
     else fail('Fix instruction missing', prompt.slice(0, 100))
 
     // Prompt with only stderr
-    const onlyStderr: SandboxResult = { ...broken, compilationOutput: null, stderr: 'ModuleNotFoundError: numpy' }
+    const onlyStderr: SandboxResult = {
+      ...broken,
+      compilationOutput: null,
+      stderr: 'ModuleNotFoundError: numpy'
+    }
     const prompt2 = buildFixPrompt('import numpy', onlyStderr)
     if (prompt2.includes('ModuleNotFoundError')) ok('stderr fallback included when no compilationOutput')
     else fail('stderr fallback missing', prompt2.slice(0, 100))
-
   } catch (err) {
     fail('buildFixPrompt threw', err)
   }
@@ -191,7 +191,7 @@ async function checkOpenSandboxConnectivity(): Promise<boolean> {
   console.log(`  ${DIM}Connecting to http://${SANDBOX_DOMAIN}/health ...${RESET}`)
   try {
     const res = await fetch(`http://${SANDBOX_DOMAIN}/health`, {
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(5000)
     })
     if (res.ok) {
       ok(`OpenSandbox reachable at http://${SANDBOX_DOMAIN}`, `HTTP ${res.status}`)
@@ -243,11 +243,13 @@ def flatten(lst: list) -> list:
     domain: SANDBOX_DOMAIN,
     apiKey: SANDBOX_API_KEY,
     protocol: SANDBOX_PROTOCOL as any,
-    defaultImage: SANDBOX_IMAGE,
+    defaultImage: SANDBOX_IMAGE
   })
 
   const events: string[] = []
-  const emit = (event: string, _pid: string, _payload: unknown) => { events.push(event) }
+  const emit = (event: string, _pid: string, _payload: unknown) => {
+    events.push(event)
+  }
 
   console.log(`  ${DIM}Provisioning sandbox container (this may take 10-30s on first run)...${RESET}`)
   const start = Date.now()
@@ -256,7 +258,7 @@ def flatten(lst: list) -> list:
     const { result } = await runSandbox(llmOutput, provider, emit, 'test-proj-py', {
       timeoutMs: SANDBOX_TIMEOUT,
       language: 'python',
-      runTests: false,
+      runTests: false
     })
 
     const elapsed = Date.now() - start
@@ -278,7 +280,6 @@ def flatten(lst: list) -> list:
     }
 
     if (result.stdout) ok('stdout captured', result.stdout.trim().slice(0, 60))
-
   } catch (err) {
     fail('Python execution threw', err)
   }
@@ -288,7 +289,10 @@ def flatten(lst: list) -> list:
 
 async function testTypescriptExecution(available: boolean) {
   section('5. TypeScript Code Execution (future language — skipped in Python-first mode)')
-  warn('TypeScript sandbox execution not tested in Python-first mode', 'will be enabled when multi-language support is added')
+  warn(
+    'TypeScript sandbox execution not tested in Python-first mode',
+    'will be enabled when multi-language support is added'
+  )
 }
 
 // ─── 6. Agentic Fix Loop (broken Python → fixed) ─────────────────────────────
@@ -322,7 +326,7 @@ def greet(name: str) -> str:
     domain: SANDBOX_DOMAIN,
     apiKey: SANDBOX_API_KEY,
     protocol: SANDBOX_PROTOCOL as any,
-    defaultImage: SANDBOX_IMAGE,
+    defaultImage: SANDBOX_IMAGE
   })
 
   const retryEvents: string[] = []
@@ -341,11 +345,11 @@ def greet(name: str) -> str:
     const { result: brokenResult } = await runSandbox(brokenOutput, provider, emit, 'test-fix', {
       timeoutMs: SANDBOX_TIMEOUT,
       language: 'python',
-      runTests: false,
+      runTests: false
     })
 
     if (!brokenResult.success) {
-      ok('Broken code detected as failed', `output="${brokenResult.compilationOutput?.slice(0,60)}..."`)
+      ok('Broken code detected as failed', `output="${brokenResult.compilationOutput?.slice(0, 60)}..."`)
     } else {
       warn('Broken code unexpectedly succeeded (py_compile may be lenient on this syntax)')
     }
@@ -359,7 +363,7 @@ def greet(name: str) -> str:
     const { result: fixedResult } = await runSandbox(fixedOutput, provider, emit, 'test-fix', {
       timeoutMs: SANDBOX_TIMEOUT,
       language: 'python',
-      runTests: false,
+      runTests: false
     })
 
     if (fixedResult.success) {
@@ -367,7 +371,6 @@ def greet(name: str) -> str:
     } else {
       warn('Fixed code still failed', fixedResult.compilationOutput?.slice(0, 80) || fixedResult.error || '')
     }
-
   } catch (err) {
     fail('Agentic fix loop threw', err)
   }
@@ -377,7 +380,9 @@ def greet(name: str) -> str:
 
 async function main() {
   banner('Mockline Shadow Workspace (OpenSandbox) Smoke Test')
-  console.log(`${DIM}  Layers: code-extractor → buildFixPrompt → connectivity → TS exec → Python exec → fix loop${RESET}`)
+  console.log(
+    `${DIM}  Layers: code-extractor → buildFixPrompt → connectivity → TS exec → Python exec → fix loop${RESET}`
+  )
   console.log(`${DIM}  OpenSandbox: http://${SANDBOX_DOMAIN}  image=${SANDBOX_IMAGE}${RESET}`)
 
   testCodeExtractor()
@@ -389,13 +394,15 @@ async function main() {
 
   const line = '─'.repeat(55)
   console.log(`\n${BOLD}${line}${RESET}`)
-  console.log(`  ${GREEN}${passCount} passed${RESET}  ${failCount > 0 ? RED : DIM}${failCount} failed${RESET}  ${warnCount > 0 ? YELLOW : DIM}${warnCount} warnings${RESET}`)
+  console.log(
+    `  ${GREEN}${passCount} passed${RESET}  ${failCount > 0 ? RED : DIM}${failCount} failed${RESET}  ${warnCount > 0 ? YELLOW : DIM}${warnCount} warnings${RESET}`
+  )
   console.log(`${BOLD}${line}${RESET}\n`)
 
   if (failCount > 0) process.exit(1)
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(`\n${RED}Fatal error:${RESET}`, err)
   process.exit(1)
 })

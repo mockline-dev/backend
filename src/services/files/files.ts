@@ -94,11 +94,19 @@ export const files = (app: Application) => {
           // Trigger incremental re-index for the project (deduplicated by jobId)
           const projectId = result?.projectId ?? context.data?.projectId
           if (projectId) {
-            indexingQueue.add('sync', { projectId }, {
-              delay: 3000,
-              jobId: `sync-${projectId}`,
-              removeOnComplete: true,
-            }).catch(() => {/* non-fatal */})
+            indexingQueue
+              .add(
+                'sync',
+                { projectId },
+                {
+                  delay: 3000,
+                  jobId: `sync-${projectId}`,
+                  removeOnComplete: true
+                }
+              )
+              .catch(() => {
+                /* non-fatal */
+              })
           }
         }
       ],
@@ -106,11 +114,19 @@ export const files = (app: Application) => {
         async (context: HookContext) => {
           const projectId = context.result?.projectId
           if (projectId) {
-            indexingQueue.add('sync', { projectId }, {
-              delay: 3000,
-              jobId: `sync-${projectId}`,
-              removeOnComplete: true,
-            }).catch(() => {/* non-fatal */})
+            indexingQueue
+              .add(
+                'sync',
+                { projectId },
+                {
+                  delay: 3000,
+                  jobId: `sync-${projectId}`,
+                  removeOnComplete: true
+                }
+              )
+              .catch(() => {
+                /* non-fatal */
+              })
           }
         }
       ],
@@ -118,11 +134,19 @@ export const files = (app: Application) => {
         async (context: HookContext) => {
           const projectId = context.result?.projectId
           if (projectId) {
-            indexingQueue.add('sync', { projectId }, {
-              delay: 3000,
-              jobId: `sync-${projectId}`,
-              removeOnComplete: true,
-            }).catch(() => {/* non-fatal */})
+            indexingQueue
+              .add(
+                'sync',
+                { projectId },
+                {
+                  delay: 3000,
+                  jobId: `sync-${projectId}`,
+                  removeOnComplete: true
+                }
+              )
+              .catch(() => {
+                /* non-fatal */
+              })
           }
         }
       ]

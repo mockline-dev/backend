@@ -12,12 +12,12 @@ function mockProvider(name: string, response?: Partial<LLMResponse>): ILLMProvid
       provider: name,
       usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
       finishReason: 'stop',
-      ...response,
+      ...response
     }),
     chatStream: vi.fn().mockImplementation(async function* () {
       yield { content: 'mock', done: false }
       yield { content: ' stream', done: true }
-    }),
+    })
   }
 }
 
@@ -27,7 +27,7 @@ function failingProvider(name: string, error: Error): ILLMProvider {
     chat: vi.fn().mockRejectedValue(error),
     chatStream: vi.fn().mockImplementation(async function* () {
       throw error
-    }),
+    })
   }
 }
 
@@ -90,7 +90,7 @@ describe('LLMRouter', () => {
       chunks.push(chunk)
     }
     expect(chunks.length).toBeGreaterThan(0)
-    expect(chunks.some((c) => c.content.length > 0)).toBe(true)
+    expect(chunks.some(c => c.content.length > 0)).toBe(true)
   })
 
   it('falls back stream on RateLimitError', async () => {
