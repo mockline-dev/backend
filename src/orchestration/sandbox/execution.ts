@@ -7,6 +7,7 @@ const log = createModuleLogger('sandbox-execution')
 export interface ExecutionResult {
   containerId: string
   proxyUrl: string
+  endpointHeaders: Record<string, string>
   port: number
 }
 
@@ -266,21 +267,23 @@ export async function startProjectExecution(
     })
   }
 
-  // Poll for server readiness (max 30s) and get external URL
-  const proxyUrl = await waitForServer(sandbox, SERVER_PORT, 30000)
+  // Poll for server readiness (max 30s) and get external URL + routing headers
+  const { proxyUrl, endpointHeaders } = await waitForServer(sandbox, SERVER_PORT, 30000)
   log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint })
 
   // Extract containerId from sandbox internals (best-effort)
   const containerId = (sandbox as any).id ?? (sandbox as any).containerId ?? 'unknown'
 
-  return { containerId, proxyUrl, port: SERVER_PORT, sandbox }
+  return { containerId, proxyUrl, endpointHeaders, port: SERVER_PORT, sandbox }
 }
 
-async function waitForServer(sandbox: Sandbox, port: number, timeoutMs: number): Promise<string> {
+async function waitForServer(
+  sandbox: Sandbox,
+  port: number,
+  timeoutMs: number
+): Promise<{ proxyUrl: string; endpointHeaders: Record<string, string> }> {
   // Run a single shell loop inside the sandbox that polls until the port opens.
   // nc -z exits 0 when the port is open; the loop exits 1 on timeout.
-  // This avoids the JS polling loop and the broken result.stdout check
-  // (Execution.logs.stdout is OutputMessage[], not a string).
   const maxAttempts = Math.max(5, Math.floor(timeoutMs / 2000))
   const portCheckCmd =
     `for i in $(seq 1 ${maxAttempts}); do nc -z localhost ${port} 2>/dev/null && exit 0; sleep 2; done; exit 1`
@@ -289,20 +292,28 @@ async function waitForServer(sandbox: Sandbox, port: number, timeoutMs: number):
     const result = await sandbox.commands.run(portCheckCmd) as any
     if (result.exitCode === 0) {
       try {
-        return await sandbox.getEndpointUrl(port)
+        // getEndpoint returns both the URL and any required routing headers
+        // (e.g. when OpenSandbox server-proxy mode needs a routing header)
+        const ep = await sandbox.getEndpoint(port)
+        const proxyUrl = `${sandbox.connectionConfig.protocol}://${ep.endpoint}`
+        const endpointHeaders = (ep.headers as Record<string, string>) ?? {}
+        return { proxyUrl, endpointHeaders }
       } catch {
-        return `http://localhost:${port}`
+        return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {} }
       }
     }
   } catch {
-    // nc not available or command error — fall through and try URL anyway
+    // nc not available or command timed out — fall through
   }
 
-  // Server may be running even if check failed — get URL as best effort
+  // Best-effort: get endpoint URL even if server readiness check failed
   try {
-    return await sandbox.getEndpointUrl(port)
+    const ep = await sandbox.getEndpoint(port)
+    const proxyUrl = `${sandbox.connectionConfig.protocol}://${ep.endpoint}`
+    const endpointHeaders = (ep.headers as Record<string, string>) ?? {}
+    return { proxyUrl, endpointHeaders }
   } catch {
-    return `http://localhost:${port}`
+    return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {} }
   }
 }
 
