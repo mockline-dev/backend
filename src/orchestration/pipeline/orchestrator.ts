@@ -137,8 +137,8 @@ export async function orchestrate(
 
   // 5. Stream response
   let fullContent = ''
-  let finalModel = ''
-  let finalProvider = ''
+  let finalModel = llmConfig?.groq?.defaultModel ?? 'unknown'
+  let finalProvider = 'groq'
   let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
 
   try {
@@ -147,24 +147,26 @@ export async function orchestrate(
         fullContent += chunk.content
         emit('orchestration:token', projectId, { token: chunk.content })
       }
+      if (chunk.done) {
+        if (chunk.usage) usage = chunk.usage
+        if (chunk.model) finalModel = chunk.model
+        if (chunk.provider) finalProvider = chunk.provider
+      }
     }
 
-    // Get usage via non-streaming call metadata is not available on stream
-    // We do a best-effort token estimate
-    usage = {
-      promptTokens:
-        built.budget.systemPrompt +
-        built.budget.retrievedContext +
-        built.budget.history +
-        built.budget.userQuery,
-      completionTokens: Math.ceil(fullContent.length / 4),
-      totalTokens: 0
+    // Fallback estimation only if provider didn't return usage
+    if (!usage.promptTokens && !usage.completionTokens) {
+      usage = {
+        promptTokens:
+          built.budget.systemPrompt +
+          built.budget.retrievedContext +
+          built.budget.history +
+          built.budget.userQuery,
+        completionTokens: Math.ceil(fullContent.length / 4),
+        totalTokens: 0
+      }
+      usage.totalTokens = usage.promptTokens + usage.completionTokens
     }
-    usage.totalTokens = usage.promptTokens + usage.completionTokens
-
-    // Get model/provider info from router
-    finalModel = llmConfig?.groq?.defaultModel ?? 'unknown'
-    finalProvider = 'router'
   } catch (err: unknown) {
     const error = err instanceof Error ? err : new Error(String(err))
     log.error('LLM generation failed', { projectId, error: error.message })
