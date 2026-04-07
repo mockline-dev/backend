@@ -56,6 +56,7 @@
     "test:smoke": "ts-node --project tsconfig.scripts.json scripts/test-orchestration.ts",
     "test:merkle": "ts-node --project tsconfig.scripts.json scripts/test-merkle.ts",
     "test:sandbox": "ts-node --project tsconfig.scripts.json scripts/test-sandbox.ts",
+    "test:session": "ts-node --project tsconfig.scripts.json scripts/test-session.ts",
     "test:all": "pnpm run test:smoke && pnpm run test:merkle && pnpm run test:sandbox",
     "sim": "ts-node --project tsconfig.scripts.json scripts/simulate-frontend.ts"
   },
