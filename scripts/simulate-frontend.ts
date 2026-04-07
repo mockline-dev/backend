@@ -13,11 +13,14 @@
  *   9. Tear down
  *
  * Usage:
- *   pnpm run sim                         # uses defaults
- *   API_URL=http://localhost:3030 pnpm run sim
- *   SIM_EMAIL=test@x.com SIM_PASS=secret pnpm run sim
- *   SIM_PROMPT="Build a FastAPI todo app" pnpm run sim
- *   SIM_SKIP_SESSION=1 pnpm run sim      # skip session/proxy steps
+ *   pnpm run sim                                    # uses defaults (requires SIM_TOKEN)
+ *   SIM_TOKEN=eyJ... pnpm run sim                   # pass existing JWT (recommended)
+ *   SIM_TOKEN=eyJ... SIM_USER_ID=abc pnpm run sim   # with known userId
+ *   SIM_PROMPT="Build a FastAPI todo app" SIM_TOKEN=eyJ... pnpm run sim
+ *   SIM_SKIP_SESSION=1 SIM_TOKEN=eyJ... pnpm run sim  # skip session/proxy steps
+ *
+ * Get a token: POST /authentication { strategy: 'firebase', idToken: '<firebase_id_token>' }
+ * Or copy the accessToken from your browser's network tab after login.
  */
 
 import axios, { type AxiosInstance } from 'axios'
@@ -26,8 +29,8 @@ import { io, type Socket } from 'socket.io-client'
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3030'
-const SIM_EMAIL = process.env.SIM_EMAIL ?? `sim-${Date.now()}@mockline-test.dev`
-const SIM_PASS = process.env.SIM_PASS ?? 'SimPassword123!'
+const SIM_TOKEN = process.env.SIM_TOKEN ?? ''           // required: JWT from POST /authentication
+const SIM_USER_ID = process.env.SIM_USER_ID ?? ''       // optional: skip /users lookup
 const SIM_PROMPT = process.env.SIM_PROMPT ?? 'Create a simple FastAPI todo app with SQLite and basic CRUD'
 const SIM_FRAMEWORK = process.env.SIM_FRAMEWORK ?? 'fast-api'
 const SIM_LANGUAGE = process.env.SIM_LANGUAGE ?? 'python'
@@ -111,48 +114,54 @@ function waitForEvent<T = any>(
 async function step1_auth(): Promise<{ token: string; userId: string }> {
   section('Step 1 · Authentication')
 
-  const client = makeClient()
+  // If a token is provided directly, verify it and extract the userId
+  if (SIM_TOKEN) {
+    info('Using provided SIM_TOKEN', `${SIM_TOKEN.slice(0, 20)}...`)
 
-  // Try login first, register if 401/404
-  try {
-    const res = await client.post('/authentication', {
-      strategy: 'local',
-      email: SIM_EMAIL,
-      password: SIM_PASS
-    })
-    ok('Logged in', `userId=${res.data.user._id}`)
-    return { token: res.data.accessToken, userId: res.data.user._id }
-  } catch (err: any) {
-    if (err?.response?.status === 401 || err?.response?.status === 404 || err?.response?.status === 400) {
-      info('Login failed — registering new user', SIM_EMAIL)
-    } else {
-      fail('Login failed with unexpected error', err?.response?.data ?? err)
-      throw err
+    if (SIM_USER_ID) {
+      ok('Using provided SIM_USER_ID', SIM_USER_ID)
+      return { token: SIM_TOKEN, userId: SIM_USER_ID }
     }
+
+    // Decode userId from JWT payload (no verification needed — server will validate)
+    try {
+      const payload = JSON.parse(Buffer.from(SIM_TOKEN.split('.')[1], 'base64').toString())
+      const userId = payload.sub ?? payload.userId ?? payload._id ?? ''
+      if (userId) {
+        ok('Decoded userId from JWT', userId)
+        return { token: SIM_TOKEN, userId }
+      }
+      warn('Could not decode userId from JWT — set SIM_USER_ID env var')
+    } catch {
+      warn('Could not parse JWT payload — set SIM_USER_ID env var')
+    }
+
+    // Fall back: fetch current user from /users with this token
+    try {
+      const client = makeClient(SIM_TOKEN)
+      const res = await client.get('/users?$limit=1')
+      const users = res.data?.data ?? res.data ?? []
+      if (users.length > 0) {
+        ok('Fetched userId via GET /users', users[0]._id)
+        return { token: SIM_TOKEN, userId: users[0]._id }
+      }
+    } catch (err: any) {
+      warn('Could not fetch userId via /users', err?.response?.data?.message ?? err.message)
+    }
+
+    fail('Could not determine userId. Set SIM_USER_ID=<your_user_id> env var.')
+    process.exit(1)
   }
 
-  // Register
-  try {
-    await client.post('/users', {
-      firebaseUid: `sim-${Date.now()}`,
-      firstName: 'Sim',
-      lastName: 'User',
-      email: SIM_EMAIL
-    })
-    ok('Registered user', SIM_EMAIL)
-  } catch (err: any) {
-    fail('Registration failed', err?.response?.data ?? err)
-    throw err
-  }
-
-  // Login after register
-  const res = await client.post('/authentication', {
-    strategy: 'local',
-    email: SIM_EMAIL,
-    password: SIM_PASS
-  })
-  ok('Logged in after registration', `userId=${res.data.user._id}`)
-  return { token: res.data.accessToken, userId: res.data.user._id }
+  // No token provided
+  fail(
+    'No SIM_TOKEN provided.',
+    'The backend uses Firebase auth — local strategy has no passwords in the DB. ' +
+    'Get a token by authenticating in the frontend (copy accessToken from network tab) ' +
+    'or run: curl -X POST http://localhost:3030/authentication -d \'{"strategy":"firebase","idToken":"<firebase_id_token>"}\' ' +
+    'Then re-run: SIM_TOKEN=<token> pnpm run sim'
+  )
+  process.exit(1)
 }
 
 async function step2_createProject(client: AxiosInstance, userId: string): Promise<string> {
@@ -457,7 +466,7 @@ async function step7_cleanup(
 async function main() {
   banner('Mockline Frontend Simulation')
   console.log(`${D}  API: ${API_URL}`)
-  console.log(`  Email: ${SIM_EMAIL}`)
+  console.log(`  Token: ${SIM_TOKEN ? SIM_TOKEN.slice(0, 20) + '...' : '(none — will fail)'}`)
   console.log(`  Prompt: "${SIM_PROMPT.slice(0, 70)}..."`)
   console.log(`  Framework: ${SIM_FRAMEWORK}  Language: ${SIM_LANGUAGE}${RESET}\n`)
 
