@@ -49,6 +49,19 @@ app.configure(
     cors: {
       origin: app.get('origins')
     }
+  }, (io) => {
+    io.on('connection', (socket: any) => {
+      // Allow clients to join named channels (e.g. 'projects/123').
+      // Without this, socket.emit('join', ...) from the frontend has no effect
+      // and project-scoped events (projects patched, files created, etc.) are never delivered.
+      socket.on('join', (channelName: string) => {
+        const connection = socket.feathers
+        if (connection && channelName) {
+          app.channel(channelName).join(connection)
+          log.debug('Socket joined channel', { channel: channelName })
+        }
+      })
+    })
   })
 )
 app.configure(mongodb)
