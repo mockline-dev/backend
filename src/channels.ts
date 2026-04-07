@@ -22,7 +22,10 @@ export const channels = (app: Application) => {
     }
   })
 
-  const getId = (value: any) => value?._id?.toString?.() ?? value?.id?.toString?.()
+  const getId = (value: any) =>
+    value?._id?.toString?.() ??
+    value?.id?.toString?.() ??
+    value?.projectId?.toString?.()    // custom events emit { projectId, ... } without _id
 
   app.service('projects').publish((data: any) => {
     const projectId = getId(data)

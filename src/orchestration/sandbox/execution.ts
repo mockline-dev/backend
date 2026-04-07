@@ -277,34 +277,28 @@ export async function startProjectExecution(
 }
 
 async function waitForServer(sandbox: Sandbox, port: number, timeoutMs: number): Promise<string> {
-  const start = Date.now()
+  // Run a single shell loop inside the sandbox that polls until the port opens.
+  // nc -z exits 0 when the port is open; the loop exits 1 on timeout.
+  // This avoids the JS polling loop and the broken result.stdout check
+  // (Execution.logs.stdout is OutputMessage[], not a string).
+  const maxAttempts = Math.max(5, Math.floor(timeoutMs / 2000))
+  const portCheckCmd =
+    `for i in $(seq 1 ${maxAttempts}); do nc -z localhost ${port} 2>/dev/null && exit 0; sleep 2; done; exit 1`
 
-  while (Date.now() - start < timeoutMs) {
-    try {
-      // Check if something is listening on the port
-      const result = await (sandbox.commands.run(
-        `nc -z localhost ${port} 2>/dev/null && echo "open" || echo "closed"`,
-        {},
-        {}
-      ) as any)
-
-      if (result.exitCode === 0 || result.stdout?.includes('open')) {
-        // Get the externally-reachable URL from OpenSandbox
-        try {
-          const url = await sandbox.getEndpointUrl(port)
-          return url
-        } catch {
-          // Fallback if getEndpointUrl fails (e.g. local dev without OpenSandbox cloud)
-          return `http://localhost:${port}`
-        }
+  try {
+    const result = await sandbox.commands.run(portCheckCmd) as any
+    if (result.exitCode === 0) {
+      try {
+        return await sandbox.getEndpointUrl(port)
+      } catch {
+        return `http://localhost:${port}`
       }
-    } catch {
-      // ignore, keep polling
     }
-    await new Promise(r => setTimeout(r, 2000))
+  } catch {
+    // nc not available or command error — fall through and try URL anyway
   }
 
-  // Last attempt to get URL even on timeout
+  // Server may be running even if check failed — get URL as best effort
   try {
     return await sandbox.getEndpointUrl(port)
   } catch {
