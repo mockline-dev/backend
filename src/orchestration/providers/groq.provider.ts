@@ -78,8 +78,20 @@ export class GroqProvider implements ILLMProvider {
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content ?? ''
         const done = chunk.choices[0]?.finish_reason != null
-        yield { content: delta, done }
-        if (done) break
+        if (done) {
+          const rawUsage = (chunk as any).x_groq?.usage
+          yield {
+            content: delta,
+            done: true,
+            model: chunk.model ?? this.defaultModel,
+            provider: this.name,
+            usage: rawUsage
+              ? { promptTokens: rawUsage.prompt_tokens, completionTokens: rawUsage.completion_tokens, totalTokens: rawUsage.total_tokens }
+              : undefined
+          }
+          break
+        }
+        yield { content: delta, done: false }
       }
     } catch (err: unknown) {
       this.handleError(err, timeoutMs)

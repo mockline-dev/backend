@@ -20,6 +20,9 @@ export interface LLMResponse {
 export interface LLMStreamChunk {
   content: string
   done: boolean
+  usage?: { promptTokens: number; completionTokens: number; totalTokens: number }
+  model?: string
+  provider?: string
 }
 
 export interface LLMCallOptions {

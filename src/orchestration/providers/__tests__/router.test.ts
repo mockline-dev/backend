@@ -16,7 +16,7 @@ function mockProvider(name: string, response?: Partial<LLMResponse>): ILLMProvid
     }),
     chatStream: vi.fn().mockImplementation(async function* () {
       yield { content: 'mock', done: false }
-      yield { content: ' stream', done: true }
+      yield { content: ' stream', done: true, model: 'mock-model', provider: name, usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 } }
     })
   }
 }
@@ -110,5 +110,18 @@ describe('LLMRouter', () => {
     const router = new LLMRouter(primary, [])
     await router.chat(MESSAGES, { temperature: 0.2, maxTokens: 100 })
     expect(primary.chat).toHaveBeenCalledWith(MESSAGES, { temperature: 0.2, maxTokens: 100 })
+  })
+
+  it('passes usage metadata from final chunk', async () => {
+    const primary = mockProvider('groq')
+    const router = new LLMRouter(primary, [])
+    const chunks: LLMStreamChunk[] = []
+    for await (const chunk of router.chatStream(MESSAGES)) {
+      chunks.push(chunk)
+    }
+    const finalChunk = chunks.find(c => c.done)
+    expect(finalChunk?.usage).toEqual({ promptTokens: 10, completionTokens: 5, totalTokens: 15 })
+    expect(finalChunk?.model).toBe('mock-model')
+    expect(finalChunk?.provider).toBe('groq')
   })
 })

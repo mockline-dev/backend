@@ -120,8 +120,20 @@ export class MinimaxProvider implements ILLMProvider {
             const chunk = JSON.parse(json)
             const delta = chunk.choices[0]?.delta?.content ?? ''
             const isDone = chunk.choices[0]?.finish_reason != null
-            yield { content: delta, done: isDone }
-            if (isDone) return
+            if (isDone) {
+              const rawUsage = chunk.usage
+              yield {
+                content: delta,
+                done: true,
+                model: chunk.model ?? this.config.defaultModel,
+                provider: this.name,
+                usage: rawUsage
+                  ? { promptTokens: rawUsage.prompt_tokens, completionTokens: rawUsage.completion_tokens, totalTokens: rawUsage.total_tokens }
+                  : undefined
+              }
+              return
+            }
+            yield { content: delta, done: false }
           } catch {
             // skip malformed SSE lines
           }
