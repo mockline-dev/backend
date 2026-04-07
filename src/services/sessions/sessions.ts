@@ -24,6 +24,10 @@ const log = createModuleLogger('sessions-service')
 // In-memory map of sessionId -> sandbox instance for lifecycle management
 const activeSandboxes = new Map<string, any>()
 
+export function getActiveSandbox(sessionId: string): any | undefined {
+  return activeSandboxes.get(sessionId)
+}
+
 export * from './sessions.class'
 export * from './sessions.schema'
 
