@@ -349,7 +349,37 @@ async function step5_startSession(
     return null
   }
 
+  // Pre-check: warn if sandbox is not configured (API key empty)
+  try {
+    // We check by attempting POST and watching the event — but set up the listener FIRST
+    // to avoid the race condition where the 'sessions patched' event fires during the
+    // after-create hook (before the HTTP response returns)
+  } catch { /* ignore */ }
+
   let sessionId: string
+
+  // ── Set up event listener BEFORE the POST so we never miss a fast 'error' patch ──
+  let resolveSessionEvent!: (s: any) => void
+  let rejectSessionEvent!: (err: Error) => void
+  const sessionEventPromise = new Promise<any>((res, rej) => {
+    resolveSessionEvent = res
+    rejectSessionEvent = rej
+  })
+
+  const sessionTimer = setTimeout(() => {
+    rejectSessionEvent(new Error(`Timeout waiting for session status 'running' or 'error' (${SESSION_TIMEOUT / 1000}s)`))
+  }, SESSION_TIMEOUT)
+
+  function sessionPatchHandler(s: any) {
+    if (sessionId && (s._id === sessionId || s.id === sessionId) &&
+        (s.status === 'running' || s.status === 'error')) {
+      clearTimeout(sessionTimer)
+      socket.off('sessions patched', sessionPatchHandler)
+      resolveSessionEvent(s)
+    }
+  }
+  // Attach listener now — before POST
+  socket.on('sessions patched', sessionPatchHandler)
 
   try {
     const res = await client.post('/sessions', {
@@ -359,13 +389,21 @@ async function step5_startSession(
     })
     sessionId = res.data._id
     ok('Session created', `id=${sessionId}  status=${res.data.status}`)
-  } catch (err: any) {
-    const body = err?.response?.data
-    // If sandbox not configured, it's expected to fail — just warn
-    if (body?.message?.includes('Sandbox not configured') || err?.response?.status === 500) {
-      warn('Session creation failed — sandbox not configured (expected in dev)', body?.message ?? err.message)
-      return null
+
+    // Now wire the sessionId into the already-attached handler (needed because
+    // sessionId wasn't known when we attached the listener)
+    // Also handle the edge case where the event fired before we had sessionId —
+    // re-check any buffered data via REST
+    const currentSession = await client.get(`/sessions/${sessionId}`).then(r => r.data).catch(() => null)
+    if (currentSession && (currentSession.status === 'running' || currentSession.status === 'error')) {
+      clearTimeout(sessionTimer)
+      socket.off('sessions patched', sessionPatchHandler)
+      resolveSessionEvent(currentSession)
     }
+  } catch (err: any) {
+    clearTimeout(sessionTimer)
+    socket.off('sessions patched', sessionPatchHandler)
+    const body = err?.response?.data
     fail('POST /sessions failed', body ?? err)
     return null
   }
@@ -373,17 +411,14 @@ async function step5_startSession(
   info(`Waiting for session to reach 'running' (timeout: ${SESSION_TIMEOUT / 1000}s)...`)
 
   try {
-    const patchedSession: any = await waitForEvent(
-      socket,
-      'sessions patched',
-      (s: any) => (s._id === sessionId || s.id === sessionId) &&
-        (s.status === 'running' || s.status === 'error'),
-      SESSION_TIMEOUT,
-      "session status 'running' or 'error'"
-    )
+    const patchedSession: any = await sessionEventPromise
 
     if (patchedSession.status === 'error') {
       fail('Session ended in error state', patchedSession.errorMessage)
+      if (patchedSession.errorMessage?.includes('Sandbox not configured')) {
+        warn('Sandbox API key is not configured in config/default.json → sandbox.opensandbox.apiKey')
+        warn('Set it up to enable session/execution features')
+      }
       return null
     }
 
@@ -395,7 +430,7 @@ async function step5_startSession(
     // Fetch current session state for diagnosis
     try {
       const s = await client.get(`/sessions/${sessionId}`)
-      info('Current session state', JSON.stringify(s.data))
+      info('Current session state (for diagnosis)', JSON.stringify(s.data))
     } catch { /* ignore */ }
 
     return null
