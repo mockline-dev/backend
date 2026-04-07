@@ -46,4 +46,18 @@ describe('getSystemPrompt', () => {
     expect(generate).not.toBe(fix)
     expect(fix).not.toBe(explain)
   })
+
+  it('code-producing intents include filepath format instructions', () => {
+    const codeIntents = [Intent.GenerateProject, Intent.EditCode, Intent.FixBug, Intent.AddFeature]
+    for (const intent of codeIntents) {
+      const prompt = getSystemPrompt(intent)
+      expect(prompt).toContain('filepath')
+      expect(prompt).toContain('FORMAT RULES FOR CODE OUTPUT')
+    }
+  })
+
+  it('ExplainCode and General do NOT include filepath format instructions', () => {
+    expect(getSystemPrompt(Intent.ExplainCode)).not.toContain('FORMAT RULES FOR CODE OUTPUT')
+    expect(getSystemPrompt(Intent.General)).not.toContain('FORMAT RULES FOR CODE OUTPUT')
+  })
 })

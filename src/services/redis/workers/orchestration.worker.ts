@@ -10,6 +10,7 @@ import { runSandbox, buildFixPrompt } from '../../../orchestration/sandbox/sandb
 import { OpenSandboxProvider } from '../../../orchestration/sandbox/providers/opensandbox.provider'
 import { detectPrimaryLanguage, extractCodeBlocks } from '../../../orchestration/sandbox/code-extractor'
 import { indexingQueue } from '../queues/queues'
+import { jobTracker } from '../queues/job-tracker'
 import { getRedisClient } from '../client'
 import type { OrchestrationJobData } from '../queues/queues'
 
@@ -30,6 +31,7 @@ export function startOrchestrationWorker(app: any): Worker {
       const { projectId, userId, prompt, conversationHistory, model, messageId } = job.data
 
       log.info('Orchestration job started', { jobId: job.id, projectId, userId })
+      jobTracker.registerJob(job.id!, projectId)
 
       try {
         // Update project status
@@ -39,8 +41,11 @@ export function startOrchestrationWorker(app: any): Worker {
             status: 'generating',
             generationProgress: { currentStage: 'orchestrating', percentage: 5 }
           })
-          .catch(() => {
-            /* non-fatal */
+          .catch((err: unknown) => {
+            log.warn('Failed to update project status to generating', {
+              projectId,
+              error: err instanceof Error ? err.message : String(err)
+            })
           })
 
         const llmConfig = app.get('llm')
@@ -56,8 +61,8 @@ export function startOrchestrationWorker(app: any): Worker {
         const emit = (event: string, pid: string, payload: unknown) => {
           try {
             app.service('projects').emit(event, { projectId: pid, ...(payload as object) })
-          } catch {
-            /* non-fatal */
+          } catch (e: unknown) {
+            log.debug('Failed to emit event', { event, error: e instanceof Error ? e.message : String(e) })
           }
         }
 
@@ -137,8 +142,11 @@ export function startOrchestrationWorker(app: any): Worker {
                 .patch(projectId, {
                   generationProgress: { currentStage: 'persisting', percentage: 85 }
                 })
-                .catch(() => {
-                  /* non-fatal */
+                .catch((err: unknown) => {
+                  log.warn('Failed to update progress to persisting', {
+                    projectId,
+                    error: err instanceof Error ? err.message : String(err)
+                  })
                 })
 
               const { fileIds, snapshotId, uploadedCount } = await persistFiles(
@@ -147,6 +155,7 @@ export function startOrchestrationWorker(app: any): Worker {
                 messageId ?? null,
                 app
               )
+              sandboxFiles.forEach(f => jobTracker.trackR2Key(job.id!, `projects/${projectId}/${f.path}`))
 
               emit('files:persisted', projectId, {
                 fileIds,
@@ -160,8 +169,11 @@ export function startOrchestrationWorker(app: any): Worker {
                 .patch(projectId, {
                   generationProgress: { filesGenerated: uploadedCount }
                 })
-                .catch(() => {
-                  /* non-fatal */
+                .catch((err: unknown) => {
+                  log.warn('Failed to update filesGenerated count', {
+                    projectId,
+                    error: err instanceof Error ? err.message : String(err)
+                  })
                 })
 
               // ── Step 4: Save assistant message with result metadata ──────────
@@ -202,6 +214,7 @@ export function startOrchestrationWorker(app: any): Worker {
             messageId ?? null,
             app
           )
+          sandboxFiles.forEach(f => jobTracker.trackR2Key(job.id!, `projects/${projectId}/${f.path}`))
 
           emit('files:persisted', projectId, {
             fileIds,
@@ -266,8 +279,11 @@ export function startOrchestrationWorker(app: any): Worker {
             status: 'ready',
             generationProgress: { percentage: 100, currentStage: 'complete' }
           })
-          .catch(() => {
-            /* non-fatal */
+          .catch((err: unknown) => {
+            log.warn('Failed to update project status to ready', {
+              projectId,
+              error: err instanceof Error ? err.message : String(err)
+            })
           })
 
         // ── Step 6: Trigger async incremental re-index ────────────────────────
@@ -281,15 +297,21 @@ export function startOrchestrationWorker(app: any): Worker {
               removeOnComplete: true
             }
           )
-          .catch(() => {
-            /* non-fatal */
+          .catch((err: unknown) => {
+            log.warn('Failed to enqueue indexing job', {
+              projectId,
+              error: err instanceof Error ? err.message : String(err)
+            })
           })
 
         log.info('Orchestration job completed', { jobId: job.id, projectId, intent: result.intent })
+        jobTracker.completeJob(job.id!)
         return result
       } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err))
         log.error('Orchestration job failed', { jobId: job.id, projectId, error: error.message })
+
+        await jobTracker.cancelJob(job.id!)
 
         await app
           .service('projects')
@@ -297,8 +319,11 @@ export function startOrchestrationWorker(app: any): Worker {
             status: 'error',
             errorMessage: error.message
           })
-          .catch(() => {
-            /* non-fatal */
+          .catch((patchErr: unknown) => {
+            log.warn('Failed to update project status to error', {
+              projectId,
+              error: patchErr instanceof Error ? patchErr.message : String(patchErr)
+            })
           })
 
         throw err
