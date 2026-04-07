@@ -26,6 +26,12 @@ describe('extractCodeBlocks', () => {
     expect(files[0].path).toBe('src/app.ts')
   })
 
+  it('extracts filepath from fence line with # filepath:', () => {
+    const md = '```python # filepath: src/main.py\nprint("hello")\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('src/main.py')
+  })
+
   it('extracts filepath from first-line C-style comment', () => {
     const md = '```ts\n// src/utils.ts\nexport const foo = () => {}\n```'
     const files = extractCodeBlocks(md)
@@ -38,10 +44,21 @@ describe('extractCodeBlocks', () => {
     expect(files[0].path).toBe('src/main.py')
   })
 
+  it('extracts filepath from first-line with # filepath: prefix', () => {
+    const md = '```python\n# filepath: app/routes.py\nimport os\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('app/routes.py')
+  })
+
+  it('extracts filepath from HTML comment', () => {
+    const md = '```html\n<!-- filepath: templates/index.html -->\n<html></html>\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('templates/index.html')
+  })
+
   it('generates fallback filename when no path found', () => {
     const md = '```typescript\nconst z = 3\n```'
     const files = extractCodeBlocks(md)
-    // Should either infer a name or fall back to file_N.ts
     expect(files[0].path).toMatch(/\.(ts|js)$/)
   })
 
@@ -73,6 +90,24 @@ describe('extractCodeBlocks', () => {
     expect(files[0].path).toBe('main.py')
   })
 
+  it('infers app.py for Flask entry point', () => {
+    const md = '```python\nfrom flask import Flask\napp = Flask(__name__)\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('app.py')
+  })
+
+  it('infers server.ts for Express server', () => {
+    const md = '```typescript\nimport express from "express"\nconst app = express()\napp.listen(3000)\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('server.ts')
+  })
+
+  it('infers server.js for Express server (javascript)', () => {
+    const md = '```javascript\nconst express = require("express")\nconst app = express()\napp.listen(3000)\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('server.js')
+  })
+
   it('infers script.sh for shell scripts with shebang', () => {
     const md = '```sh\n#!/bin/bash\necho "hello"\n```'
     const files = extractCodeBlocks(md)
@@ -85,6 +120,42 @@ describe('extractCodeBlocks', () => {
     expect(files[0].path).toBe('Dockerfile')
   })
 
+  it('infers Dockerfile for dockerfile language tag', () => {
+    const md = '```dockerfile\nFROM node:18-alpine\nWORKDIR /app\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('Dockerfile')
+  })
+
+  it('infers docker-compose.yml for docker-compose YAML', () => {
+    const md = '```yaml\nservices:\n  web:\n    image: python:3.11\n    ports:\n      - "8000:8000"\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('docker-compose.yml')
+  })
+
+  it('infers index.html for HTML content', () => {
+    const md = '```html\n<!DOCTYPE html>\n<html><body></body></html>\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('index.html')
+  })
+
+  it('detects pre-block filename from **filename.py** pattern', () => {
+    const md = '**src/models.py**\n```python\nfrom pydantic import BaseModel\nclass User(BaseModel):\n    name: str\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('src/models.py')
+  })
+
+  it('detects pre-block filename from `filename.ts`: pattern', () => {
+    const md = '`src/routes/users.ts`:\n```typescript\nconst router = Router()\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('src/routes/users.ts')
+  })
+
+  it('detects pre-block filename from ### heading', () => {
+    const md = '### src/config.ts\n```typescript\nexport const config = {}\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('src/config.ts')
+  })
+
   it('disambiguates collisions when two blocks infer the same name', () => {
     const md = [
       '```python\nif __name__ == "__main__":\n    pass\n```',
@@ -95,6 +166,25 @@ describe('extractCodeBlocks', () => {
     expect(files).toHaveLength(2)
     expect(files[0].path).toBe('main.py')
     expect(files[1].path).toBe('main_2.py')
+  })
+
+  it('rejects URLs as file paths', () => {
+    const md = '```ts\n// https://example.com/file.ts\nconst x = 1\n```'
+    const files = extractCodeBlocks(md)
+    // Should fall through to inference/fallback, not use the URL
+    expect(files[0].path).not.toContain('://')
+  })
+
+  it('rejects absolute paths as file paths', () => {
+    const md = '```ts\n// /absolute/path/file.ts\nconst x = 1\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).not.toMatch(/^\//)
+  })
+
+  it('rejects language keywords as file paths', () => {
+    const md = '```ts\n// import\nconst x = 1\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).not.toBe('import')
   })
 })
 

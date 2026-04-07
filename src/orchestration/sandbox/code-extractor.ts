@@ -14,7 +14,71 @@ const LANG_EXT: Record<string, string> = {
   yaml: 'yaml',
   yml: 'yml',
   sh: 'sh',
-  bash: 'sh'
+  bash: 'sh',
+  html: 'html',
+  css: 'css',
+  toml: 'toml',
+  dockerfile: '',
+  markdown: 'md',
+  md: 'md'
+}
+
+// Common language keywords that should never be treated as file paths
+const KEYWORDS = new Set([
+  'import', 'from', 'const', 'let', 'var', 'return', 'class', 'function',
+  'if', 'else', 'for', 'while', 'async', 'await', 'export', 'default',
+  'type', 'interface', 'def', 'print', 'pass', 'break', 'continue',
+  'true', 'false', 'null', 'undefined', 'None', 'True', 'False'
+])
+
+/**
+ * Validate that an extracted string is a plausible file path and not noise.
+ */
+function isValidFilePath(path: string): boolean {
+  if (!path || path.length > 200) return false
+  // No absolute paths, parent traversal, or shebang leftovers
+  if (path.startsWith('/') || path.startsWith('..') || path.startsWith('!')) return false
+  // No URLs
+  if (path.includes('://')) return false
+  // No single-word language keywords
+  if (KEYWORDS.has(path)) return false
+  // Must contain at least one word character
+  if (!/\w/.test(path)) return false
+  // No spaces (file paths don't have spaces in LLM-generated code)
+  if (/\s/.test(path)) return false
+  return true
+}
+
+/**
+ * Scan the text immediately before a code fence for a filename hint.
+ * LLMs often write "**src/main.py**" or "`src/main.py`:" or "### src/main.py" before a block.
+ */
+function extractPreBlockPath(markdown: string, blockStartIndex: number): string | null {
+  const window = markdown.slice(Math.max(0, blockStartIndex - 300), blockStartIndex)
+  const lines = window.split('\n').reverse() // check closest lines first
+
+  for (const line of lines.slice(0, 5)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    // **src/main.py** or **`src/main.py`**
+    let m = trimmed.match(/\*\*`?([^\s*`]+)`?\*\*\s*:?\s*$/)
+    if (m && isValidFilePath(m[1])) return m[1]
+
+    // `src/main.py` or `src/main.py`:
+    m = trimmed.match(/^`([^\s`]+)`\s*:?\s*$/)
+    if (m && isValidFilePath(m[1])) return m[1]
+
+    // ### src/main.py or ## src/main.py
+    m = trimmed.match(/^#{1,4}\s+`?([^\s`]+)`?\s*$/)
+    if (m && isValidFilePath(m[1])) return m[1]
+
+    // Bare path ending with colon: src/main.py:
+    m = trimmed.match(/^([a-zA-Z][\w/.-]+)\s*:\s*$/)
+    if (m && isValidFilePath(m[1]) && (m[1].includes('/') || m[1].includes('.'))) return m[1]
+  }
+
+  return null
 }
 
 /**
@@ -25,9 +89,11 @@ function inferFileNameFromContent(content: string, language: string): string | n
   const firstLine = content.split('\n')[0]?.trim() ?? ''
   const lower = content.toLowerCase()
 
-  // Dockerfile — FROM must be uppercase, and language must not be a known code lang
+  // Dockerfile — FROM must be uppercase
   const knownCodeLangs = new Set(['python', 'py', 'typescript', 'ts', 'javascript', 'js', 'sh', 'bash', 'json', 'yaml', 'yml', 'toml'])
-  if (!knownCodeLangs.has(language) && /^FROM\s+\S+/.test(firstLine)) return 'Dockerfile'
+  if (language === 'dockerfile' || (!knownCodeLangs.has(language) && /^FROM\s+\S+/.test(firstLine))) {
+    return 'Dockerfile'
+  }
 
   // Shell scripts
   if (firstLine === '#!/bin/bash' || firstLine === '#!/bin/sh' || firstLine === '#!/usr/bin/env bash') {
@@ -36,9 +102,11 @@ function inferFileNameFromContent(content: string, language: string): string | n
 
   // Python entry points
   if (language === 'python' || language === 'py') {
-    if (lower.includes('if __name__') || lower.includes('from fastapi') || lower.includes('import fastapi') ||
-        lower.includes('from flask') || lower.includes('import flask')) {
+    if (lower.includes('if __name__') || lower.includes('from fastapi') || lower.includes('import fastapi')) {
       return 'main.py'
+    }
+    if (lower.includes('flask(__name__)') || lower.includes('from flask') || lower.includes('import flask')) {
+      return 'app.py'
     }
     // requirements.txt pattern: lines of "package==version" or "package>=version"
     if (/^[a-z][a-z0-9_-]*[=><!]=/.test(content.trim())) return 'requirements.txt'
@@ -46,9 +114,14 @@ function inferFileNameFromContent(content: string, language: string): string | n
 
   // JavaScript/TypeScript entry points
   if (['typescript', 'ts', 'javascript', 'js'].includes(language)) {
+    const isTS = language === 'typescript' || language === 'ts'
+    if (lower.includes('app.listen(') || lower.includes('createserver(') ||
+        lower.includes('.listen(') && lower.includes('express')) {
+      return isTS ? 'server.ts' : 'server.js'
+    }
     if (lower.includes('export default') || lower.includes('export const app') ||
         lower.includes('module.exports')) {
-      return language === 'typescript' || language === 'ts' ? 'index.ts' : 'index.js'
+      return isTS ? 'index.ts' : 'index.js'
     }
   }
 
@@ -66,29 +139,51 @@ function inferFileNameFromContent(content: string, language: string): string | n
   }
 
   // TOML project files
-  if (language === 'toml' && (lower.includes('[tool.poetry]') || lower.includes('[project]'))) {
+  if (language === 'toml' && (lower.includes('[tool.poetry]') || lower.includes('[project]') ||
+      lower.includes('[build-system]'))) {
     return 'pyproject.toml'
+  }
+
+  // YAML: docker-compose
+  if ((language === 'yaml' || language === 'yml') &&
+      (lower.includes('docker-compose') || (lower.includes('services:') && lower.includes('image:')))) {
+    return 'docker-compose.yml'
+  }
+
+  // .env files: lines of KEY=VALUE
+  if ((language === 'env' || language === '') && /^[A-Z_][A-Z0-9_]*=.*/m.test(content)) {
+    return '.env.example'
+  }
+
+  // HTML
+  if (language === 'html' && (lower.includes('<!doctype') || lower.includes('<html'))) {
+    return 'index.html'
+  }
+
+  // CSS
+  if (language === 'css' && (lower.includes('{') && lower.includes(':'))) {
+    return 'styles.css'
   }
 
   return null
 }
 
 // File path comment patterns (checked in order):
-// 1. After the fence language tag:    ```ts // filepath: src/foo.ts
-// 2. First line comment Python style: # src/foo.py
-// 3. First line comment C-style:      // src/foo.ts
-// 4. FeathersJS / AI agent style:     // File: src/foo.ts
-const FILE_PATH_IN_FENCE = /^[a-z]*\s+(?:\/\/\s*(?:filepath:|file:)?\s*(\S+\.\w+)|#\s*(\S+\.\w+))/i
-const FILE_PATH_FIRST_LINE_COMMENT = /^(?:\/\/\s*(?:filepath:|file:)?\s*|#\s*)(\S+\.\w+)/
+// 1. After the fence language tag:    ```ts // filepath: src/foo.ts  or  ```ts // src/foo.ts
+// 2. First line comment (various styles)
+const FILE_PATH_IN_FENCE = /^[a-z]*\s+(?:\/\/\s*(?:filepath:|file:)?\s*(\S+)|#\s*(?:filepath:|file:)?\s*(\S+))/i
+const FILE_PATH_FIRST_LINE_COMMENT =
+  /^(?:\/\/\s*(?:filepath:|file:)?\s*|#\s*(?:filepath:|file:)?\s*|<!--\s*(?:filepath:|file:)?\s*)(\S+?)(?:\s*-->)?$/
 
 /**
  * Extract fenced code blocks from LLM markdown output and return them as SandboxFile objects.
  *
- * Supported path hint locations:
- *   ```ts // filepath: src/index.ts
- *   ```typescript // src/index.ts
- *   ```python\n# src/main.py
- *   ```js\n// src/utils.js
+ * Path detection priority:
+ *   1. Pre-block hint: **src/main.py**, `src/main.py`:, ### src/main.py
+ *   2. Fence-line: ```ts // filepath: src/index.ts  or  ```typescript // src/index.ts
+ *   3. First-line comment: // filepath: src/utils.ts  or  # src/main.py
+ *   4. Content inference (entry points, package files, etc.)
+ *   5. Fallback: file_N.ext
  */
 export function extractCodeBlocks(markdown: string): SandboxFile[] {
   const files: SandboxFile[] = []
@@ -111,26 +206,37 @@ export function extractCodeBlocks(markdown: string): SandboxFile[] {
     const fenceMatch = FILE_PATH_IN_FENCE.exec(fenceLine)
     if (fenceMatch) {
       language = fenceLine.split(/\s+/)[0].toLowerCase()
-      filePath = fenceMatch[1] ?? fenceMatch[2] ?? null
+      const candidate = fenceMatch[1] ?? fenceMatch[2] ?? null
+      if (candidate && isValidFilePath(candidate)) {
+        filePath = candidate
+      }
     } else {
       // Fence line only contains the language tag
       language = fenceLine.split(/\s+/)[0].toLowerCase()
     }
 
-    // If no path in fence, check first line of the body for a path comment
+    // Priority 1: pre-block hint (only if no path found in fence)
+    if (!filePath) {
+      const preBlock = extractPreBlockPath(markdown, match.index)
+      if (preBlock) filePath = preBlock
+    }
+
+    // Priority 3: check first line of the body for a path comment
     if (!filePath) {
       const firstLine = body.split('\n')[0]
       const lineMatch = FILE_PATH_FIRST_LINE_COMMENT.exec(firstLine.trim())
       if (lineMatch) {
-        filePath = lineMatch[1]
+        const candidate = lineMatch[1]
+        if (isValidFilePath(candidate)) {
+          filePath = candidate
+        }
       }
     }
 
-    // Try to infer a meaningful name from content before falling back to generic
+    // Priority 4: infer from content
     if (!filePath) {
       const inferred = inferFileNameFromContent(body, language)
       if (inferred) {
-        // Resolve collisions by appending index
         if (!usedNames.has(inferred)) {
           filePath = inferred
         } else {
@@ -144,10 +250,15 @@ export function extractCodeBlocks(markdown: string): SandboxFile[] {
       }
     }
 
-    // Final fallback: generate a filename from language
+    // Priority 5: generic fallback
     if (!filePath) {
-      const ext = LANG_EXT[language] ?? 'txt'
-      filePath = `file_${++fallbackIndex}.${ext}`
+      const ext = LANG_EXT[language]
+      if (ext === '') {
+        // Language with no extension (e.g. dockerfile)
+        filePath = 'Dockerfile'
+      } else {
+        filePath = `file_${++fallbackIndex}.${ext ?? 'txt'}`
+      }
     }
 
     usedNames.add(filePath)

@@ -13,25 +13,49 @@ function interpolate(template: string, ctx: TemplateContext): string {
 
 const CODE_OUTPUT_FORMAT = `
 
-FORMAT RULES FOR CODE OUTPUT:
-- Wrap each file in a fenced code block with the language identifier
-- On the FIRST LINE inside each code block, include a filepath comment:
-  For JS/TS:     // filepath: path/to/file.ext
-  For Python:    # filepath: path/to/file.ext
-  For Shell:     # filepath: path/to/script.sh
-- Use realistic file paths that match the project structure
-- Example:
-  \`\`\`typescript
-  // filepath: src/index.ts
-  import express from 'express'
-  \`\`\`
-- Always include the filepath comment. Never omit it.`
+MANDATORY CODE OUTPUT FORMAT:
+Every code block MUST have a filepath comment as its FIRST LINE. Without this comment, the file cannot be saved correctly.
+
+Rules:
+1. Wrap each file in a fenced code block with the correct language identifier
+2. The FIRST LINE inside EVERY code block MUST be a filepath comment — NO EXCEPTIONS:
+   - JavaScript/TypeScript: // filepath: path/to/file.ext
+   - Python/Shell/YAML:     # filepath: path/to/file.ext
+   - HTML/XML:              <!-- filepath: path/to/file.html -->
+   - JSON:                  // filepath: path/to/file.json
+3. Use descriptive, realistic file paths matching the project structure (e.g. src/routes/users.ts, NOT file_1.ts)
+4. NEVER output a code block without a filepath comment
+
+Examples:
+\`\`\`python
+# filepath: main.py
+from fastapi import FastAPI
+app = FastAPI()
+\`\`\`
+
+\`\`\`python
+# filepath: requirements.txt
+fastapi==0.104.1
+uvicorn==0.24.0
+\`\`\`
+
+\`\`\`typescript
+// filepath: src/index.ts
+import express from 'express'
+const app = express()
+\`\`\`
+
+\`\`\`json
+// filepath: package.json
+{ "name": "my-app", "dependencies": { "express": "^4.18.0" } }
+\`\`\``
 
 const TEMPLATES: Record<Intent, string> = {
   [Intent.GenerateProject]: `You are an expert backend architect specializing in {{framework}} and {{language}}.
 Your task is to help design and generate a complete, production-ready backend project.
 Follow best practices for project structure, security, and code quality.
-Be concise and precise. Return only what is asked — no filler text.${CODE_OUTPUT_FORMAT}`,
+Be concise and precise. Return only what is asked — no filler text.
+Output configuration files first (package.json, requirements.txt, pyproject.toml, .env.example), then source files starting from the entry point.${CODE_OUTPUT_FORMAT}`,
 
   [Intent.EditCode]: `You are an expert {{framework}} developer editing code in the project "{{name}}".
 Understand the existing code structure before making changes.
