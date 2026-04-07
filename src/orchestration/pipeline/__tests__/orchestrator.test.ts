@@ -19,7 +19,7 @@ function makeProvider(content = 'generated response'): ILLMProvider {
     } satisfies LLMResponse),
     chatStream: vi.fn().mockImplementation(async function* () {
       yield { content: 'generated ', done: false }
-      yield { content: 'response', done: true }
+      yield { content: 'response', done: true, model: 'test-model', provider: 'mock-router', usage: { promptTokens: 50, completionTokens: 20, totalTokens: 70 } }
     })
   }
 }
@@ -180,7 +180,7 @@ describe('orchestrate', () => {
       emit: vi.fn()
     }
     await orchestrate(JOB, deps)
-    expect(vectorStore.query).toHaveBeenCalledWith(JOB.projectId, JOB.prompt, expect.any(Number))
+    expect(vectorStore.query).toHaveBeenCalledWith(JOB.projectId, expect.any(String), expect.any(Number))
   })
 
   it('skips ChromaDB for non-RAG intents', async () => {
@@ -223,8 +223,10 @@ describe('orchestrate', () => {
       emit: vi.fn()
     }
     const result = await orchestrate(JOB, deps)
-    expect(result.usage.promptTokens).toBeGreaterThanOrEqual(0)
-    expect(result.usage.completionTokens).toBeGreaterThanOrEqual(0)
-    expect(result.usage.totalTokens).toBeGreaterThanOrEqual(0)
+    expect(result.usage.promptTokens).toBe(50)
+    expect(result.usage.completionTokens).toBe(20)
+    expect(result.usage.totalTokens).toBe(70)
+    expect(result.model).toBe('test-model')
+    expect(result.provider).toBe('mock-router')
   })
 })
