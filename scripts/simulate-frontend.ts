@@ -190,7 +190,7 @@ async function step3_connectSocket(token: string, projectId: string): Promise<So
 
   return new Promise((resolve, reject) => {
     const socket = io(API_URL, {
-      auth: { token },
+      auth: { accessToken: token },   // FeathersJS JWT strategy expects 'accessToken', not 'token'
       transports: ['websocket', 'polling']
     })
 
