@@ -20,6 +20,7 @@ export const sessionsSchema = Type.Object(
     ]),
     containerId: Type.Optional(Type.String()),
     proxyUrl: Type.Optional(Type.String()),
+    endpointHeaders: Type.Optional(Type.Record(Type.String(), Type.String())),
     port: Type.Optional(Type.Number()),
     language: Type.String(),
     startedAt: Type.Optional(Type.Number()),

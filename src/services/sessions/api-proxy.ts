@@ -71,6 +71,15 @@ export function createApiProxyMiddleware(app: Application) {
         headers['content-type'] = ctx.headers['content-type'] as string
       }
 
+      // Add any endpoint-specific routing headers required by the sandbox proxy
+      // (e.g. OpenSandbox server-proxy mode injects routing headers via getEndpoint())
+      const endpointHeaders = session.endpointHeaders as Record<string, string> | undefined
+      if (endpointHeaders) {
+        for (const [key, val] of Object.entries(endpointHeaders)) {
+          headers[key] = val
+        }
+      }
+
       const fetchInit: RequestInit = {
         method: ctx.method,
         headers,
