@@ -75,13 +75,14 @@ export const sessions = (app: Application) => {
 
           // Start sandbox asynchronously — emit events when ready
           startProjectExecution(session.projectId.toString(), session.language, sandboxConfig)
-            .then(async ({ containerId, proxyUrl, port, sandbox }) => {
+            .then(async ({ containerId, proxyUrl, endpointHeaders, port, sandbox }) => {
               activeSandboxes.set(sessionId, sandbox)
 
               await app.service(sessionsPath).patch(sessionId, {
                 status: 'running',
                 containerId,
                 proxyUrl,
+                endpointHeaders,
                 port,
                 startedAt: Date.now()
               })
