@@ -52,12 +52,12 @@ describe('getSystemPrompt', () => {
     for (const intent of codeIntents) {
       const prompt = getSystemPrompt(intent)
       expect(prompt).toContain('filepath')
-      expect(prompt).toContain('FORMAT RULES FOR CODE OUTPUT')
+      expect(prompt).toContain('MANDATORY CODE OUTPUT FORMAT')
     }
   })
 
   it('ExplainCode and General do NOT include filepath format instructions', () => {
-    expect(getSystemPrompt(Intent.ExplainCode)).not.toContain('FORMAT RULES FOR CODE OUTPUT')
-    expect(getSystemPrompt(Intent.General)).not.toContain('FORMAT RULES FOR CODE OUTPUT')
+    expect(getSystemPrompt(Intent.ExplainCode)).not.toContain('MANDATORY CODE OUTPUT FORMAT')
+    expect(getSystemPrompt(Intent.General)).not.toContain('MANDATORY CODE OUTPUT FORMAT')
   })
 })
