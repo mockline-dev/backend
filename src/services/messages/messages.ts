@@ -16,6 +16,7 @@ import type { Application, HookContext } from '../../declarations'
 import { MessagesService, getOptions } from './messages.class'
 import { messagesPath, messagesMethods } from './messages.shared'
 import { orchestrationQueue } from '../redis/queues/queues'
+import { logger } from '../../logger'
 
 export * from './messages.class'
 export * from './messages.schema'
@@ -98,8 +99,11 @@ export const messages = (app: Application) => {
               jobId: job.id,
               status: 'generating'
             })
-            .catch(() => {
-              /* non-fatal */
+            .catch((err: unknown) => {
+              logger.warn('Failed to update project jobId/status after message create', {
+                projectId,
+                error: err instanceof Error ? err.message : String(err)
+              })
             })
         }
       ]

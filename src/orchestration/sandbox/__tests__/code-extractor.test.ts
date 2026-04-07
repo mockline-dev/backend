@@ -41,7 +41,8 @@ describe('extractCodeBlocks', () => {
   it('generates fallback filename when no path found', () => {
     const md = '```typescript\nconst z = 3\n```'
     const files = extractCodeBlocks(md)
-    expect(files[0].path).toMatch(/file_\d+\.ts/)
+    // Should either infer a name or fall back to file_N.ts
+    expect(files[0].path).toMatch(/\.(ts|js)$/)
   })
 
   it('extracts multiple code blocks', () => {
@@ -58,6 +59,42 @@ describe('extractCodeBlocks', () => {
   it('skips empty code blocks', () => {
     const md = '```ts\n```'
     expect(extractCodeBlocks(md)).toHaveLength(0)
+  })
+
+  it('infers main.py for Python block with if __name__', () => {
+    const md = '```python\nif __name__ == "__main__":\n    print("hello")\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('main.py')
+  })
+
+  it('infers main.py for FastAPI entry point', () => {
+    const md = '```python\nfrom fastapi import FastAPI\napp = FastAPI()\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('main.py')
+  })
+
+  it('infers script.sh for shell scripts with shebang', () => {
+    const md = '```sh\n#!/bin/bash\necho "hello"\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('script.sh')
+  })
+
+  it('infers Dockerfile for Dockerfile content', () => {
+    const md = '```\nFROM python:3.11-slim\nRUN pip install fastapi\n```'
+    const files = extractCodeBlocks(md)
+    expect(files[0].path).toBe('Dockerfile')
+  })
+
+  it('disambiguates collisions when two blocks infer the same name', () => {
+    const md = [
+      '```python\nif __name__ == "__main__":\n    pass\n```',
+      '',
+      '```python\nif __name__ == "__main__":\n    print("second")\n```'
+    ].join('\n')
+    const files = extractCodeBlocks(md)
+    expect(files).toHaveLength(2)
+    expect(files[0].path).toBe('main.py')
+    expect(files[1].path).toBe('main_2.py')
   })
 })
 
