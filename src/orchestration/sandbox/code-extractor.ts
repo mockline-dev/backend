@@ -17,6 +17,62 @@ const LANG_EXT: Record<string, string> = {
   bash: 'sh'
 }
 
+/**
+ * Try to infer a meaningful filename from code content when no filepath comment is present.
+ * Returns null if no strong signal is found.
+ */
+function inferFileNameFromContent(content: string, language: string): string | null {
+  const firstLine = content.split('\n')[0]?.trim() ?? ''
+  const lower = content.toLowerCase()
+
+  // Dockerfile — FROM must be uppercase, and language must not be a known code lang
+  const knownCodeLangs = new Set(['python', 'py', 'typescript', 'ts', 'javascript', 'js', 'sh', 'bash', 'json', 'yaml', 'yml', 'toml'])
+  if (!knownCodeLangs.has(language) && /^FROM\s+\S+/.test(firstLine)) return 'Dockerfile'
+
+  // Shell scripts
+  if (firstLine === '#!/bin/bash' || firstLine === '#!/bin/sh' || firstLine === '#!/usr/bin/env bash') {
+    return 'script.sh'
+  }
+
+  // Python entry points
+  if (language === 'python' || language === 'py') {
+    if (lower.includes('if __name__') || lower.includes('from fastapi') || lower.includes('import fastapi') ||
+        lower.includes('from flask') || lower.includes('import flask')) {
+      return 'main.py'
+    }
+    // requirements.txt pattern: lines of "package==version" or "package>=version"
+    if (/^[a-z][a-z0-9_-]*[=><!]=/.test(content.trim())) return 'requirements.txt'
+  }
+
+  // JavaScript/TypeScript entry points
+  if (['typescript', 'ts', 'javascript', 'js'].includes(language)) {
+    if (lower.includes('export default') || lower.includes('export const app') ||
+        lower.includes('module.exports')) {
+      return language === 'typescript' || language === 'ts' ? 'index.ts' : 'index.js'
+    }
+  }
+
+  // JSON: package.json if has "name" + "scripts" or "dependencies"
+  if (language === 'json') {
+    try {
+      const parsed = JSON.parse(content.trim())
+      if (parsed && typeof parsed === 'object' && 'name' in parsed &&
+          ('scripts' in parsed || 'dependencies' in parsed)) {
+        return 'package.json'
+      }
+    } catch {
+      // Not valid JSON
+    }
+  }
+
+  // TOML project files
+  if (language === 'toml' && (lower.includes('[tool.poetry]') || lower.includes('[project]'))) {
+    return 'pyproject.toml'
+  }
+
+  return null
+}
+
 // File path comment patterns (checked in order):
 // 1. After the fence language tag:    ```ts // filepath: src/foo.ts
 // 2. First line comment Python style: # src/foo.py
@@ -40,6 +96,7 @@ export function extractCodeBlocks(markdown: string): SandboxFile[] {
   const fenceRegex = /^```([^\n`]*)\n([\s\S]*?)^```/gm
   let match: RegExpExecArray | null
   let fallbackIndex = 0
+  const usedNames = new Set<string>()
 
   while ((match = fenceRegex.exec(markdown)) !== null) {
     const fenceLine = match[1].trim() // e.g. "ts // filepath: src/index.ts"
@@ -69,12 +126,31 @@ export function extractCodeBlocks(markdown: string): SandboxFile[] {
       }
     }
 
+    // Try to infer a meaningful name from content before falling back to generic
+    if (!filePath) {
+      const inferred = inferFileNameFromContent(body, language)
+      if (inferred) {
+        // Resolve collisions by appending index
+        if (!usedNames.has(inferred)) {
+          filePath = inferred
+        } else {
+          const dotIdx = inferred.lastIndexOf('.')
+          const base = dotIdx >= 0 ? inferred.slice(0, dotIdx) : inferred
+          const ext = dotIdx >= 0 ? inferred.slice(dotIdx) : ''
+          let counter = 2
+          while (usedNames.has(`${base}_${counter}${ext}`)) counter++
+          filePath = `${base}_${counter}${ext}`
+        }
+      }
+    }
+
     // Final fallback: generate a filename from language
     if (!filePath) {
       const ext = LANG_EXT[language] ?? 'txt'
       filePath = `file_${++fallbackIndex}.${ext}`
     }
 
+    usedNames.add(filePath)
     files.push({ path: filePath, content: body, language: language || undefined })
   }
 
