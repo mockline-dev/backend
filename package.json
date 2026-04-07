@@ -56,7 +56,8 @@
     "test:smoke": "ts-node --project tsconfig.scripts.json scripts/test-orchestration.ts",
     "test:merkle": "ts-node --project tsconfig.scripts.json scripts/test-merkle.ts",
     "test:sandbox": "ts-node --project tsconfig.scripts.json scripts/test-sandbox.ts",
-    "test:all": "pnpm run test:smoke && pnpm run test:merkle && pnpm run test:sandbox"
+    "test:all": "pnpm run test:smoke && pnpm run test:merkle && pnpm run test:sandbox",
+    "sim": "ts-node --project tsconfig.scripts.json scripts/simulate-frontend.ts"
   },
   "overrides": {
     "config": "4.1.1"
@@ -118,6 +119,7 @@
     "nodemon": "^3.1.10",
     "prettier": "^3.5.3",
     "shx": "^0.4.0",
+    "socket.io-client": "^4.8.3",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3",
