@@ -207,15 +207,9 @@ export async function startProjectExecution(
   const files: ProjectFile[] = []
   for (const obj of objects) {
     try {
-      const stream = await r2Client.getObject(obj.key)
-      if (!stream) continue
-
-      const chunks: Buffer[] = []
-      for await (const chunk of stream as any) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-      }
-      const content = Buffer.concat(chunks).toString('utf8')
-      // Strip the `projects/{projectId}/` prefix for the workspace path
+      // r2Client.getObject returns a string directly — no stream iteration needed
+      const content = await r2Client.getObject(obj.key)
+      if (!content) continue
       const relativePath = obj.key.replace(`projects/${projectId}/`, '')
       files.push({ path: `/workspace/${relativePath}`, data: content, mode: 0o644 })
     } catch (err: unknown) {
@@ -252,84 +246,93 @@ export async function startProjectExecution(
 
   log.debug('Execution sandbox created', { projectId, fileCount: files.length })
 
-  // Write all project files
-  await sandbox.files.writeFiles(files)
+  try {
+    // Write all project files
+    await sandbox.files.writeFiles(files)
 
-  // Install dependencies if manifest present
-  const depConfig = DEP_INSTALL_COMMANDS[language] ?? DEP_INSTALL_COMMANDS['python']
-  const hasManifest = files.some(f => f.path.endsWith(`/${depConfig.manifest}`))
-  if (hasManifest) {
-    log.info('Installing dependencies', { projectId, language, cmd: depConfig.cmd })
-    let pipOutput = ''
-    const depResult = await sandbox.commands.run(depConfig.cmd, {}, {
+    // Install dependencies if manifest present
+    const depConfig = DEP_INSTALL_COMMANDS[language] ?? DEP_INSTALL_COMMANDS['python']
+    const hasManifest = files.some(f => f.path.endsWith(`/${depConfig.manifest}`))
+    if (hasManifest) {
+      log.info('Installing dependencies', { projectId, language, cmd: depConfig.cmd })
+      let pipOutput = ''
+      const depResult = await sandbox.commands.run(depConfig.cmd, {}, {
+        onStdout: (msg: any) => {
+          const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
+          pipOutput += text
+          emit?.('terminal:stdout', projectId, { phase: 'deps', text })
+        },
+        onStderr: (msg: any) => {
+          const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
+          pipOutput += text
+          emit?.('terminal:stderr', projectId, { phase: 'deps', text })
+        }
+      }).catch((err: any) => {
+        log.warn('Dependency install error (non-fatal)', { projectId, error: err?.message })
+      })
+      const depExitCode = (depResult as any)?.exitCode
+      if (pipOutput) {
+        log.info('Dependency install output', { projectId, output: pipOutput.slice(0, 2000) })
+      }
+      if (depExitCode !== 0 && depExitCode != null) {
+        const msg = `Dependency installation failed (exit ${depExitCode}). Check requirements.txt and network access.`
+        log.error(msg, { projectId, exitCode: depExitCode })
+        emit?.('terminal:stderr', projectId, { phase: 'deps', text: `\n[ERROR] ${msg}\n` })
+        throw new Error(msg)
+      }
+      log.info('Dependency install complete', { projectId, exitCode: depExitCode })
+    }
+
+    // Dynamically find entry point and build start commands
+    const entryPoint = findEntryPoint(files, language)
+    const startCmds = buildStartCommands(language, entryPoint, files)
+    log.debug('Starting server', { projectId, entryPoint, language })
+
+    // Create server log file first so tail can start immediately (A3)
+    await sandbox.commands.run('touch /tmp/server.log').catch(() => {})
+
+    // Start tailing server log BEFORE launching server — captures output from byte 0,
+    // including crash tracebacks that appear before the port opens (A3)
+    log.debug('Starting server log tail', { projectId })
+    sandbox.commands.run('tail -n +1 -f /tmp/server.log 2>/dev/null', {}, {
       onStdout: (msg: any) => {
         const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
-        pipOutput += text
-        emit?.('terminal:stdout', projectId, { phase: 'deps', text })
+        emit?.('terminal:stdout', projectId, { phase: 'server', text })
       },
       onStderr: (msg: any) => {
         const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
-        pipOutput += text
-        emit?.('terminal:stderr', projectId, { phase: 'deps', text })
+        emit?.('terminal:stderr', projectId, { phase: 'server', text })
       }
-    }).catch((err: any) => {
-      log.warn('Dependency install error (non-fatal)', { projectId, error: err?.message })
-    })
-    const depExitCode = (depResult as any)?.exitCode
-    if (pipOutput) {
-      log.info('Dependency install output', { projectId, output: pipOutput.slice(0, 2000) })
+    }).catch(() => { /* non-fatal — tail exits when sandbox is killed */ })
+
+    // Run start commands. Output is redirected to /tmp/server.log (backgrounded with &),
+    // so stdout/stderr callbacks would never fire — emit the command text instead (A4)
+    for (const cmd of startCmds) {
+      log.info('Running start command', { projectId, cmd })
+      emit?.('terminal:stdout', projectId, { phase: 'start', text: `$ ${cmd}\n` })
+      await sandbox.commands.run(cmd).catch((err: any) => {
+        log.warn('Start command error (non-fatal)', { projectId, cmd, error: err?.message })
+      })
     }
-    if (depExitCode !== 0 && depExitCode != null) {
-      const msg = `Dependency installation failed (exit ${depExitCode}). Check requirements.txt and network access.`
-      log.error(msg, { projectId, exitCode: depExitCode })
-      emit?.('terminal:stderr', projectId, { phase: 'deps', text: `\n[ERROR] ${msg}\n` })
-      throw new Error(msg)
-    }
-    log.info('Dependency install complete', { projectId, exitCode: depExitCode })
+
+    log.info('Waiting for server to be ready', { projectId, port: SERVER_PORT })
+
+    // Poll for server readiness (max 30s) and get external URL + routing headers
+    const { proxyUrl, endpointHeaders, serverReady, serverLog } = await waitForServer(sandbox, SERVER_PORT, 30000)
+    log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint, serverReady })
+
+    // Extract containerId from sandbox internals (best-effort)
+    const containerId = (sandbox as any).id ?? (sandbox as any).containerId ?? 'unknown'
+
+    return { containerId, proxyUrl, endpointHeaders, port: SERVER_PORT, sandbox, serverReady, serverLog }
+  } catch (err) {
+    // Kill the sandbox container on any startup failure to prevent resource leaks.
+    // Without this, the container stays alive until OpenSandbox's timeout.
+    log.warn('Startup failed — killing orphaned sandbox', { projectId })
+    await sandbox.kill().catch(() => {})
+    await sandbox.close().catch(() => {})
+    throw err
   }
-
-  // Dynamically find entry point and build start commands
-  const entryPoint = findEntryPoint(files, language)
-  const startCmds = buildStartCommands(language, entryPoint, files)
-  log.debug('Starting server', { projectId, entryPoint, language })
-
-  // Create server log file first so tail can start immediately (A3)
-  await sandbox.commands.run('touch /tmp/server.log').catch(() => {})
-
-  // Start tailing server log BEFORE launching server — captures output from byte 0,
-  // including crash tracebacks that appear before the port opens (A3)
-  log.debug('Starting server log tail', { projectId })
-  sandbox.commands.run('tail -n +1 -f /tmp/server.log 2>/dev/null', {}, {
-    onStdout: (msg: any) => {
-      const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
-      emit?.('terminal:stdout', projectId, { phase: 'server', text })
-    },
-    onStderr: (msg: any) => {
-      const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
-      emit?.('terminal:stderr', projectId, { phase: 'server', text })
-    }
-  }).catch(() => { /* non-fatal — tail exits when sandbox is killed */ })
-
-  // Run start commands. Output is redirected to /tmp/server.log (backgrounded with &),
-  // so stdout/stderr callbacks would never fire — emit the command text instead (A4)
-  for (const cmd of startCmds) {
-    log.info('Running start command', { projectId, cmd })
-    emit?.('terminal:stdout', projectId, { phase: 'start', text: `$ ${cmd}\n` })
-    await sandbox.commands.run(cmd).catch((err: any) => {
-      log.warn('Start command error (non-fatal)', { projectId, cmd, error: err?.message })
-    })
-  }
-
-  log.info('Waiting for server to be ready', { projectId, port: SERVER_PORT })
-
-  // Poll for server readiness (max 30s) and get external URL + routing headers
-  const { proxyUrl, endpointHeaders, serverReady, serverLog } = await waitForServer(sandbox, SERVER_PORT, 30000)
-  log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint, serverReady })
-
-  // Extract containerId from sandbox internals (best-effort)
-  const containerId = (sandbox as any).id ?? (sandbox as any).containerId ?? 'unknown'
-
-  return { containerId, proxyUrl, endpointHeaders, port: SERVER_PORT, sandbox, serverReady, serverLog }
 }
 
 async function waitForServer(
@@ -373,7 +376,7 @@ except Exception as e:
  sys.exit(1)
 "`
       const httpResult = await sandbox.commands.run(pyHttpCheck, { timeoutSeconds: 10 }) as any
-      if ((httpResult as any).exitCode !== 0) {
+      if (httpResult.exitCode !== 0) {
         log.warn('HTTP health check failed — port open but server not serving', { port })
         serverReady = false
       }
