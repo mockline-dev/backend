@@ -124,7 +124,13 @@ async function cleanupRenamedFiles(
         from: staleCounterpart,
         to: addedPath
       })
-      await r2Client.deleteObject(`projects/${projectId}/${staleCounterpart}`).catch(() => {})
+      await r2Client.deleteObject(`projects/${projectId}/${staleCounterpart}`).catch((err: unknown) => {
+        log.warn('Failed to delete stale R2 file', {
+          projectId,
+          key: `projects/${projectId}/${staleCounterpart}`,
+          error: err instanceof Error ? err.message : String(err)
+        })
+      })
     }
   }
 }
@@ -274,7 +280,7 @@ export async function repairExecutionSandbox(params: RepairParams): Promise<void
             port: execResult.port,
             serverLog: execResult.serverLog.slice(-2000),
             startedAt: Date.now(),
-            errorMessage: undefined
+            errorMessage: ''  // clear any previous repair error message
           })
           .catch(() => {})
 
