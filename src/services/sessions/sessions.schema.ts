@@ -14,6 +14,7 @@ export const sessionsSchema = Type.Object(
     userId: ObjectIdSchema(),
     status: Type.Union([
       Type.Literal('starting'),
+      Type.Literal('repairing'),
       Type.Literal('running'),
       Type.Literal('stopped'),
       Type.Literal('error')
