@@ -50,17 +50,38 @@ const app = express()
 { "name": "my-app", "dependencies": { "express": "^4.18.0" } }
 \`\`\``
 
+const OPENAPI_FASTAPI_INSTRUCTIONS = `
+
+OPENAPI REQUIREMENTS (FastAPI):
+- Pass title, version, and description to the FastAPI() constructor: FastAPI(title="...", version="1.0.0", description="...")
+- Add tags=["TagName"] to every route decorator (@app.get, @app.post, etc.)
+- Add summary="..." and description="..." to every route decorator
+- Define Pydantic models for all request bodies and responses; use Field(description="...", example=...) on each field
+- Use Query(description="...", example=...) and Path(description="...", example=...) for parameters
+- Do NOT disable the built-in /openapi.json endpoint`
+
+const OPENAPI_FLASK_INSTRUCTIONS = `
+
+OPENAPI REQUIREMENTS (Flask):
+- Use flask-openapi3 instead of plain Flask: from flask_openapi3 import OpenAPI; app = OpenAPI(__name__, info=Info(title="...", version="1.0.0"))
+- Add flask-openapi3 to requirements.txt
+- Define request/response schemas using Pydantic models
+- The /openapi.json endpoint must be accessible and return valid OpenAPI 3.x JSON`
+
+const OPENAPI_ENDPOINT_REMINDER = `
+Ensure all endpoints include OpenAPI metadata: tags, summary, description, and typed request/response schemas.`
+
 const TEMPLATES: Record<Intent, string> = {
   [Intent.GenerateProject]: `You are an expert backend architect specializing in {{framework}} and {{language}}.
 Your task is to help design and generate a complete, production-ready backend project.
 Follow best practices for project structure, security, and code quality.
 Be concise and precise. Return only what is asked — no filler text.
-Output configuration files first (package.json, requirements.txt, pyproject.toml, .env.example), then source files starting from the entry point.${CODE_OUTPUT_FORMAT}`,
+Output configuration files first (package.json, requirements.txt, pyproject.toml, .env.example), then source files starting from the entry point.${OPENAPI_FASTAPI_INSTRUCTIONS}${OPENAPI_FLASK_INSTRUCTIONS}${CODE_OUTPUT_FORMAT}`,
 
   [Intent.EditCode]: `You are an expert {{framework}} developer editing code in the project "{{name}}".
 Understand the existing code structure before making changes.
 Make minimal, targeted edits. Preserve existing patterns and conventions.
-Explain what you changed and why, briefly.${CODE_OUTPUT_FORMAT}`,
+Explain what you changed and why, briefly.${OPENAPI_ENDPOINT_REMINDER}${CODE_OUTPUT_FORMAT}`,
 
   [Intent.ExplainCode]: `You are a senior {{language}} developer explaining code clearly.
 Break down complex concepts into understandable parts.
@@ -75,7 +96,7 @@ Do not introduce unrelated changes.${CODE_OUTPUT_FORMAT}`,
   [Intent.AddFeature]: `You are adding a new feature to the {{framework}} project "{{name}}".
 Integrate seamlessly with the existing codebase structure and patterns.
 Consider edge cases, validation, and error handling.
-Keep changes minimal and focused.${CODE_OUTPUT_FORMAT}`,
+Keep changes minimal and focused.${OPENAPI_ENDPOINT_REMINDER}${CODE_OUTPUT_FORMAT}`,
 
   [Intent.General]: `You are a helpful backend programming assistant with expertise in modern web frameworks.
 Answer questions clearly and concisely.

@@ -85,7 +85,6 @@ export const projectsDataSchema = Type.Pick(
     'description',
     'framework',
     'language',
-    'model',
     'status',
     'jobId',
     'generationProgress',
@@ -103,6 +102,10 @@ export const projectsDataResolver = resolve<Projects, HookContext<ProjectsServic
   },
   updatedAt: async () => {
     return Date.now()
+  },
+  model: async (_value, _data, context) => {
+    const llmConfig = context.app.get('llm')
+    return llmConfig?.groq?.defaultModel ?? 'llama-3.3-70b-versatile'
   }
 })
 
