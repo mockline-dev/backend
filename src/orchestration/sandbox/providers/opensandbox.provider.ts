@@ -28,7 +28,35 @@ const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
   python: {
     buildCommands: [
       // Syntax-check every .py file — fast, no execution
-      'python3 -m py_compile $(find /workspace -name "*.py" | head -50) 2>&1'
+      'python3 -m py_compile $(find /workspace -name "*.py" | head -50) 2>&1',
+      // Verify all third-party imports are actually installed.
+      // py_compile only catches syntax errors, not missing modules.
+      // This walks all .py files, parses import statements via AST,
+      // and tries __import__() for any non-stdlib, non-local module.
+      `python3 -c "
+import ast,os,sys
+missing=[]
+ws='/workspace'
+for root,dirs,files in os.walk(ws):
+ dirs[:]=[d for d in dirs if d!='__pycache__' and not d.startswith('.')]
+ for fname in files:
+  if not fname.endswith('.py'):continue
+  try:src=open(os.path.join(root,fname)).read();tree=ast.parse(src)
+  except:continue
+  for node in ast.walk(tree):
+   mods=[]
+   if isinstance(node,ast.Import):mods=[a.name.split('.')[0] for a in node.names]
+   elif isinstance(node,ast.ImportFrom) and node.module and not node.level:mods=[node.module.split('.')[0]]
+   for mod in mods:
+    if mod in sys.stdlib_module_names:continue
+    if os.path.exists(f'{ws}/{mod}.py') or os.path.exists(f'{ws}/{mod}/__init__.py'):continue
+    try:__import__(mod)
+    except ImportError:missing.append(mod)
+if missing:
+ unique=list(set(missing))
+ print(f'Missing modules (not installed): {unique}',file=sys.stderr)
+ sys.exit(1)
+" 2>&1`
     ],
     testCommand: 'cd /workspace && python3 -m pytest --tb=short -q 2>&1 || true',
     depInstall: {
