@@ -314,28 +314,32 @@ async function waitForServer(
   port: number,
   timeoutMs: number
 ): Promise<{ proxyUrl: string; endpointHeaders: Record<string, string> }> {
-  // Run a single shell loop inside the sandbox that polls until the port opens.
-  // nc -z exits 0 when the port is open; the loop exits 1 on timeout.
+  // Use Python's socket module — always available, unlike nc which isn't in python:3.11-slim.
   const maxAttempts = Math.max(5, Math.floor(timeoutMs / 2000))
-  const portCheckCmd =
-    `for i in $(seq 1 ${maxAttempts}); do nc -z localhost ${port} 2>/dev/null && exit 0; sleep 2; done; exit 1`
+  const pyPortCheck = `python3 -c "
+import socket,time,sys
+for _ in range(${maxAttempts}):
+ try:socket.create_connection(('localhost',${port}),1).close();sys.exit(0)
+ except:time.sleep(2)
+sys.exit(1)
+"`
 
   try {
-    const result = await sandbox.commands.run(portCheckCmd) as any
+    const result = await sandbox.commands.run(pyPortCheck, { timeoutSeconds: Math.ceil(timeoutMs / 1000) + 5 }) as any
     if (result.exitCode === 0) {
       try {
-        // getEndpoint returns both the URL and any required routing headers
-        // (e.g. when OpenSandbox server-proxy mode needs a routing header)
         const ep = await sandbox.getEndpoint(port)
         const proxyUrl = `${sandbox.connectionConfig.protocol}://${ep.endpoint}`
         const endpointHeaders = (ep.headers as Record<string, string>) ?? {}
+        log.info('Server port is open', { port, proxyUrl })
         return { proxyUrl, endpointHeaders }
       } catch {
         return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {} }
       }
     }
-  } catch {
-    // nc not available or command timed out — fall through
+    log.warn('Server did not open port within timeout', { port, maxAttempts })
+  } catch (err: unknown) {
+    log.warn('Port check failed', { port, error: err instanceof Error ? err.message : String(err) })
   }
 
   // Best-effort: get endpoint URL even if server readiness check failed
