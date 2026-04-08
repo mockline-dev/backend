@@ -102,7 +102,7 @@
         "maxRetries": 2,
         "opensandbox": {
             "domain": "localhost:8080",
-            "apiKey": "",
+            $1REDACTED_API_KEY$2,
             "protocol": "http",
             "defaultImage": "python:3.11-slim"
         }
