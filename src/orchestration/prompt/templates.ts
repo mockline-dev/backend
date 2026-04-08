@@ -19,7 +19,18 @@ DEPENDENCY GUIDELINES:
 - NEVER guess or invent version numbers — non-existent versions will cause installation failures
 - Do NOT use >= constraints unless you verified the version exists (e.g. passlib has no version >= 1.8.0)
 - For requirements.txt: write one package per line, bare name preferred (e.g. "passlib", not "passlib>=1.9.0")
-- For package.json: use caret ranges only for well-known packages (e.g. "^4.18.0" for express)`
+- For package.json: use caret ranges only for well-known packages (e.g. "^4.18.0" for express)
+
+COMMON PYPI PACKAGE NAME MAPPINGS (import name ≠ PyPI package name):
+  import jwt        → PyJWT
+  import dotenv     → python-dotenv
+  import yaml       → PyYAML
+  import bs4        → beautifulsoup4
+  import PIL        → Pillow
+  import cv2        → opencv-python
+  import sklearn    → scikit-learn
+  import dateutil   → python-dateutil
+  import serial     → pyserial`
 
 const CODE_OUTPUT_FORMAT = `
 
