@@ -109,6 +109,15 @@ export function createApiProxyMiddleware(app: Application) {
         } catch {
           debug.port8000 = 'unknown'
         }
+
+        // Process list — shows whether server process is running (D2)
+        try {
+          const psResult = await sandbox.commands.run('ps aux 2>/dev/null | head -20', { timeoutSeconds: 5 }) as any
+          const processList = (psResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
+          debug.processList = processList.trim()
+        } catch {
+          debug.processList = '(could not read process list)'
+        }
       } else {
         debug.execRelay = { ok: false, error: 'No active sandbox in memory (server may have restarted)' }
       }
@@ -195,8 +204,23 @@ export function createApiProxyMiddleware(app: Application) {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       log.error('Direct fetch proxy failed', { sessionId, targetUrl, error: message })
+
+      // Include server log to help diagnose startup failures (D1)
+      let serverLog: string | undefined
+      const sandboxForLog = getActiveSandbox(sessionId)
+      if (sandboxForLog) {
+        try {
+          const logResult = await sandboxForLog.commands.run('cat /tmp/server.log 2>/dev/null || echo "(no server log)"', { timeoutSeconds: 5 }) as any
+          serverLog = (logResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('').slice(-2000)
+        } catch { /* non-fatal */ }
+      }
+
       ctx.status = 502
-      ctx.body = { error: 'Failed to reach sandbox', details: message }
+      ctx.body = {
+        error: 'Failed to reach sandbox',
+        details: message,
+        ...(serverLog ? { serverLog, hint: 'Check serverLog for startup errors' } : {})
+      }
     }
   }
 }

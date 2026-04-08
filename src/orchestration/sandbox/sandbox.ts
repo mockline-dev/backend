@@ -88,6 +88,7 @@ export async function runSandbox(
 
 /**
  * Build a prompt asking the LLM to fix code that failed sandbox validation.
+ * Categorizes the error type and provides type-specific fix instructions.
  */
 export function buildFixPrompt(originalCode: string, sandboxResult: SandboxResult): string {
   const errorDetails = [
@@ -99,27 +100,65 @@ export function buildFixPrompt(originalCode: string, sandboxResult: SandboxResul
     .join('\n\n')
 
   const allErrorText = [errorDetails, sandboxResult.stdout].filter(Boolean).join('\n')
+
+  // Categorize error type for targeted fix instructions
   const isDependencyError =
     allErrorText.includes('No matching distribution') ||
     allErrorText.includes('Could not find a version') ||
     allErrorText.includes('Dependency installation failed') ||
     allErrorText.includes('pip install') ||
-    allErrorText.includes('No module named')
+    allErrorText.includes('No module named') ||
+    allErrorText.includes('Missing modules')
 
-  const dependencyHint = isDependencyError
-    ? `\n\nIMPORTANT: The failure is in dependency installation. Fix requirements.txt by:
-- Removing exact version pins (==) for packages where the version does not exist
-- Using >= constraints instead (e.g. "fastapi>=0.100.0") or omitting the version entirely (e.g. just "fastapi")
-- Removing any packages that do not exist on PyPI
-- Only using well-known packages with versions you are certain exist\n`
-    : ''
+  const isSyntaxError =
+    allErrorText.includes('SyntaxError') ||
+    allErrorText.includes('IndentationError') ||
+    allErrorText.includes('error TS') ||
+    allErrorText.includes('SyntaxError:')
+
+  const isImportError =
+    allErrorText.includes('ImportError') ||
+    allErrorText.includes('ModuleNotFoundError') ||
+    allErrorText.includes('Cannot find module') ||
+    allErrorText.includes('Missing modules')
+
+  const isRuntimeError =
+    !isDependencyError && !isSyntaxError && !isImportError && allErrorText.length > 0
+
+  let typeSpecificHint = ''
+  if (isDependencyError) {
+    typeSpecificHint = `\n\nERROR TYPE: Dependency installation failure
+Fix instructions:
+- Check requirements.txt: remove exact version pins (==) where the version doesn't exist on PyPI
+- Use bare package names (e.g. "fastapi", not "fastapi==0.99.0") or well-known version ranges
+- Fix import name → PyPI name mappings: jwt→PyJWT, dotenv→python-dotenv, yaml→PyYAML, bs4→beautifulsoup4
+- Remove any invented packages that don't exist on PyPI\n`
+  } else if (isSyntaxError) {
+    typeSpecificHint = `\n\nERROR TYPE: Syntax error
+Fix instructions:
+- Correct the syntax in the file(s) mentioned in the error output
+- Check for missing colons, mismatched parentheses, or incorrect indentation\n`
+  } else if (isImportError) {
+    typeSpecificHint = `\n\nERROR TYPE: Missing import/module
+Fix instructions:
+- Add every imported package to requirements.txt/package.json
+- Check import name → package name mappings (e.g. import jwt → PyJWT in requirements.txt)
+- Remove imports for packages you are not certain exist\n`
+  } else if (isRuntimeError) {
+    typeSpecificHint = `\n\nERROR TYPE: Runtime error
+Fix instructions:
+- Fix the runtime error shown in the output
+- Server MUST bind to 0.0.0.0:8000 (not 127.0.0.1); read port from os.environ.get("PORT", 8000)\n`
+  }
 
   return [
     'The code you generated failed validation. Please fix it.',
     '',
     'Error details:',
     errorDetails || 'Unknown error',
-    dependencyHint,
+    typeSpecificHint,
+    'CONSTRAINTS: Server must bind to 0.0.0.0:8000. Do not change the overall project structure.',
+    '',
     'Original code:',
     originalCode,
     '',

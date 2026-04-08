@@ -96,7 +96,8 @@ export function startOrchestrationWorker(app: any): Worker {
             let { result: sandboxResult } = await runSandbox(result.content, provider, emit, projectId, {
               timeoutMs: sandboxConfig.timeoutMs,
               language,
-              runTests: false
+              runTests: false,
+              checkServerStart: result.intent === Intent.GenerateProject
             })
 
             // Agentic fix loop
@@ -126,7 +127,8 @@ export function startOrchestrationWorker(app: any): Worker {
               const retryRun = await runSandbox(result.content, provider, emit, projectId, {
                 timeoutMs: sandboxConfig.timeoutMs,
                 language,
-                runTests: false
+                runTests: false,
+                checkServerStart: originalIntent === Intent.GenerateProject
               })
               sandboxResult = retryRun.result
             }

@@ -9,6 +9,8 @@ export interface ExecutionResult {
   proxyUrl: string
   endpointHeaders: Record<string, string>
   port: number
+  serverReady: boolean
+  serverLog: string
 }
 
 const SERVER_PORT = 8000
@@ -291,26 +293,11 @@ export async function startProjectExecution(
   const startCmds = buildStartCommands(language, entryPoint, files)
   log.debug('Starting server', { projectId, entryPoint, language })
 
-  for (const cmd of startCmds) {
-    log.info('Running start command', { projectId, cmd })
-    await sandbox.commands.run(cmd, {}, {
-      onStdout: (msg: any) => {
-        const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
-        emit?.('terminal:stdout', projectId, { phase: 'start', text })
-      },
-      onStderr: (msg: any) => {
-        const text = typeof msg === 'string' ? msg : (msg?.text ?? '')
-        emit?.('terminal:stderr', projectId, { phase: 'start', text })
-      }
-    }).catch((err: any) => {
-      log.warn('Start command error (non-fatal)', { projectId, cmd, error: err?.message })
-    })
-  }
+  // Create server log file first so tail can start immediately (A3)
+  await sandbox.commands.run('touch /tmp/server.log').catch(() => {})
 
-  log.info('Waiting for server to be ready', { projectId, port: SERVER_PORT })
-
-  // Tail server log immediately (fire-and-forget) so terminal output starts the moment
-  // the server writes anything — including crash tracebacks before the port opens.
+  // Start tailing server log BEFORE launching server — captures output from byte 0,
+  // including crash tracebacks that appear before the port opens (A3)
   log.debug('Starting server log tail', { projectId })
   sandbox.commands.run('tail -n +1 -f /tmp/server.log 2>/dev/null', {}, {
     onStdout: (msg: any) => {
@@ -323,21 +310,33 @@ export async function startProjectExecution(
     }
   }).catch(() => { /* non-fatal — tail exits when sandbox is killed */ })
 
+  // Run start commands. Output is redirected to /tmp/server.log (backgrounded with &),
+  // so stdout/stderr callbacks would never fire — emit the command text instead (A4)
+  for (const cmd of startCmds) {
+    log.info('Running start command', { projectId, cmd })
+    emit?.('terminal:stdout', projectId, { phase: 'start', text: `$ ${cmd}\n` })
+    await sandbox.commands.run(cmd).catch((err: any) => {
+      log.warn('Start command error (non-fatal)', { projectId, cmd, error: err?.message })
+    })
+  }
+
+  log.info('Waiting for server to be ready', { projectId, port: SERVER_PORT })
+
   // Poll for server readiness (max 30s) and get external URL + routing headers
-  const { proxyUrl, endpointHeaders } = await waitForServer(sandbox, SERVER_PORT, 30000)
-  log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint })
+  const { proxyUrl, endpointHeaders, serverReady, serverLog } = await waitForServer(sandbox, SERVER_PORT, 30000)
+  log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint, serverReady })
 
   // Extract containerId from sandbox internals (best-effort)
   const containerId = (sandbox as any).id ?? (sandbox as any).containerId ?? 'unknown'
 
-  return { containerId, proxyUrl, endpointHeaders, port: SERVER_PORT, sandbox }
+  return { containerId, proxyUrl, endpointHeaders, port: SERVER_PORT, sandbox, serverReady, serverLog }
 }
 
 async function waitForServer(
   sandbox: Sandbox,
   port: number,
   timeoutMs: number
-): Promise<{ proxyUrl: string; endpointHeaders: Record<string, string> }> {
+): Promise<{ proxyUrl: string; endpointHeaders: Record<string, string>; serverReady: boolean; serverLog: string }> {
   // Use Python's socket module — always available, unlike nc which isn't in python:3.11-slim.
   const maxAttempts = Math.max(5, Math.floor(timeoutMs / 2000))
   const pyPortCheck = `python3 -c "
@@ -348,32 +347,57 @@ for _ in range(${maxAttempts}):
 sys.exit(1)
 "`
 
+  let portOpen = false
   try {
     const result = await sandbox.commands.run(pyPortCheck, { timeoutSeconds: Math.ceil(timeoutMs / 1000) + 5 }) as any
-    if (result.exitCode === 0) {
-      try {
-        const ep = await sandbox.getEndpoint(port)
-        const proxyUrl = `${sandbox.connectionConfig.protocol}://${ep.endpoint}`
-        const endpointHeaders = (ep.headers as Record<string, string>) ?? {}
-        log.info('Server port is open', { port, proxyUrl })
-        return { proxyUrl, endpointHeaders }
-      } catch {
-        return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {} }
-      }
+    portOpen = result.exitCode === 0
+    if (!portOpen) {
+      log.warn('Server did not open port within timeout', { port, maxAttempts })
     }
-    log.warn('Server did not open port within timeout', { port, maxAttempts })
   } catch (err: unknown) {
     log.warn('Port check failed', { port, error: err instanceof Error ? err.message : String(err) })
   }
 
-  // Best-effort: get endpoint URL even if server readiness check failed
+  // HTTP health check: port open but server might not be serving yet (A2)
+  let serverReady = portOpen
+  if (portOpen) {
+    try {
+      const pyHttpCheck = `python3 -c "
+import urllib.request, urllib.error, sys
+try:
+ urllib.request.urlopen('http://localhost:${port}/', timeout=5)
+except urllib.error.HTTPError:
+ sys.exit(0)
+except Exception as e:
+ print(str(e), end='')
+ sys.exit(1)
+"`
+      const httpResult = await sandbox.commands.run(pyHttpCheck, { timeoutSeconds: 10 }) as any
+      if ((httpResult as any).exitCode !== 0) {
+        log.warn('HTTP health check failed — port open but server not serving', { port })
+        serverReady = false
+      }
+    } catch {
+      serverReady = false
+    }
+  }
+
+  // Read server log — always useful for both success and failure diagnostics (A1)
+  let serverLog = ''
+  try {
+    const logResult = await sandbox.commands.run('cat /tmp/server.log 2>/dev/null || echo ""', { timeoutSeconds: 5 }) as any
+    serverLog = (logResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
+  } catch { /* non-fatal */ }
+
+  // Get endpoint URL (best-effort regardless of server status)
   try {
     const ep = await sandbox.getEndpoint(port)
     const proxyUrl = `${sandbox.connectionConfig.protocol}://${ep.endpoint}`
     const endpointHeaders = (ep.headers as Record<string, string>) ?? {}
-    return { proxyUrl, endpointHeaders }
+    if (portOpen) log.info('Server port is open', { port, proxyUrl })
+    return { proxyUrl, endpointHeaders, serverReady, serverLog }
   } catch {
-    return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {} }
+    return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {}, serverReady, serverLog }
   }
 }
 
