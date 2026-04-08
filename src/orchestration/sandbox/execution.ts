@@ -22,7 +22,10 @@ interface ProjectFile {
 const DEP_INSTALL_COMMANDS: Record<string, { manifest: string; cmd: string }> = {
   python: {
     manifest: 'requirements.txt',
-    cmd: 'pip install -r /workspace/requirements.txt 2>&1'
+    // python3 -m pip is more reliable than bare `pip` in slim images.
+    // sed strips \r to handle Windows-style line endings in requirements.txt.
+    // --no-cache-dir avoids stale cache issues in ephemeral containers.
+    cmd: 'python3 -m pip install --no-cache-dir -r <(sed "s/\\r//" /workspace/requirements.txt) 2>&1'
   },
   typescript: {
     manifest: 'package.json',
@@ -254,17 +257,23 @@ export async function startProjectExecution(
   const hasManifest = files.some(f => f.path.endsWith(`/${depConfig.manifest}`))
   if (hasManifest) {
     log.info('Installing dependencies', { projectId, language, cmd: depConfig.cmd })
+    let pipOutput = ''
     const depResult = await sandbox.commands.run(depConfig.cmd, {}, {
       onStdout: (msg: any) => {
+        pipOutput += msg.text ?? ''
         emit?.('terminal:stdout', projectId, { phase: 'deps', text: msg.text })
       },
       onStderr: (msg: any) => {
+        pipOutput += msg.text ?? ''
         emit?.('terminal:stderr', projectId, { phase: 'deps', text: msg.text })
       }
     }).catch((err: any) => {
       log.warn('Dependency install error (non-fatal)', { projectId, error: err?.message })
     })
     const depExitCode = (depResult as any)?.exitCode
+    if (pipOutput) {
+      log.info('Dependency install output', { projectId, output: pipOutput.slice(0, 2000) })
+    }
     if (depExitCode !== 0 && depExitCode != null) {
       const msg = `Dependency installation failed (exit ${depExitCode}). Check requirements.txt and network access.`
       log.error(msg, { projectId, exitCode: depExitCode })
