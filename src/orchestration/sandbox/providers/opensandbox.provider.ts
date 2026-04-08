@@ -33,7 +33,7 @@ const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
     testCommand: 'cd /workspace && python3 -m pytest --tb=short -q 2>&1 || true',
     depInstall: {
       manifestFile: 'requirements.txt',
-      command: 'pip install --quiet -r /workspace/requirements.txt 2>&1 || true'
+      command: 'python3 -m pip install --no-cache-dir --quiet -r /workspace/requirements.txt 2>&1'
     },
     failurePatterns: ['FAILED', 'ERROR', 'error:', 'SyntaxError', 'IndentationError']
   },
@@ -44,7 +44,7 @@ const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
     testCommand: 'cd /workspace && npm test 2>&1 || true',
     depInstall: {
       manifestFile: 'package.json',
-      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true'
+      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1'
     },
     failurePatterns: ['error TS', 'FAIL', 'Error:']
   },
@@ -57,7 +57,7 @@ const LANGUAGE_CONFIG: Record<string, LanguageConfig> = {
     testCommand: 'cd /workspace && npm test 2>&1 || true',
     depInstall: {
       manifestFile: 'package.json',
-      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1 || true'
+      command: 'cd /workspace && npm install --prefer-offline --silent 2>&1'
     },
     failurePatterns: ['SyntaxError', 'FAIL', 'Error:']
   }
@@ -139,7 +139,7 @@ export class OpenSandboxProvider implements ISandboxProvider {
         )
         if (hasManifest) {
           log.debug('Installing dependencies', { langKey, manifest: lang.depInstall.manifestFile })
-          await sandbox.commands.run(
+          const depResult = await sandbox.commands.run(
             lang.depInstall.command,
             {},
             {
@@ -147,6 +147,20 @@ export class OpenSandboxProvider implements ISandboxProvider {
               onStderr: capture('stderr')
             }
           )
+          const depExitCode = (depResult as any).exitCode ?? 0
+          if (depExitCode !== 0) {
+            log.debug('Dependency install failed', { langKey, depExitCode, output: stdout.slice(0, 300) })
+            return {
+              success: false,
+              files,
+              syntaxValid: true,
+              compilationOutput: `Dependency installation failed (exit ${depExitCode}):\n${stdout}\n${stderr}`.trim(),
+              testOutput: null,
+              stdout,
+              stderr,
+              durationMs: Date.now() - start
+            }
+          }
         }
       }
 

@@ -11,6 +11,16 @@ function interpolate(template: string, ctx: TemplateContext): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => ctx[key] ?? key)
 }
 
+const DEPENDENCY_GUIDELINES = `
+
+DEPENDENCY GUIDELINES:
+- Use >= version constraints (e.g. fastapi>=0.100.0) instead of == exact pins
+- If you are not certain about a specific version number, omit the version entirely (e.g. just "fastapi")
+- NEVER invent or guess package version numbers — non-existent versions will cause installation failures
+- Only use well-known, widely-used packages that exist on PyPI / npm
+- For requirements.txt: prefer "package>=major.minor" or just "package" over "package==x.y.z"
+- For package.json: use caret ranges (e.g. "^4.18.0") which is already standard`
+
 const CODE_OUTPUT_FORMAT = `
 
 MANDATORY CODE OUTPUT FORMAT:
@@ -35,8 +45,8 @@ app = FastAPI()
 
 \`\`\`python
 # filepath: requirements.txt
-fastapi==0.104.1
-uvicorn==0.24.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
 \`\`\`
 
 \`\`\`typescript
@@ -76,7 +86,7 @@ const TEMPLATES: Record<Intent, string> = {
 Your task is to help design and generate a complete, production-ready backend project.
 Follow best practices for project structure, security, and code quality.
 Be concise and precise. Return only what is asked — no filler text.
-Output configuration files first (package.json, requirements.txt, pyproject.toml, .env.example), then source files starting from the entry point.${OPENAPI_FASTAPI_INSTRUCTIONS}${OPENAPI_FLASK_INSTRUCTIONS}${CODE_OUTPUT_FORMAT}`,
+Output configuration files first (package.json, requirements.txt, pyproject.toml, .env.example), then source files starting from the entry point.${OPENAPI_FASTAPI_INSTRUCTIONS}${OPENAPI_FLASK_INSTRUCTIONS}${DEPENDENCY_GUIDELINES}${CODE_OUTPUT_FORMAT}`,
 
   [Intent.EditCode]: `You are an expert {{framework}} developer editing code in the project "{{name}}".
 Understand the existing code structure before making changes.
