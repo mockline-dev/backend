@@ -87,29 +87,52 @@ export const sessions = (app: Application) => {
 
           // Start sandbox asynchronously — emit events when ready
           startProjectExecution(session.projectId.toString(), session.language, sandboxConfig, emit)
-            .then(async ({ containerId, proxyUrl, endpointHeaders, port, sandbox }) => {
+            .then(async ({ containerId, proxyUrl, endpointHeaders, port, sandbox, serverReady, serverLog }) => {
               activeSandboxes.set(sessionId, sandbox)
 
-              await app.service(sessionsPath).patch(sessionId, {
-                status: 'running',
-                containerId,
-                proxyUrl,
-                endpointHeaders,
-                port,
-                startedAt: Date.now()
-              })
+              // Emit server log to frontend so terminal shows complete output
+              if (serverLog) {
+                emit('terminal:stdout', session.projectId.toString(), { phase: 'server', text: serverLog })
+              }
 
-              // Update project status
-              await app
-                .service('projects')
-                .patch(session.projectId.toString(), {
-                  status: 'running'
-                })
-                .catch(() => {
-                  /* non-fatal */
+              if (serverReady) {
+                await app.service(sessionsPath).patch(sessionId, {
+                  status: 'running',
+                  containerId,
+                  proxyUrl,
+                  endpointHeaders,
+                  port,
+                  serverLog: serverLog.slice(-2000),
+                  startedAt: Date.now()
                 })
 
-              log.info('Execution sandbox started', { sessionId, containerId, proxyUrl })
+                // Update project status
+                await app
+                  .service('projects')
+                  .patch(session.projectId.toString(), {
+                    status: 'running'
+                  })
+                  .catch(() => {
+                    /* non-fatal */
+                  })
+
+                log.info('Execution sandbox started', { sessionId, containerId, proxyUrl })
+              } else {
+                const errMsg = serverLog
+                  ? `Server failed to start. Log: ${serverLog.slice(-300)}`
+                  : 'Server did not respond within timeout'
+                log.error('Server failed to start', { sessionId, serverLog: serverLog.slice(-500) })
+
+                await app.service(sessionsPath).patch(sessionId, {
+                  status: 'error',
+                  containerId,
+                  proxyUrl,
+                  endpointHeaders,
+                  port,
+                  serverLog: serverLog.slice(-2000),
+                  errorMessage: errMsg
+                }).catch(() => { /* non-fatal */ })
+              }
             })
             .catch(async (err: unknown) => {
               const message = err instanceof Error ? err.message : String(err)

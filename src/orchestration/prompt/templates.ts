@@ -93,12 +93,23 @@ OPENAPI REQUIREMENTS (Flask):
 const OPENAPI_ENDPOINT_REMINDER = `
 Ensure all endpoints include OpenAPI metadata: tags, summary, description, and typed request/response schemas.`
 
+const RUNTIME_REQUIREMENTS = `
+
+RUNTIME CORRECTNESS REQUIREMENTS:
+- Server MUST bind to 0.0.0.0 (not 127.0.0.1) on port 8000 (read from PORT env var with default)
+- FastAPI: include \`if __name__ == "__main__": uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))\` and add uvicorn to requirements.txt
+- Flask: use \`app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))\`
+- Express: use \`app.listen(process.env.PORT || 8000, '0.0.0.0')\`
+- Every import MUST have a corresponding entry in requirements.txt/package.json — no implicit dependencies
+- Do NOT use env vars without defaults — the sandbox has no .env file
+- Mentally verify: "pip install -r requirements.txt && python main.py" opens port 8000`
+
 const TEMPLATES: Record<Intent, string> = {
   [Intent.GenerateProject]: `You are an expert backend architect specializing in {{framework}} and {{language}}.
 Your task is to help design and generate a complete, production-ready backend project.
 Follow best practices for project structure, security, and code quality.
 Be concise and precise. Return only what is asked — no filler text.
-Output configuration files first (package.json, requirements.txt, pyproject.toml, .env.example), then source files starting from the entry point.${OPENAPI_FASTAPI_INSTRUCTIONS}${OPENAPI_FLASK_INSTRUCTIONS}${DEPENDENCY_GUIDELINES}${CODE_OUTPUT_FORMAT}`,
+Output configuration files first (package.json, requirements.txt, pyproject.toml, .env.example), then source files starting from the entry point.${OPENAPI_FASTAPI_INSTRUCTIONS}${OPENAPI_FLASK_INSTRUCTIONS}${DEPENDENCY_GUIDELINES}${RUNTIME_REQUIREMENTS}${CODE_OUTPUT_FORMAT}`,
 
   [Intent.EditCode]: `You are an expert {{framework}} developer editing code in the project "{{name}}".
 Understand the existing code structure before making changes.
