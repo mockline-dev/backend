@@ -47,20 +47,21 @@ function findEntryPoint(files: ProjectFile[], language: string): string {
 
   if (language === 'python') {
     // 1. File with __main__ guard
-    const mainGuard = files.find(f => f.data.includes('if __name__'))
+    const mainGuard = files.find(f => f.data.includes('if __name__') && relative(f).endsWith('.py'))
     if (mainGuard) return relative(mainGuard)
 
-    // 2. FastAPI app definition
+    // 2. FastAPI app — must instantiate the app (not just import from fastapi)
+    // Route files import from fastapi too, so require actual app = FastAPI() call
     const fastapiFile = files.find(f =>
-      f.data.includes('FastAPI()') ||
-      f.data.toLowerCase().includes('from fastapi')
+      relative(f).endsWith('.py') &&
+      (f.data.includes('app = FastAPI(') || f.data.includes('app=FastAPI('))
     )
     if (fastapiFile) return relative(fastapiFile)
 
-    // 3. Flask app
+    // 3. Flask app — Flask(__name__) is already specific enough
     const flaskFile = files.find(f =>
-      f.data.includes('Flask(__name__)') ||
-      f.data.toLowerCase().includes('from flask')
+      relative(f).endsWith('.py') &&
+      f.data.includes('Flask(__name__)')
     )
     if (flaskFile) return relative(flaskFile)
 
