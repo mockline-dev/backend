@@ -16,7 +16,7 @@ import {
 import type { Application, HookContext } from '../../declarations'
 import { SessionsService, getOptions } from './sessions.class'
 import { sessionsPath, sessionsMethods } from './sessions.shared'
-import { startProjectExecution, stopProjectExecution } from '../../orchestration/sandbox/execution'
+import { startProjectExecution, stopProjectExecution, recheckServerReady } from '../../orchestration/sandbox/execution'
 import { repairExecutionSandbox } from '../../orchestration/sandbox/repair'
 import { createModuleLogger } from '../../logging'
 
@@ -88,7 +88,7 @@ export const sessions = (app: Application) => {
 
           // Start sandbox asynchronously — emit events when ready
           startProjectExecution(session.projectId.toString(), session.language, sandboxConfig, emit)
-            .then(async ({ containerId, proxyUrl, endpointHeaders, port, sandbox, serverReady, serverLog }) => {
+            .then(async ({ containerId, proxyUrl, endpointHeaders, port, sandbox, serverReady, serverLog, failureType, processAlive }) => {
               activeSandboxes.set(sessionId, sandbox)
 
               // Emit server log to frontend so terminal shows complete output
@@ -121,6 +121,35 @@ export const sessions = (app: Application) => {
               } else {
                 const maxRepairAttempts: number = sandboxConfig.maxRepairAttempts ?? 2
 
+                // False-positive detection: process alive but HTTP check failed.
+                // FastAPI with Pydantic v2 can be slow to start serving after port bind.
+                // Retry with extended timeout before triggering the repair loop.
+                if (failureType === 'http_not_serving' && processAlive && maxRepairAttempts > 0) {
+                  log.info('Potential false-positive health check — retrying HTTP (60s)', { sessionId, failureType })
+                  emit('terminal:stdout', session.projectId.toString(), {
+                    phase: 'server',
+                    text: '\n[Health check] Server process alive — retrying HTTP check (60s)...\n'
+                  })
+
+                  const recheckReady = await recheckServerReady(sandbox, port, 60000)
+                  if (recheckReady) {
+                    log.info('False positive resolved — server healthy on extended check', { sessionId })
+                    await app.service(sessionsPath).patch(sessionId, {
+                      status: 'running',
+                      containerId,
+                      proxyUrl,
+                      endpointHeaders,
+                      port,
+                      serverLog: serverLog.slice(-2000),
+                      startedAt: Date.now()
+                    })
+                    await app.service('projects').patch(session.projectId.toString(), { status: 'running' }).catch(() => {})
+                    log.info('Execution sandbox started (after false-positive recheck)', { sessionId, containerId, proxyUrl })
+                    return
+                  }
+                  // Still failing — fall through to repair
+                }
+
                 if (maxRepairAttempts > 0) {
                   // Launch the self-healing repair loop asynchronously (non-blocking)
                   repairExecutionSandbox({
@@ -128,6 +157,7 @@ export const sessions = (app: Application) => {
                     session,
                     failedSandbox: sandbox,
                     serverLog,
+                    failureType,
                     app,
                     emit,
                     activeSandboxes,
@@ -151,6 +181,7 @@ export const sessions = (app: Application) => {
                     endpointHeaders,
                     port,
                     serverLog: serverLog.slice(-2000),
+                    failureType,
                     errorMessage: errMsg
                   }).catch(() => { /* non-fatal */ })
                 }

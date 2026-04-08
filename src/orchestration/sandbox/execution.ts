@@ -4,6 +4,13 @@ import { r2Client } from '../../storage/r2.client'
 
 const log = createModuleLogger('sandbox-execution')
 
+export type HealthCheckFailure =
+  | 'none'               // healthy
+  | 'port_never_opened'  // import/syntax error — process died before binding
+  | 'process_crashed'    // started, wrote to log, then died
+  | 'http_not_serving'   // port open, process alive, HTTP failed
+  | 'timeout'            // general timeout
+
 export interface ExecutionResult {
   containerId: string
   proxyUrl: string
@@ -11,6 +18,8 @@ export interface ExecutionResult {
   port: number
   serverReady: boolean
   serverLog: string
+  failureType: HealthCheckFailure
+  processAlive: boolean
 }
 
 const SERVER_PORT = 8000
@@ -318,13 +327,13 @@ export async function startProjectExecution(
     log.info('Waiting for server to be ready', { projectId, port: SERVER_PORT })
 
     // Poll for server readiness (max 30s) and get external URL + routing headers
-    const { proxyUrl, endpointHeaders, serverReady, serverLog } = await waitForServer(sandbox, SERVER_PORT, 30000)
-    log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint, serverReady })
+    const { proxyUrl, endpointHeaders, serverReady, serverLog, failureType, processAlive } = await waitForServer(sandbox, SERVER_PORT, 30000)
+    log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint, serverReady, failureType, processAlive })
 
     // Extract containerId from sandbox internals (best-effort)
     const containerId = (sandbox as any).id ?? (sandbox as any).containerId ?? 'unknown'
 
-    return { containerId, proxyUrl, endpointHeaders, port: SERVER_PORT, sandbox, serverReady, serverLog }
+    return { containerId, proxyUrl, endpointHeaders, port: SERVER_PORT, sandbox, serverReady, serverLog, failureType, processAlive }
   } catch (err) {
     // Kill the sandbox container on any startup failure to prevent resource leaks.
     // Without this, the container stays alive until OpenSandbox's timeout.
@@ -339,13 +348,14 @@ async function waitForServer(
   sandbox: Sandbox,
   port: number,
   timeoutMs: number
-): Promise<{ proxyUrl: string; endpointHeaders: Record<string, string>; serverReady: boolean; serverLog: string }> {
+): Promise<{ proxyUrl: string; endpointHeaders: Record<string, string>; serverReady: boolean; serverLog: string; failureType: HealthCheckFailure; processAlive: boolean }> {
   // Use Python's socket module — always available, unlike nc which isn't in python:3.11-slim.
+  // Use 127.0.0.1 instead of localhost — avoids IPv6 resolution issues in slim containers.
   const maxAttempts = Math.max(5, Math.floor(timeoutMs / 2000))
   const pyPortCheck = `python3 -c "
 import socket,time,sys
 for _ in range(${maxAttempts}):
- try:socket.create_connection(('localhost',${port}),1).close();sys.exit(0)
+ try:socket.create_connection(('127.0.0.1',${port}),1).close();sys.exit(0)
  except:time.sleep(2)
 sys.exit(1)
 "`
@@ -361,29 +371,66 @@ sys.exit(1)
     log.warn('Port check failed', { port, error: err instanceof Error ? err.message : String(err) })
   }
 
-  // HTTP health check: port open but server might not be serving yet (A2)
-  let serverReady = portOpen
-  if (portOpen) {
-    try {
-      const pyHttpCheck = `python3 -c "
+  // Check if a server process is alive via /proc (always available in Linux containers).
+  // Look for uvicorn, tsx/ts-node (always server processes), or python3/node referencing /workspace
+  // (excludes the health-check Python scripts themselves which don't reference /workspace).
+  let processAlive = false
+  try {
+    const pyProcCheck = `python3 -c "
+import os
+procs = []
+for pid in os.listdir('/proc'):
+ if pid.isdigit():
+  try:
+   cmd = open(f'/proc/{pid}/cmdline').read().replace(chr(0),' ')
+   if any(x in cmd for x in ['uvicorn','tsx','ts-node']) or ('/workspace' in cmd and any(x in cmd for x in ['python3','python ','node'])):
+    procs.append(cmd[:80])
+  except: pass
+print('alive' if procs else 'dead')
+"`
+    const pgrepResult = await sandbox.commands.run(pyProcCheck, { timeoutSeconds: 5 }) as any
+    const output = (pgrepResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('').trim()
+    processAlive = output.includes('alive')
+  } catch { /* non-fatal — treat as unknown */ }
+
+  let failureType: HealthCheckFailure = 'none'
+
+  if (!portOpen) {
+    failureType = processAlive ? 'process_crashed' : 'port_never_opened'
+  } else {
+    // Port is open — wait 1s warm-up before HTTP check (FastAPI + Pydantic v2 needs settle time)
+    await sandbox.commands.run('sleep 1').catch(() => {})
+
+    // HTTP health check with retries (up to 3 attempts, 1s gap) using 127.0.0.1
+    let httpPassed = false
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const pyHttpCheck = `python3 -c "
 import urllib.request, urllib.error, sys
 try:
- urllib.request.urlopen('http://localhost:${port}/', timeout=5)
+ urllib.request.urlopen('http://127.0.0.1:${port}/', timeout=5)
 except urllib.error.HTTPError:
  sys.exit(0)
 except Exception as e:
  print(str(e), end='')
  sys.exit(1)
 "`
-      const httpResult = await sandbox.commands.run(pyHttpCheck, { timeoutSeconds: 10 }) as any
-      if (httpResult.exitCode !== 0) {
-        log.warn('HTTP health check failed — port open but server not serving', { port })
-        serverReady = false
-      }
-    } catch {
-      serverReady = false
+        const httpResult = await sandbox.commands.run(pyHttpCheck, { timeoutSeconds: 10 }) as any
+        if (httpResult.exitCode === 0) {
+          httpPassed = true
+          break
+        }
+      } catch { /* retry */ }
+      if (attempt < 3) await sandbox.commands.run('sleep 1').catch(() => {})
+    }
+
+    if (!httpPassed) {
+      log.warn('HTTP health check failed after retries — port open but not serving', { port })
+      failureType = 'http_not_serving'
     }
   }
+
+  const serverReady = failureType === 'none'
 
   // Read server log — always useful for both success and failure diagnostics (A1)
   let serverLog = ''
@@ -392,16 +439,50 @@ except Exception as e:
     serverLog = (logResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
   } catch { /* non-fatal */ }
 
+  // Append diagnostics block
+  serverLog += [
+    '\n--- Health Check Diagnostics ---',
+    `Port open: ${portOpen}`,
+    `Process alive: ${processAlive}`,
+    `Failure type: ${failureType}`,
+    '--------------------------------\n'
+  ].join('\n')
+
   // Get endpoint URL (best-effort regardless of server status)
   try {
     const ep = await sandbox.getEndpoint(port)
     const proxyUrl = `${sandbox.connectionConfig.protocol}://${ep.endpoint}`
     const endpointHeaders = (ep.headers as Record<string, string>) ?? {}
     if (portOpen) log.info('Server port is open', { port, proxyUrl })
-    return { proxyUrl, endpointHeaders, serverReady, serverLog }
+    return { proxyUrl, endpointHeaders, serverReady, serverLog, failureType, processAlive }
   } catch {
-    return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {}, serverReady, serverLog }
+    return { proxyUrl: `http://localhost:${port}`, endpointHeaders: {}, serverReady, serverLog, failureType, processAlive }
   }
+}
+
+/**
+ * Re-checks HTTP health on an already-running sandbox.
+ * Used in sessions.ts to detect false positives before triggering repair.
+ */
+export async function recheckServerReady(sandbox: Sandbox, port: number, timeoutMs: number): Promise<boolean> {
+  const maxChecks = Math.max(1, Math.ceil(timeoutMs / 5000))
+  const pyHttpCheck = `python3 -c "
+import urllib.request, urllib.error, sys
+try:
+ urllib.request.urlopen('http://127.0.0.1:${port}/', timeout=5)
+except urllib.error.HTTPError:
+ sys.exit(0)
+except Exception:
+ sys.exit(1)
+"`
+  for (let i = 0; i < maxChecks; i++) {
+    try {
+      const result = await sandbox.commands.run(pyHttpCheck, { timeoutSeconds: 10 }) as any
+      if (result.exitCode === 0) return true
+    } catch { /* retry */ }
+    if (i < maxChecks - 1) await sandbox.commands.run('sleep 5').catch(() => {})
+  }
+  return false
 }
 
 /**
