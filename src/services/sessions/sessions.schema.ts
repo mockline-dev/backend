@@ -28,6 +28,13 @@ export const sessionsSchema = Type.Object(
     stoppedAt: Type.Optional(Type.Number()),
     errorMessage: Type.Optional(Type.String()),
     serverLog: Type.Optional(Type.String()),
+    failureType: Type.Optional(Type.Union([
+      Type.Literal('none'),
+      Type.Literal('port_never_opened'),
+      Type.Literal('process_crashed'),
+      Type.Literal('http_not_serving'),
+      Type.Literal('timeout')
+    ])),
     createdAt: Type.Number(),
     updatedAt: Type.Number()
   },
@@ -74,6 +81,7 @@ export const sessionsQueryProperties = Type.Pick(sessionsSchema, [
   'userId',
   'status',
   'language',
+  'failureType',
   'createdAt',
   'updatedAt'
 ])
