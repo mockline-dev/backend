@@ -125,8 +125,8 @@ export function createApiProxyMiddleware(app: Application) {
 /**
  * Relay an HTTP request through the OpenSandbox SDK exec channel.
  *
- * Executes `curl` inside the container, which reaches the app server on localhost
- * regardless of Docker networking. Uses python as fallback if curl is unavailable.
+ * Tries curl first (faster), then python3 urllib as fallback (always available in Python containers).
+ * Uses curl's -w flag for structured output — avoids fragile CRLF header parsing.
  */
 async function execRelay(
   sandbox: any,
@@ -137,56 +137,78 @@ async function execRelay(
   ctx: any
 ): Promise<{ status: number; body: string; contentType?: string }> {
   const url = `http://localhost:${port}${path}${queryString}`
-
-  // Build curl args — write JSON body to a temp file to avoid shell-escaping issues
-  const args: string[] = ['-s', '-i', '--max-time', '25', '-X', method, `'${url}'`]
-
-  // Forward content-type
-  const ct = ctx.headers['content-type']
-  if (ct) args.push('-H', `'Content-Type: ${ct}'`)
-
-  // Write body to temp file if present
+  const ct = ctx.headers['content-type'] as string | undefined
   const hasBody = !['GET', 'HEAD'].includes(method) && ctx.request.rawBody
   const bodyFile = `/tmp/proxy_body_${Date.now()}`
+
   if (hasBody) {
     await sandbox.files.writeFiles([{ path: bodyFile, data: ctx.request.rawBody.toString('utf8') }])
-    args.push('-d', `@${bodyFile}`)
   }
 
-  const cmd = `curl ${args.join(' ')}; echo "___CURL_EXIT_$?___"`
-  const result = await sandbox.commands.run(cmd) as any
+  try {
+    // ── Attempt 1: curl with -w markers (no -i; avoids CRLF parsing issues) ─────
+    // Output format: <body>___STATUS_NNN___CT_<content-type>___
+    const curlArgs = ['-s', '--max-time', '20', '-X', method, `'${url}'`]
+    if (ct) curlArgs.push('-H', `'Content-Type: ${ct}'`)
+    if (hasBody) curlArgs.push('-d', `@${bodyFile}`)
+    curlArgs.push('-w', `'\\n___STATUS_%{http_code}___CT_%{content_type}___'`)
 
-  // Collect stdout text from OutputMessage[]
-  const stdout: string = (result.logs?.stdout ?? [])
-    .map((m: any) => m.text ?? '')
-    .join('')
+    const curlCmd = `curl ${curlArgs.join(' ')}; echo "___EXIT_$?___"`
+    const curlResult = await sandbox.commands.run(curlCmd, { timeoutSeconds: 25 }) as any
+    const curlStdout: string = (curlResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
 
-  if (hasBody) {
-    // Clean up temp file (best-effort)
-    sandbox.commands.run(`rm -f ${bodyFile}`).catch(() => {})
+    const curlExitMatch = curlStdout.match(/___EXIT_(\d+)___/)
+    const curlExit = curlExitMatch ? parseInt(curlExitMatch[1]) : -1
+
+    if (curlExit === 0) {
+      // Parse markers — body is everything before the ___STATUS_ marker
+      const markerIdx = curlStdout.lastIndexOf('\n___STATUS_')
+      const body = markerIdx >= 0 ? curlStdout.slice(0, markerIdx) : ''
+      const statusMatch = curlStdout.match(/___STATUS_(\d{3})___/)
+      const status = statusMatch ? parseInt(statusMatch[1]) : 200
+      const ctMatch = curlStdout.match(/___CT_([^_\n\r]*)___/)
+      const contentType = ctMatch?.[1]?.trim() || undefined
+      return { status, body, contentType }
+    }
+
+    // curl not installed (exit 127) or other error — fall through to python3
+    if (curlExit !== 127) {
+      throw new Error(`curl exited ${curlExit}`)
+    }
+
+    // ── Attempt 2: python3 urllib (always available in Python containers) ────────
+    // Writes a JSON result to stdout: {"status":200,"ct":"...","body":"..."}
+    const escapedUrl = url.replace(/'/g, "\\'")
+    const escapedMethod = method.replace(/'/g, "\\'")
+    const bodyArg = hasBody ? `, data=open('${bodyFile}','rb').read()` : ''
+    const ctArg = ct ? `req.add_header('Content-Type', '${ct.replace(/'/g, "\\'")}')` : ''
+    const pyScript = [
+      'import urllib.request, json, sys',
+      `req = urllib.request.Request('${escapedUrl}', method='${escapedMethod}'${bodyArg})`,
+      ctArg,
+      'try:',
+      '  with urllib.request.urlopen(req, timeout=20) as r:',
+      '    body = r.read().decode("utf-8", errors="replace")',
+      '    ct = r.headers.get("Content-Type", "")',
+      '    sys.stdout.write(json.dumps({"status": r.status, "ct": ct, "body": body}))',
+      'except urllib.error.HTTPError as e:',
+      '  body = e.read().decode("utf-8", errors="replace")',
+      '  ct = e.headers.get("Content-Type", "")',
+      '  sys.stdout.write(json.dumps({"status": e.code, "ct": ct, "body": body}))',
+    ].join('; ')
+
+    const pyResult = await sandbox.commands.run(`python3 -c "${pyScript.replace(/"/g, '\\"')}"`, { timeoutSeconds: 25 }) as any
+    const pyStdout: string = (pyResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
+
+    const parsed = JSON.parse(pyStdout)
+    return {
+      status: parsed.status ?? 200,
+      body: parsed.body ?? '',
+      contentType: parsed.ct || undefined
+    }
+  } finally {
+    if (hasBody) {
+      sandbox.commands.run(`rm -f ${bodyFile}`).catch(() => {})
+    }
   }
-
-  // Check if curl ran at all
-  const exitMatch = stdout.match(/___CURL_EXIT_(\d+)___/)
-  const curlExit = exitMatch ? parseInt(exitMatch[1]) : -1
-
-  if (curlExit !== 0 || !exitMatch) {
-    throw new Error(`curl exited ${curlExit} — container app may not be running yet`)
-  }
-
-  // Parse HTTP response from curl -i output (headers + blank line + body)
-  const curlOutput = stdout.slice(0, stdout.lastIndexOf('___CURL_EXIT_'))
-  const headerBodySplit = curlOutput.indexOf('\r\n\r\n')
-  const headerSection = headerBodySplit >= 0 ? curlOutput.slice(0, headerBodySplit) : curlOutput
-  const body = headerBodySplit >= 0 ? curlOutput.slice(headerBodySplit + 4) : ''
-
-  // Extract HTTP status from first header line: "HTTP/1.1 200 OK"
-  const statusMatch = headerSection.match(/^HTTP\/\S+\s+(\d{3})/)
-  const status = statusMatch ? parseInt(statusMatch[1]) : 200
-
-  // Extract content-type
-  const ctMatch = headerSection.match(/content-type:\s*([^\r\n]+)/i)
-  const contentType = ctMatch ? ctMatch[1].trim() : undefined
-
-  return { status, body, contentType }
 }
