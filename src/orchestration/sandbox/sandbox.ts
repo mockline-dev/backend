@@ -98,12 +98,28 @@ export function buildFixPrompt(originalCode: string, sandboxResult: SandboxResul
     .filter(Boolean)
     .join('\n\n')
 
+  const allErrorText = [errorDetails, sandboxResult.stdout].filter(Boolean).join('\n')
+  const isDependencyError =
+    allErrorText.includes('No matching distribution') ||
+    allErrorText.includes('Could not find a version') ||
+    allErrorText.includes('Dependency installation failed') ||
+    allErrorText.includes('pip install') ||
+    allErrorText.includes('No module named')
+
+  const dependencyHint = isDependencyError
+    ? `\n\nIMPORTANT: The failure is in dependency installation. Fix requirements.txt by:
+- Removing exact version pins (==) for packages where the version does not exist
+- Using >= constraints instead (e.g. "fastapi>=0.100.0") or omitting the version entirely (e.g. just "fastapi")
+- Removing any packages that do not exist on PyPI
+- Only using well-known packages with versions you are certain exist\n`
+    : ''
+
   return [
     'The code you generated failed validation. Please fix it.',
     '',
     'Error details:',
     errorDetails || 'Unknown error',
-    '',
+    dependencyHint,
     'Original code:',
     originalCode,
     '',
