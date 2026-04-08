@@ -82,6 +82,33 @@ export function createApiProxyMiddleware(app: Application) {
         } catch (err: any) {
           debug.execRelay = { ok: false, error: err?.message }
         }
+
+        // Read server log to show why the server may have failed to start
+        try {
+          const logResult = await sandbox.commands.run('cat /tmp/server.log 2>/dev/null || echo "(no server log found)"', { timeoutSeconds: 5 }) as any
+          const serverLog = (logResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
+          debug.serverLog = serverLog.slice(-3000) // last 3000 chars
+        } catch {
+          debug.serverLog = '(could not read server log)'
+        }
+
+        // List workspace files
+        try {
+          const lsResult = await sandbox.commands.run('find /workspace -type f 2>/dev/null | head -30', { timeoutSeconds: 5 }) as any
+          const listing = (lsResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
+          debug.workspaceFiles = listing.trim().split('\n').filter(Boolean)
+        } catch {
+          debug.workspaceFiles = []
+        }
+
+        // Check if port 8000 is open right now
+        try {
+          const portResult = await sandbox.commands.run(`python3 -c "import socket; s=socket.create_connection(('localhost',${containerPort}),1); s.close(); print('open')" 2>/dev/null || echo "closed"`, { timeoutSeconds: 5 }) as any
+          const portStatus = (portResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('').trim()
+          debug.port8000 = portStatus
+        } catch {
+          debug.port8000 = 'unknown'
+        }
       } else {
         debug.execRelay = { ok: false, error: 'No active sandbox in memory (server may have restarted)' }
       }
@@ -247,12 +274,17 @@ async function execRelay(
       '  body = e.read().decode("utf-8", errors="replace")',
       '  ct = e.headers.get("Content-Type", "")',
       '  sys.stdout.write(json.dumps({"status": e.code, "ct": ct, "body": body}))',
+      'except Exception as e:',
+      '  sys.stdout.write(json.dumps({"status": 0, "ct": "", "body": "", "error": str(e)}))',
     ].join('; ')
 
     const pyResult = await sandbox.commands.run(`python3 -c "${pyScript.replace(/"/g, '\\"')}"`, { timeoutSeconds: 25 }) as any
     const pyStdout: string = (pyResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
 
     const parsed = JSON.parse(pyStdout)
+    if (parsed.error) {
+      throw new Error(`python3 relay: ${parsed.error}`)
+    }
     return {
       status: parsed.status ?? 200,
       body: parsed.body ?? '',
