@@ -52,6 +52,17 @@ export const channels = (app: Application) => {
     return projectId ? app.channel(`projects/${projectId}`) : app.channel('authenticated')
   })
 
+  // Custom terminal streaming events — must be published explicitly (not covered by the CRUD publisher above)
+  app.service('sessions').publish('terminal:stdout', (data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : []
+  })
+
+  app.service('sessions').publish('terminal:stderr', (data: any) => {
+    const projectId = data?.projectId?.toString?.()
+    return projectId ? app.channel(`projects/${projectId}`) : []
+  })
+
   // eslint-disable-next-line no-unused-vars
   app.publish((_data: any, _context: HookContext) => {
     return app.channel('authenticated')

@@ -57,7 +57,59 @@ export function createApiProxyMiddleware(app: Application) {
     const queryString = ctx.querystring ? `?${ctx.querystring}` : ''
     const containerPort = session.port || 8000
 
-    log.debug('Proxying request', { sessionId, method: ctx.method, path: subPath })
+    // ── Debug endpoint: GET /api-test/:sessionId/_debug ───────────────────────
+    // Returns full diagnostic info without proxying — use this to isolate backend vs frontend issues.
+    if (ctx.method === 'GET' && subPath === '/_debug') {
+      const sandbox = getActiveSandbox(sessionId)
+      const debug: Record<string, any> = {
+        session: {
+          id: sessionId,
+          status: session.status,
+          proxyUrl: session.proxyUrl,
+          port: containerPort,
+          containerId: session.containerId,
+          endpointHeaders: session.endpointHeaders,
+          startedAt: session.startedAt
+        },
+        sandbox: { active: !!sandbox }
+      }
+
+      // Try exec-relay test (ping localhost inside container)
+      if (sandbox) {
+        try {
+          const pingResult = await execRelay(sandbox, 'GET', containerPort, '/openapi.json', '', ctx)
+          debug.execRelay = { ok: pingResult.status >= 200 && pingResult.status < 300, status: pingResult.status, bodyLength: pingResult.body?.length, contentType: pingResult.contentType }
+        } catch (err: any) {
+          debug.execRelay = { ok: false, error: err?.message }
+        }
+      } else {
+        debug.execRelay = { ok: false, error: 'No active sandbox in memory (server may have restarted)' }
+      }
+
+      // Try direct fetch test
+      if (session.proxyUrl) {
+        const testUrl = `${session.proxyUrl}/openapi.json`
+        try {
+          const headers: Record<string, string> = {}
+          const endpointHeaders = session.endpointHeaders as Record<string, string> | undefined
+          if (endpointHeaders) Object.assign(headers, endpointHeaders)
+          const resp = await fetch(testUrl, { method: 'GET', headers, signal: AbortSignal.timeout(10000) })
+          const body = await resp.text()
+          debug.directFetch = { ok: resp.ok, status: resp.status, bodyLength: body.length, url: testUrl }
+        } catch (err: any) {
+          debug.directFetch = { ok: false, error: err?.message, url: testUrl }
+        }
+      } else {
+        debug.directFetch = { ok: false, error: 'No proxyUrl stored on session' }
+      }
+
+      ctx.status = 200
+      ctx.set('content-type', 'application/json')
+      ctx.body = JSON.stringify(debug, null, 2)
+      return
+    }
+
+    log.info('Proxying request', { sessionId, method: ctx.method, path: subPath })
 
     // ── Primary: exec-relay via SDK (works through Docker network) ────────────
     const sandbox = getActiveSandbox(sessionId)
@@ -70,7 +122,7 @@ export function createApiProxyMiddleware(app: Application) {
         return
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
-        log.warn('Exec-relay failed, falling back to direct fetch', { sessionId, error: msg })
+        log.info('Exec-relay failed, falling back to direct fetch', { sessionId, error: msg })
       }
     }
 

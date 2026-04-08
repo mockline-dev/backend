@@ -253,17 +253,18 @@ export async function startProjectExecution(
   const depConfig = DEP_INSTALL_COMMANDS[language] ?? DEP_INSTALL_COMMANDS['python']
   const hasManifest = files.some(f => f.path.endsWith(`/${depConfig.manifest}`))
   if (hasManifest) {
-    log.debug('Installing dependencies', { projectId, language })
-    await sandbox.commands.run(depConfig.cmd, {}, {
+    log.info('Installing dependencies', { projectId, language, cmd: depConfig.cmd })
+    const depResult = await sandbox.commands.run(depConfig.cmd, {}, {
       onStdout: (msg: any) => {
         emit?.('terminal:stdout', projectId, { phase: 'deps', text: msg.text })
       },
       onStderr: (msg: any) => {
         emit?.('terminal:stderr', projectId, { phase: 'deps', text: msg.text })
       }
-    }).catch(() => {
-      /* non-fatal */
+    }).catch((err: any) => {
+      log.warn('Dependency install error (non-fatal)', { projectId, error: err?.message })
     })
+    log.info('Dependency install complete', { projectId, exitCode: (depResult as any)?.exitCode })
   }
 
   // Dynamically find entry point and build start commands
@@ -272,6 +273,7 @@ export async function startProjectExecution(
   log.debug('Starting server', { projectId, entryPoint, language })
 
   for (const cmd of startCmds) {
+    log.info('Running start command', { projectId, cmd })
     await sandbox.commands.run(cmd, {}, {
       onStdout: (msg: any) => {
         emit?.('terminal:stdout', projectId, { phase: 'start', text: msg.text })
@@ -279,17 +281,20 @@ export async function startProjectExecution(
       onStderr: (msg: any) => {
         emit?.('terminal:stderr', projectId, { phase: 'start', text: msg.text })
       }
-    }).catch(() => {
-      /* non-fatal */
+    }).catch((err: any) => {
+      log.warn('Start command error (non-fatal)', { projectId, cmd, error: err?.message })
     })
   }
 
+  log.info('Waiting for server to be ready', { projectId, port: SERVER_PORT })
   // Poll for server readiness (max 30s) and get external URL + routing headers
   const { proxyUrl, endpointHeaders } = await waitForServer(sandbox, SERVER_PORT, 30000)
   log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint })
 
-  // Tail server log for ongoing real-time output (fire-and-forget; dies when sandbox is killed)
-  sandbox.commands.run('tail -f /tmp/server.log 2>/dev/null', {}, {
+  // Tail server log from the beginning — replays all startup output then follows new lines.
+  // Fire-and-forget: tail exits naturally when the sandbox is killed.
+  log.debug('Starting server log tail', { projectId })
+  sandbox.commands.run('tail -n +1 -f /tmp/server.log 2>/dev/null', {}, {
     onStdout: (msg: any) => {
       emit?.('terminal:stdout', projectId, { phase: 'server', text: msg.text })
     },
