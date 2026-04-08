@@ -177,6 +177,8 @@ function buildStartCommands(language: string, entryFile: string, files: ProjectF
   return [`cd /workspace && python3 main.py > /tmp/server.log 2>&1 &`]
 }
 
+type EmitFn = (event: string, projectId: string, payload: unknown) => void
+
 /**
  * Starts a long-lived sandbox container with all project files,
  * installs dependencies, and starts the server process.
@@ -185,7 +187,8 @@ function buildStartCommands(language: string, entryFile: string, files: ProjectF
 export async function startProjectExecution(
   projectId: string,
   language: string,
-  sandboxConfig: any
+  sandboxConfig: any,
+  emit?: EmitFn
 ): Promise<ExecutionResult & { sandbox: Sandbox }> {
   log.info('Starting project execution sandbox', { projectId, language })
 
@@ -251,7 +254,14 @@ export async function startProjectExecution(
   const hasManifest = files.some(f => f.path.endsWith(`/${depConfig.manifest}`))
   if (hasManifest) {
     log.debug('Installing dependencies', { projectId, language })
-    await sandbox.commands.run(depConfig.cmd, {}, {}).catch(() => {
+    await sandbox.commands.run(depConfig.cmd, {}, {
+      onStdout: (msg: any) => {
+        emit?.('terminal:stdout', projectId, { phase: 'deps', text: msg.text })
+      },
+      onStderr: (msg: any) => {
+        emit?.('terminal:stderr', projectId, { phase: 'deps', text: msg.text })
+      }
+    }).catch(() => {
       /* non-fatal */
     })
   }
@@ -262,7 +272,14 @@ export async function startProjectExecution(
   log.debug('Starting server', { projectId, entryPoint, language })
 
   for (const cmd of startCmds) {
-    await sandbox.commands.run(cmd, {}, {}).catch(() => {
+    await sandbox.commands.run(cmd, {}, {
+      onStdout: (msg: any) => {
+        emit?.('terminal:stdout', projectId, { phase: 'start', text: msg.text })
+      },
+      onStderr: (msg: any) => {
+        emit?.('terminal:stderr', projectId, { phase: 'start', text: msg.text })
+      }
+    }).catch(() => {
       /* non-fatal */
     })
   }
@@ -270,6 +287,16 @@ export async function startProjectExecution(
   // Poll for server readiness (max 30s) and get external URL + routing headers
   const { proxyUrl, endpointHeaders } = await waitForServer(sandbox, SERVER_PORT, 30000)
   log.info('Execution sandbox server ready', { projectId, proxyUrl, entryPoint })
+
+  // Tail server log for ongoing real-time output (fire-and-forget; dies when sandbox is killed)
+  sandbox.commands.run('tail -f /tmp/server.log 2>/dev/null', {}, {
+    onStdout: (msg: any) => {
+      emit?.('terminal:stdout', projectId, { phase: 'server', text: msg.text })
+    },
+    onStderr: (msg: any) => {
+      emit?.('terminal:stderr', projectId, { phase: 'server', text: msg.text })
+    }
+  }).catch(() => { /* non-fatal — tail exits when sandbox is killed */ })
 
   // Extract containerId from sandbox internals (best-effort)
   const containerId = (sandbox as any).id ?? (sandbox as any).containerId ?? 'unknown'

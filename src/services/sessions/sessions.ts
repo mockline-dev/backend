@@ -34,7 +34,7 @@ export * from './sessions.schema'
 export const sessions = (app: Application) => {
   app.use(sessionsPath, new SessionsService(getOptions(app)), {
     methods: sessionsMethods,
-    events: []
+    events: ['terminal:stdout', 'terminal:stderr']
   })
 
   app.service(sessionsPath).hooks({
@@ -77,8 +77,16 @@ export const sessions = (app: Application) => {
             return
           }
 
+          const emit = (event: string, pid: string, payload: unknown) => {
+            try {
+              app.service(sessionsPath).emit(event, { projectId: pid, sessionId, ...(payload as object) })
+            } catch {
+              /* non-fatal */
+            }
+          }
+
           // Start sandbox asynchronously — emit events when ready
-          startProjectExecution(session.projectId.toString(), session.language, sandboxConfig)
+          startProjectExecution(session.projectId.toString(), session.language, sandboxConfig, emit)
             .then(async ({ containerId, proxyUrl, endpointHeaders, port, sandbox }) => {
               activeSandboxes.set(sessionId, sandbox)
 
