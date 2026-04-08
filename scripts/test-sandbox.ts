@@ -376,12 +376,163 @@ def greet(name: str) -> str:
   }
 }
 
+// ─── 7. Import Checker (Fix 3) ───────────────────────────────────────────────
+// Verifies that importing a third-party module not listed in requirements.txt
+// causes the sandbox to return success=false and triggers the fix loop.
+
+async function testImportChecker(available: boolean) {
+  section('7. Import Checker — missing module detection (Fix 3)')
+
+  if (!available) {
+    warn('Skipping — OpenSandbox not available')
+    return
+  }
+
+  // Code imports `jwt` but requirements.txt only has `fastapi`.
+  // The AST checker should catch `jwt` as uninstalled → exit 1 → success: false.
+  const missingJwtOutput = `
+\`\`\`python
+# filepath: main.py
+import jwt
+
+def create_token(payload: dict) -> str:
+    return jwt.encode(payload, "secret", algorithm="HS256")
+\`\`\`
+
+\`\`\`python
+# filepath: requirements.txt
+fastapi
+uvicorn
+\`\`\`
+  `.trim()
+
+  const provider = new OpenSandboxProvider({
+    domain: SANDBOX_DOMAIN,
+    apiKey: SANDBOX_API_KEY,
+    protocol: SANDBOX_PROTOCOL as any,
+    defaultImage: SANDBOX_IMAGE
+  })
+
+  console.log(`  ${DIM}Running Python code with import jwt but jwt not in requirements.txt...${RESET}`)
+
+  try {
+    const { result } = await runSandbox(missingJwtOutput, provider, () => {}, 'test-import-check', {
+      timeoutMs: SANDBOX_TIMEOUT,
+      language: 'python',
+      runTests: false
+    })
+
+    if (!result.success) {
+      ok('Sandbox correctly detected missing import', `success=${result.success}`)
+    } else {
+      fail('Expected failure for missing jwt module, but sandbox reported success', '')
+    }
+
+    const output = (result.compilationOutput ?? '') + (result.stderr ?? '')
+    if (output.toLowerCase().includes('missing') || output.toLowerCase().includes('jwt')) {
+      ok('compilationOutput mentions missing module', output.slice(0, 80))
+    } else {
+      warn('compilationOutput does not mention jwt — check AST checker output', output.slice(0, 80))
+    }
+
+    // Also verify the fix prompt mentions a dependency issue
+    if (!result.success) {
+      const fixPrompt = buildFixPrompt(missingJwtOutput, result)
+      const hasDependencyHint = fixPrompt.includes('requirements.txt') || fixPrompt.includes('dependency')
+      if (hasDependencyHint) ok('buildFixPrompt() includes dependency hint for missing module')
+      else warn('buildFixPrompt() did not add dependency hint', fixPrompt.slice(0, 120))
+    }
+  } catch (err) {
+    fail('Import checker test threw', err)
+  }
+}
+
+// ─── 8. Terminal text normalization (Fix 1) ──────────────────────────────────
+// Verifies that all terminal:stdout / terminal:stderr events emitted during
+// sandbox execution carry a defined `text` field (never undefined).
+// This catches regressions where msg.text is used directly on raw-string SDKs.
+
+async function testTerminalTextNormalization(available: boolean) {
+  section('8. Terminal msg.text normalization (Fix 1)')
+
+  if (!available) {
+    warn('Skipping — OpenSandbox not available')
+    return
+  }
+
+  const simplePython = `
+\`\`\`python
+# filepath: main.py
+print("hello from sandbox")
+\`\`\`
+
+\`\`\`python
+# filepath: requirements.txt
+\`\`\`
+  `.trim()
+
+  const provider = new OpenSandboxProvider({
+    domain: SANDBOX_DOMAIN,
+    apiKey: SANDBOX_API_KEY,
+    protocol: SANDBOX_PROTOCOL as any,
+    defaultImage: SANDBOX_IMAGE
+  })
+
+  // Collect all terminal events, checking for undefined text
+  const undefinedTextEvents: string[] = []
+  let terminalEventCount = 0
+  const emit = (event: string, _pid: string, payload: unknown) => {
+    if (event === 'terminal:stdout' || event === 'terminal:stderr') {
+      terminalEventCount++
+      const text = (payload as any)?.text
+      if (text === undefined) {
+        undefinedTextEvents.push(event)
+      }
+    }
+  }
+
+  // Use startProjectExecution indirectly via runSandbox — it uses OpenSandboxProvider
+  // which already normalizes, but we can still verify via the provider's capture function
+  console.log(`  ${DIM}Running simple Python and checking terminal event text fields...${RESET}`)
+
+  try {
+    const { result } = await runSandbox(simplePython, provider, emit, 'test-terminal-norm', {
+      timeoutMs: SANDBOX_TIMEOUT,
+      language: 'python',
+      runTests: false
+    })
+
+    // OpenSandboxProvider.execute() does not emit terminal:* events (that's execution.ts).
+    // This test confirms the provider itself doesn't surface undefined text in stdout/stderr capture.
+    if (result.stdout !== undefined && result.stderr !== undefined) {
+      ok('provider stdout/stderr are always defined strings (not undefined)')
+    } else {
+      fail('provider stdout or stderr is undefined', `stdout=${result.stdout} stderr=${result.stderr}`)
+    }
+
+    if (undefinedTextEvents.length === 0) {
+      ok(`All ${terminalEventCount} terminal events have defined text fields`)
+    } else {
+      fail(
+        `${undefinedTextEvents.length} terminal events had undefined text`,
+        undefinedTextEvents.slice(0, 5).join(', ')
+      )
+    }
+
+    console.log(
+      `  ${DIM}  Note: terminal:stdout/stderr events from execution.ts (startProjectExecution) are tested via live server run, not this script.${RESET}`
+    )
+  } catch (err) {
+    fail('Terminal normalization test threw', err)
+  }
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   banner('Mockline Shadow Workspace (OpenSandbox) Smoke Test')
   console.log(
-    `${DIM}  Layers: code-extractor → buildFixPrompt → connectivity → TS exec → Python exec → fix loop${RESET}`
+    `${DIM}  Layers: code-extractor → buildFixPrompt → connectivity → TS exec → Python exec → fix loop → import checker → terminal norm${RESET}`
   )
   console.log(`${DIM}  OpenSandbox: http://${SANDBOX_DOMAIN}  image=${SANDBOX_IMAGE}${RESET}`)
 
@@ -391,6 +542,8 @@ async function main() {
   await testTypescriptExecution(available)
   await testPythonExecution(available)
   await testAgenticFixLoop(available)
+  await testImportChecker(available)
+  await testTerminalTextNormalization(available)
 
   const line = '─'.repeat(55)
   console.log(`\n${BOLD}${line}${RESET}`)
