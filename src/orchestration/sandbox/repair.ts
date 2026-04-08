@@ -30,6 +30,12 @@ RUNTIME REQUIREMENTS:
 - Always use os.environ.get("PORT", 8000) — there is no .env file in the sandbox
 - Every import must have a matching entry in requirements.txt
 
+DATABASE CONSTRAINT:
+- The sandbox has NO external database — if you see a DB connection error, switch to SQLite
+- SQLAlchemy: change DATABASE_URL to "sqlite:///./app.db", remove psycopg2/pg from requirements.txt
+- Plain sqlite3 is in Python stdlib — import sqlite3 (no requirements.txt entry needed)
+- NEVER use psycopg2, pg, mysql-connector-python, pymongo, motor, asyncpg, redis
+
 DEPENDENCY RULES:
 - Use bare package names in requirements.txt (e.g. "fastapi", not "fastapi==0.99")
 - Correct name mappings: jwt→PyJWT, dotenv→python-dotenv, yaml→PyYAML, bs4→beautifulsoup4

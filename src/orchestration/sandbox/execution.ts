@@ -372,8 +372,10 @@ sys.exit(1)
   }
 
   // Check if a server process is alive via /proc (always available in Linux containers).
-  // Look for uvicorn, tsx/ts-node (always server processes), or python3/node referencing /workspace
-  // (excludes the health-check Python scripts themselves which don't reference /workspace).
+  // Only match processes where the ACTUAL EXECUTABLE is a server binary (first token of cmdline).
+  // Checking the full cmdline would give false positives for the shell wrapper:
+  //   /bin/sh -c "cd /workspace && (uvicorn ... || python3 ...) &"
+  // which contains 'python3' and '/workspace' as arguments, not as the executable.
   let processAlive = false
   try {
     const pyProcCheck = `python3 -c "
@@ -382,8 +384,9 @@ procs = []
 for pid in os.listdir('/proc'):
  if pid.isdigit():
   try:
-   cmd = open(f'/proc/{pid}/cmdline').read().replace(chr(0),' ')
-   if any(x in cmd for x in ['uvicorn','tsx','ts-node']) or ('/workspace' in cmd and any(x in cmd for x in ['python3','python ','node'])):
+   cmd = open(f'/proc/{pid}/cmdline').read().replace(chr(0),' ').strip()
+   exe = cmd.split()[0] if cmd else ''
+   if any(x in exe for x in ['uvicorn','tsx','ts-node','python3','python','node']):
     procs.append(cmd[:80])
   except: pass
 print('alive' if procs else 'dead')

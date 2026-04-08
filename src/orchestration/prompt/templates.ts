@@ -93,6 +93,18 @@ OPENAPI REQUIREMENTS (Flask):
 const OPENAPI_ENDPOINT_REMINDER = `
 Ensure all endpoints include OpenAPI metadata: tags, summary, description, and typed request/response schemas.`
 
+const DATABASE_CONSTRAINTS = `
+
+DATABASE CONSTRAINTS (SANDBOX ENVIRONMENT):
+- The sandbox has NO external database server — PostgreSQL, MySQL, MongoDB, Redis are NOT available
+- For Python database/storage needs, ALWAYS use SQLite:
+  - SQLAlchemy + SQLite: DATABASE_URL = "sqlite:///./app.db" (no extra install — sqlalchemy handles it)
+  - Plain stdlib:         import sqlite3  (zero dependencies)
+- For Node.js: use better-sqlite3 (file-based), NOT pg, mysql2, or mongoose
+- NEVER use: psycopg2, psycopg2-binary, pg, mysql-connector-python, pymongo, motor, asyncpg, redis
+- python-dotenv and a .env file are NOT needed — hardcode SQLite path or read from env with default
+- The SQLite file persists for the full session — perfect for demo CRUD APIs`
+
 const RUNTIME_REQUIREMENTS = `
 
 RUNTIME CORRECTNESS REQUIREMENTS:
@@ -102,7 +114,7 @@ RUNTIME CORRECTNESS REQUIREMENTS:
 - Express: use \`app.listen(process.env.PORT || 8000, '0.0.0.0')\`
 - Every import MUST have a corresponding entry in requirements.txt/package.json — no implicit dependencies
 - Do NOT use env vars without defaults — the sandbox has no .env file
-- Mentally verify: "pip install -r requirements.txt && python main.py" opens port 8000`
+- Mentally verify: "pip install -r requirements.txt && python main.py" opens port 8000${DATABASE_CONSTRAINTS}`
 
 const TEMPLATES: Record<Intent, string> = {
   [Intent.GenerateProject]: `You are an expert backend architect specializing in {{framework}} and {{language}}.
