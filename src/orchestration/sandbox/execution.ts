@@ -22,7 +22,7 @@ interface ProjectFile {
 const DEP_INSTALL_COMMANDS: Record<string, { manifest: string; cmd: string }> = {
   python: {
     manifest: 'requirements.txt',
-    cmd: 'pip install --quiet -r /workspace/requirements.txt 2>&1 || true'
+    cmd: 'pip install -r /workspace/requirements.txt 2>&1'
   },
   typescript: {
     manifest: 'package.json',
@@ -264,7 +264,14 @@ export async function startProjectExecution(
     }).catch((err: any) => {
       log.warn('Dependency install error (non-fatal)', { projectId, error: err?.message })
     })
-    log.info('Dependency install complete', { projectId, exitCode: (depResult as any)?.exitCode })
+    const depExitCode = (depResult as any)?.exitCode
+    if (depExitCode !== 0 && depExitCode != null) {
+      const msg = `Dependency installation failed (exit ${depExitCode}). Check requirements.txt and network access.`
+      log.error(msg, { projectId, exitCode: depExitCode })
+      emit?.('terminal:stderr', projectId, { phase: 'deps', text: `\n[ERROR] ${msg}\n` })
+      throw new Error(msg)
+    }
+    log.info('Dependency install complete', { projectId, exitCode: depExitCode })
   }
 
   // Dynamically find entry point and build start commands

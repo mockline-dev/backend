@@ -95,7 +95,7 @@ export function createApiProxyMiddleware(app: Application) {
         // List workspace files
         try {
           const lsResult = await sandbox.commands.run('find /workspace -type f 2>/dev/null | head -30', { timeoutSeconds: 5 }) as any
-          const listing = (lsResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
+          const listing = (lsResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('\n')
           debug.workspaceFiles = listing.trim().split('\n').filter(Boolean)
         } catch {
           debug.workspaceFiles = []
