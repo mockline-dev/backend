@@ -14,6 +14,11 @@
             "date": 1775504469710,
             "name": "/Users/shakhboz/Projects/mockline.dev/back/logs/combined-2026-04-07.log",
             "hash": "4b3677e3078dc95f6f92f67c6748f270b428d2797c7443e42df223308990208e"
+        },
+        {
+            "date": 1775656081027,
+            "name": "/Users/shakhboz/Projects/mockline.dev/back/logs/combined-2026-04-08.log",
+            "hash": "8b9f20346e4242410e25a7dbdbff27592e37517d5a296bc63dfa6fbe21884d45"
         }
     ],
     "hashType": "sha256"
