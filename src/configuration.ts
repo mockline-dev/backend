@@ -62,6 +62,7 @@ export const configurationSchema = Type.Intersect([
       timeoutMs: Type.Number(),
       executionTimeoutMs: Type.Optional(Type.Number()),
       maxRetries: Type.Number(),
+      maxRepairAttempts: Type.Optional(Type.Number()),
       opensandbox: Type.Object({
         domain: Type.String(),
         apiKey: Type.String(),
