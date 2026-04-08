@@ -80,6 +80,9 @@ export function startOrchestrationWorker(app: any): Worker {
           }
         )
 
+        // Capture original intent before fix loop may overwrite result
+        const originalIntent = result.intent
+
         // ── Step 2: Sandbox validation (blocking, code intents only) ──────────
         const sandboxConfig = app.get('sandbox')
         let sandboxFiles = extractCodeBlocks(result.content)
@@ -287,7 +290,7 @@ export function startOrchestrationWorker(app: any): Worker {
           })
 
         // ── Step 5.5: Auto-update project title and description ───────────────
-        if (result.intent === Intent.GenerateProject) {
+        if (originalIntent === Intent.GenerateProject) {
           try {
             const titleResponse = await classifierProvider.chat(
               [
