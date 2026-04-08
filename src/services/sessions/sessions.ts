@@ -17,6 +17,7 @@ import type { Application, HookContext } from '../../declarations'
 import { SessionsService, getOptions } from './sessions.class'
 import { sessionsPath, sessionsMethods } from './sessions.shared'
 import { startProjectExecution, stopProjectExecution } from '../../orchestration/sandbox/execution'
+import { repairExecutionSandbox } from '../../orchestration/sandbox/repair'
 import { createModuleLogger } from '../../logging'
 
 const log = createModuleLogger('sessions-service')
@@ -118,20 +119,41 @@ export const sessions = (app: Application) => {
 
                 log.info('Execution sandbox started', { sessionId, containerId, proxyUrl })
               } else {
-                const errMsg = serverLog
-                  ? `Server failed to start. Log: ${serverLog.slice(-300)}`
-                  : 'Server did not respond within timeout'
-                log.error('Server failed to start', { sessionId, serverLog: serverLog.slice(-500) })
+                const maxRepairAttempts: number = sandboxConfig.maxRepairAttempts ?? 2
 
-                await app.service(sessionsPath).patch(sessionId, {
-                  status: 'error',
-                  containerId,
-                  proxyUrl,
-                  endpointHeaders,
-                  port,
-                  serverLog: serverLog.slice(-2000),
-                  errorMessage: errMsg
-                }).catch(() => { /* non-fatal */ })
+                if (maxRepairAttempts > 0) {
+                  // Launch the self-healing repair loop asynchronously (non-blocking)
+                  repairExecutionSandbox({
+                    sessionId,
+                    session,
+                    failedSandbox: sandbox,
+                    serverLog,
+                    app,
+                    emit,
+                    activeSandboxes,
+                    maxAttempts: maxRepairAttempts
+                  }).catch((err: unknown) => {
+                    log.error('Repair loop threw unexpectedly', {
+                      sessionId,
+                      error: err instanceof Error ? err.message : String(err)
+                    })
+                  })
+                } else {
+                  const errMsg = serverLog
+                    ? `Server failed to start. Log: ${serverLog.slice(-300)}`
+                    : 'Server did not respond within timeout'
+                  log.error('Server failed to start (repair disabled)', { sessionId, serverLog: serverLog.slice(-500) })
+
+                  await app.service(sessionsPath).patch(sessionId, {
+                    status: 'error',
+                    containerId,
+                    proxyUrl,
+                    endpointHeaders,
+                    port,
+                    serverLog: serverLog.slice(-2000),
+                    errorMessage: errMsg
+                  }).catch(() => { /* non-fatal */ })
+                }
               }
             })
             .catch(async (err: unknown) => {
