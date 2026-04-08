@@ -26,6 +26,7 @@ export const sessionsSchema = Type.Object(
     startedAt: Type.Optional(Type.Number()),
     stoppedAt: Type.Optional(Type.Number()),
     errorMessage: Type.Optional(Type.String()),
+    serverLog: Type.Optional(Type.String()),
     createdAt: Type.Number(),
     updatedAt: Type.Number()
   },

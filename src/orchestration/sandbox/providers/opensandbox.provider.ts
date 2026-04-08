@@ -108,6 +108,43 @@ export interface OpenSandboxConfig {
   defaultImage: string
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Detect a likely server entry point from the file list.
+ */
+function detectEntryPoint(files: SandboxFile[], language: string): string | null {
+  if (language === 'python') {
+    const mainGuard = files.find(f => f.content.includes('if __name__') && f.path.endsWith('.py'))
+    if (mainGuard) return mainGuard.path
+    const known = ['main.py', 'app.py', 'server.py', 'run.py']
+    for (const name of known) {
+      const found = files.find(f => f.path === name || f.path.endsWith('/' + name))
+      if (found) return found.path
+    }
+    const anyPy = files.find(f => f.path.endsWith('.py'))
+    return anyPy ? anyPy.path : null
+  }
+  return null
+}
+
+/**
+ * Build a background start command for the validation sandbox startup check.
+ */
+function buildValidationStartCmd(files: SandboxFile[], language: string, entryPoint: string): string {
+  if (language === 'python') {
+    const hasFastAPI = files.some(f =>
+      f.content.includes('app = FastAPI(') || f.content.includes('app=FastAPI(')
+    )
+    if (hasFastAPI) {
+      const moduleBase = entryPoint.replace('.py', '').replace(/\//g, '.')
+      return `cd /workspace && (uvicorn ${moduleBase}:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 || python3 ${entryPoint} > /tmp/server.log 2>&1) &`
+    }
+    return `cd /workspace && python3 ${entryPoint} > /tmp/server.log 2>&1 &`
+  }
+  return `cd /workspace && python3 main.py > /tmp/server.log 2>&1 &`
+}
+
 export class OpenSandboxProvider implements ISandboxProvider {
   readonly name = 'opensandbox'
 
@@ -223,7 +260,73 @@ export class OpenSandboxProvider implements ISandboxProvider {
         }
       }
 
-      // 4. Run tests (optional)
+      // 4. Server startup check (optional — GenerateProject only)
+      if (opts.checkServerStart) {
+        const entryPoint = detectEntryPoint(files, langKey)
+        if (entryPoint) {
+          const startCmd = buildValidationStartCmd(files, langKey, entryPoint)
+          log.debug('Running server startup check', { langKey, entryPoint, startCmd })
+
+          // Touch log file and start server in background
+          await sandbox.commands.run('touch /tmp/server.log')
+          await sandbox.commands.run(startCmd).catch(() => {})
+
+          // Poll for port 8000 (max 10s)
+          const pyPortCheck = `python3 -c "
+import socket,time,sys
+for _ in range(5):
+ try:socket.create_connection(('localhost',8000),1).close();sys.exit(0)
+ except:time.sleep(2)
+sys.exit(1)
+"`
+          const portResult = await sandbox.commands.run(pyPortCheck, { timeoutSeconds: 15 }) as any
+          const portOpen = (portResult as any).exitCode === 0
+
+          // HTTP health check
+          let httpOk = false
+          if (portOpen) {
+            try {
+              const pyHttpCheck = `python3 -c "
+import urllib.request, urllib.error, sys
+try:
+ urllib.request.urlopen('http://localhost:8000/', timeout=5)
+except urllib.error.HTTPError:
+ sys.exit(0)
+except Exception as e:
+ print(str(e), end='')
+ sys.exit(1)
+"`
+              const httpResult = await sandbox.commands.run(pyHttpCheck, { timeoutSeconds: 10 }) as any
+              httpOk = (httpResult as any).exitCode === 0
+            } catch { /* non-fatal */ }
+          }
+
+          // Read server log for diagnostics
+          let serverStartLog = ''
+          try {
+            const logResult = await sandbox.commands.run('cat /tmp/server.log 2>/dev/null || echo ""', { timeoutSeconds: 5 }) as any
+            serverStartLog = (logResult.logs?.stdout ?? []).map((m: any) => m.text ?? '').join('')
+          } catch { /* non-fatal */ }
+
+          if (!portOpen || !httpOk) {
+            log.debug('Server startup check failed', { langKey, portOpen, httpOk, serverStartLog: serverStartLog.slice(0, 200) })
+            return {
+              success: false,
+              files,
+              syntaxValid: true,
+              compilationOutput: `Server failed to start within 10s.\n${serverStartLog}`.trim(),
+              testOutput: null,
+              stdout,
+              stderr,
+              durationMs: Date.now() - start
+            }
+          }
+
+          log.debug('Server startup check passed', { langKey, entryPoint })
+        }
+      }
+
+      // 5. Run tests (optional)
       let testOutput: string | null = null
       let testsPassed = true
       if (opts.runTests) {

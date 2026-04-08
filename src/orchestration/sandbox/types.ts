@@ -29,4 +29,6 @@ export interface SandboxOptions {
   language: string
   /** Whether to attempt running tests after compilation */
   runTests: boolean
+  /** Whether to attempt starting the server and verifying it responds (GenerateProject only) */
+  checkServerStart?: boolean
 }

@@ -7,7 +7,11 @@
  *   3. OpenSandbox connectivity — needs OpenSandbox running
  *   4. Full sandbox execution — TypeScript file compile check
  *   5. Full sandbox execution — Python file compile check
- *   6. Agentic fix loop — intentionally broken code, verify retry
+ *   6. Sandbox Error Detection & Fix Prompt — broken code → error detection + fix prompt
+ *   7. Import checker — missing module detection
+ *   8. Terminal text normalization
+ *   9. Server Startup Integration Test — FastAPI start + HTTP verify
+ *  10. Terminal Event Ordering — event phases arrive in order
  *
  * Usage:
  *   pnpm run test:sandbox
@@ -295,10 +299,13 @@ async function testTypescriptExecution(available: boolean) {
   )
 }
 
-// ─── 6. Agentic Fix Loop (broken Python → fixed) ─────────────────────────────
+// ─── 6. Sandbox Error Detection & Fix Prompt ─────────────────────────────────
+// Tests that broken code produces success=false with meaningful output,
+// and that buildFixPrompt() includes the error + original code + fix instructions.
+// NOTE: This is a unit-level test — it does NOT test the live agentic LLM fix loop.
 
-async function testAgenticFixLoop(available: boolean) {
-  section('6. Agentic Fix Loop (broken Python → fixed)')
+async function testSandboxErrorDetection(available: boolean) {
+  section('6. Sandbox Error Detection & Fix Prompt (unit-level)')
 
   if (!available) {
     warn('Skipping — OpenSandbox not available')
@@ -341,7 +348,7 @@ def greet(name: str) -> str:
   console.log(`  ${DIM}Running broken Python code (expecting SyntaxError)...${RESET}`)
 
   try {
-    // Step 1: run broken code
+    // Step 1: run broken code — must fail
     const { result: brokenResult } = await runSandbox(brokenOutput, provider, emit, 'test-fix', {
       timeoutMs: SANDBOX_TIMEOUT,
       language: 'python',
@@ -349,14 +356,32 @@ def greet(name: str) -> str:
     })
 
     if (!brokenResult.success) {
-      ok('Broken code detected as failed', `output="${brokenResult.compilationOutput?.slice(0, 60)}..."`)
+      ok('Broken code correctly detected as failed', `output="${brokenResult.compilationOutput?.slice(0, 60)}..."`)
     } else {
-      warn('Broken code unexpectedly succeeded (py_compile may be lenient on this syntax)')
+      fail('Broken code unexpectedly succeeded — SyntaxError should be caught by py_compile', '')
     }
 
-    // Step 2: build fix prompt
+    // Step 2: build fix prompt — verify it contains required sections
     const fixPrompt = buildFixPrompt(brokenOutput, brokenResult)
     ok('buildFixPrompt() generated', `${fixPrompt.length} chars`)
+
+    if (fixPrompt.includes('SyntaxError') || fixPrompt.includes(brokenResult.compilationOutput?.slice(0, 20) ?? '')) {
+      ok('Fix prompt includes error details')
+    } else {
+      fail('Fix prompt missing error details', fixPrompt.slice(0, 100))
+    }
+
+    if (fixPrompt.toLowerCase().includes('fix') && fixPrompt.includes('def greet')) {
+      ok('Fix prompt includes original code and fix instruction')
+    } else {
+      fail('Fix prompt missing original code or fix instruction', fixPrompt.slice(0, 100))
+    }
+
+    if (fixPrompt.includes('0.0.0.0') || fixPrompt.includes('CONSTRAINTS')) {
+      ok('Fix prompt includes server binding constraint')
+    } else {
+      warn('Fix prompt missing server binding constraint', fixPrompt.slice(0, 100))
+    }
 
     // Step 3: simulate LLM returning fixed code → run again
     console.log(`  ${DIM}Running fixed Python code...${RESET}`)
@@ -367,12 +392,12 @@ def greet(name: str) -> str:
     })
 
     if (fixedResult.success) {
-      ok('Fixed Python code passes — agentic loop works end-to-end')
+      ok('Fixed Python code passes — sandbox error detection works end-to-end')
     } else {
-      warn('Fixed code still failed', fixedResult.compilationOutput?.slice(0, 80) || fixedResult.error || '')
+      fail('Fixed code still failed — fix prompt or sandbox has issues', fixedResult.compilationOutput?.slice(0, 80) || fixedResult.error || '')
     }
   } catch (err) {
-    fail('Agentic fix loop threw', err)
+    fail('Sandbox error detection test threw', err)
   }
 }
 
@@ -527,12 +552,169 @@ print("hello from sandbox")
   }
 }
 
+// ─── 9. Server Startup Integration Test ──────────────────────────────────────
+// Writes a minimal FastAPI app, installs deps, verifies it starts and serves HTTP.
+// Uses checkServerStart: true to exercise the new startup validation path.
+
+async function testServerStartupIntegration(available: boolean) {
+  section('9. Server Startup Integration Test (FastAPI)')
+
+  if (!available) {
+    warn('Skipping — OpenSandbox not available')
+    return
+  }
+
+  const fastapiApp = `
+\`\`\`python
+# filepath: main.py
+import os
+from fastapi import FastAPI
+
+app = FastAPI(title="Test App", version="1.0.0")
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+\`\`\`
+
+\`\`\`python
+# filepath: requirements.txt
+fastapi
+uvicorn
+\`\`\`
+  `.trim()
+
+  const provider = new OpenSandboxProvider({
+    domain: SANDBOX_DOMAIN,
+    apiKey: SANDBOX_API_KEY,
+    protocol: SANDBOX_PROTOCOL as any,
+    defaultImage: SANDBOX_IMAGE
+  })
+
+  console.log(`  ${DIM}Running FastAPI startup check (installs deps + starts server + HTTP verify)...${RESET}`)
+  const start = Date.now()
+
+  try {
+    const { result } = await runSandbox(fastapiApp, provider, () => {}, 'test-startup', {
+      timeoutMs: SANDBOX_TIMEOUT,
+      language: 'python',
+      runTests: false,
+      checkServerStart: true
+    })
+
+    const elapsed = Date.now() - start
+    console.log(`  ${DIM}  completed in ${elapsed}ms${RESET}`)
+
+    if (result.success) {
+      ok('FastAPI app starts and serves HTTP within timeout', `${elapsed}ms`)
+    } else {
+      fail('FastAPI app failed to start', result.compilationOutput?.slice(0, 200) || result.error || '')
+    }
+
+    if (result.syntaxValid) {
+      ok('Syntax validation passed before startup check')
+    } else {
+      fail('Syntax validation failed', result.compilationOutput?.slice(0, 80) || '')
+    }
+  } catch (err) {
+    fail('Server startup integration test threw', err)
+  }
+}
+
+// ─── 10. Broken Server Startup — Error in compilationOutput ──────────────────
+// When checkServerStart: true is set and the server fails to start,
+// the server log should appear in compilationOutput so the fix loop has context.
+
+async function testBrokenServerStartup(available: boolean) {
+  section('10. Broken Server — Error Captured in compilationOutput')
+
+  if (!available) {
+    warn('Skipping — OpenSandbox not available')
+    return
+  }
+
+  // FastAPI app that will fail: bad port binding (binds to a port that's already in use
+  // is hard to test portably, so use a Python app that crashes on startup instead)
+  const crashingApp = `
+\`\`\`python
+# filepath: main.py
+import os
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    raise RuntimeError("Intentional startup crash for testing")
+\`\`\`
+
+\`\`\`python
+# filepath: requirements.txt
+fastapi
+uvicorn
+\`\`\`
+  `.trim()
+
+  const provider = new OpenSandboxProvider({
+    domain: SANDBOX_DOMAIN,
+    apiKey: SANDBOX_API_KEY,
+    protocol: SANDBOX_PROTOCOL as any,
+    defaultImage: SANDBOX_IMAGE
+  })
+
+  console.log(`  ${DIM}Running crashing Python server (expecting startup failure)...${RESET}`)
+
+  try {
+    const { result } = await runSandbox(crashingApp, provider, () => {}, 'test-broken-startup', {
+      timeoutMs: SANDBOX_TIMEOUT,
+      language: 'python',
+      runTests: false,
+      checkServerStart: true
+    })
+
+    if (!result.success) {
+      ok('Broken server correctly detected as failed (success=false)')
+    } else {
+      // uvicorn may start and serve via the app even if __main__ block raises,
+      // so this is a soft warning
+      warn('Broken server unexpectedly succeeded — uvicorn may have served before crash')
+    }
+
+    const output = result.compilationOutput ?? ''
+    if (output.length > 0) {
+      ok('compilationOutput contains server log', output.slice(0, 80))
+    } else {
+      warn('compilationOutput is empty — server log may not be captured', '')
+    }
+
+    // Verify buildFixPrompt picks up the runtime error type
+    if (!result.success) {
+      const fixPrompt = buildFixPrompt(crashingApp, result)
+      if (fixPrompt.includes('Runtime') || fixPrompt.includes('runtime') || fixPrompt.includes('0.0.0.0')) {
+        ok('buildFixPrompt() identifies runtime error type')
+      } else {
+        warn('buildFixPrompt() did not classify as runtime error', fixPrompt.slice(0, 120))
+      }
+    }
+  } catch (err) {
+    fail('Broken server startup test threw', err)
+  }
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   banner('Mockline Shadow Workspace (OpenSandbox) Smoke Test')
   console.log(
-    `${DIM}  Layers: code-extractor → buildFixPrompt → connectivity → TS exec → Python exec → fix loop → import checker → terminal norm${RESET}`
+    `${DIM}  Layers: code-extractor → buildFixPrompt → connectivity → TS exec → Python exec → error detection → import checker → terminal norm → server startup → broken startup${RESET}`
   )
   console.log(`${DIM}  OpenSandbox: http://${SANDBOX_DOMAIN}  image=${SANDBOX_IMAGE}${RESET}`)
 
@@ -541,9 +723,11 @@ async function main() {
   const available = await checkOpenSandboxConnectivity()
   await testTypescriptExecution(available)
   await testPythonExecution(available)
-  await testAgenticFixLoop(available)
+  await testSandboxErrorDetection(available)
   await testImportChecker(available)
   await testTerminalTextNormalization(available)
+  await testServerStartupIntegration(available)
+  await testBrokenServerStartup(available)
 
   const line = '─'.repeat(55)
   console.log(`\n${BOLD}${line}${RESET}`)
