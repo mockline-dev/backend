@@ -50,4 +50,5 @@
     "error": "The operation was aborted due to timeout",
     "url": "http://localhost:8080/sandboxes/a3464b72-ba4b-4528-9822-6d79cb08348c/proxy/8000/openapi.json"
   }
-}
+}{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:05:00.075Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775657100000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:05:00.078Z"}

@@ -1,62 +1,51 @@
-{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.027Z"}
-{"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-08T13:48:01.084Z"}
-{"level":"info","message":"Redis connected successfully","timestamp":"2026-04-08T13:48:01.110Z"}
-{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-08T13:48:01.132Z"}
-{"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.135Z"}
-{"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-08T13:48:01.133Z"}
-{"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-08T13:48:01.134Z"}
-{"level":"info","message":"Indexing worker started","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.136Z"}
-{"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.153Z"}
-{"level":"info","message":"Worker service started successfully","timestamp":"2026-04-08T13:48:01.153Z"}
-{"language":"python","level":"info","message":"Starting project execution sandbox","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:11.206Z"}
-{"cmd":"pip install --quiet -r /workspace/requirements.txt 2>&1 || true","language":"python","level":"info","message":"Installing dependencies","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:14.792Z"}
-{"exitCode":0,"level":"info","message":"Dependency install complete","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:19.230Z"}
-{"cmd":"cd /workspace && (uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 || python3 main.py > /tmp/server.log 2>&1) &","level":"info","message":"Running start command","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:19.230Z"}
-{"level":"info","message":"Waiting for server to be ready","module":"sandbox-execution","port":8000,"projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:20.264Z"}
-{"entryPoint":"main.py","level":"info","message":"Execution sandbox server ready","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","proxyUrl":"http://localhost:8080/sandboxes/622afe0e-5565-4b0e-aadb-5af47ea6a4fe/proxy/8000","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:51.408Z"}
-{"containerId":"622afe0e-5565-4b0e-aadb-5af47ea6a4fe","level":"info","message":"Execution sandbox started","module":"sessions-service","proxyUrl":"http://localhost:8080/sandboxes/622afe0e-5565-4b0e-aadb-5af47ea6a4fe/proxy/8000","sessionId":"69d65c9bc5b5ab9982d15fc5","timestamp":"2026-04-08T13:48:51.425Z"}
-{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775656200000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:50:00.129Z"}
-{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775656500000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:55:00.108Z"}
-{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.443Z"}
-{"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-08T13:59:55.494Z"}
-{"level":"info","message":"Redis connected successfully","timestamp":"2026-04-08T13:59:55.498Z"}
-{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-08T13:59:55.503Z"}
-{"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.505Z"}
-{"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-08T13:59:55.503Z"}
-{"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-08T13:59:55.504Z"}
-{"level":"info","message":"Indexing worker started","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.505Z"}
-{"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.520Z"}
-{"level":"info","message":"Worker service started successfully","timestamp":"2026-04-08T13:59:55.520Z"}
-{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775656800000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:00.060Z"}
-{"language":"python","level":"info","message":"Starting project execution sandbox","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:03.164Z"}
-{"cmd":"pip install --quiet -r /workspace/requirements.txt 2>&1 || true","language":"python","level":"info","message":"Installing dependencies","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:07.237Z"}
-{"exitCode":0,"level":"info","message":"Dependency install complete","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:12.791Z"}
-{"cmd":"cd /workspace && (uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 || python3 main.py > /tmp/server.log 2>&1) &","level":"info","message":"Running start command","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:12.792Z"}
-{"level":"info","message":"Waiting for server to be ready","module":"sandbox-execution","port":8000,"projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:13.823Z"}
-{"level":"warn","maxAttempts":15,"message":"Server did not open port within timeout","module":"sandbox-execution","port":8000,"sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:44.995Z"}
-{"entryPoint":"main.py","level":"info","message":"Execution sandbox server ready","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","proxyUrl":"http://localhost:8080/sandboxes/a3464b72-ba4b-4528-9822-6d79cb08348c/proxy/8000","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:45.033Z"}
-{"containerId":"a3464b72-ba4b-4528-9822-6d79cb08348c","level":"info","message":"Execution sandbox started","module":"sessions-service","proxyUrl":"http://localhost:8080/sandboxes/a3464b72-ba4b-4528-9822-6d79cb08348c/proxy/8000","sessionId":"69d65f63d5c26b833a6811c8","timestamp":"2026-04-08T14:00:45.045Z"}
-{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775657100000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:05:00.078Z"}
 {"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.125Z"}
 {"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-08T14:06:13.168Z"}
 {"level":"info","message":"Redis connected successfully","timestamp":"2026-04-08T14:06:13.181Z"}
-{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-08T14:06:13.192Z"}
+{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-08T14:06:13.191Z"}
 {"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.194Z"}
 {"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-08T14:06:13.192Z"}
 {"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-08T14:06:13.193Z"}
 {"level":"info","message":"Indexing worker started","module":"indexing-worker","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.194Z"}
 {"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.209Z"}
 {"level":"info","message":"Worker service started successfully","timestamp":"2026-04-08T14:06:13.209Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.758Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.759Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.759Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.784Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.784Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:13.784Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:15.827Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:15.835Z"}
 {"language":"python","level":"info","message":"Starting project execution sandbox","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:19.566Z"}
+{"fileCount":11,"level":"debug","message":"Execution sandbox created","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:23.339Z"}
 {"cmd":"pip install -r /workspace/requirements.txt 2>&1","language":"python","level":"info","message":"Installing dependencies","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:23.498Z"}
 {"exitCode":1,"level":"error","message":"Dependency installation failed (exit 1). Check requirements.txt and network access.","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:06:27.822Z"}
 {"error":"Dependency installation failed (exit 1). Check requirements.txt and network access.","level":"error","message":"Failed to start execution sandbox","module":"sessions-service","sessionId":"69d660db850632e954fab09e","timestamp":"2026-04-08T14:06:27.823Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.933Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.939Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.939Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.940Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.940Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.940Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.985Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.985Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:20.985Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:21.001Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:21.002Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:21.002Z"}
+{"channel":"projects/69d6611c850632e954fab09f","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:24.223Z"}
 {"jobId":"15","level":"info","message":"Orchestration job started","module":"orchestration-worker","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:24.283Z","userId":"69d4e7201b84c339a11314e7"}
 {"level":"info","message":"JobTracker: Registered job 15 for project 69d6611c850632e954fab09f","timestamp":"2026-04-08T14:07:24.284Z"}
 {"level":"info","message":"Orchestration started","module":"orchestrator","projectId":"69d6611c850632e954fab09f","promptLength":208,"sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:24.288Z","userId":"69d4e7201b84c339a11314e7"}
+{"confidence":1,"intent":"generate_project","level":"debug","message":"Intent classified","model":"llama-3.1-8b-instant","module":"intent-classifier","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:24.982Z"}
 {"confidence":1,"intent":"generate_project","level":"info","message":"Intent classified","module":"orchestrator","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:24.982Z"}
+{"enhancedLength":2311,"intent":"generate_project","level":"debug","message":"Prompt enhanced","module":"prompt-enhancer","originalLength":208,"sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:25.876Z"}
+{"budget":{"history":40,"responseReserve":2048,"retrievedContext":0,"systemPrompt":591,"total":131072,"userQuery":511},"chunksUsed":0,"historyTurns":1,"level":"debug","message":"Prompt built","messages":3,"module":"orchestrator","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:25.906Z"}
+{"level":"debug","message":"Trying provider (stream): groq","module":"llm-router","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:25.906Z"}
 {"contentLength":10769,"intent":"generate_project","level":"info","message":"Orchestration complete","module":"orchestrator","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:31.222Z"}
 {"fileCount":10,"level":"info","message":"Starting sandbox execution","module":"sandbox","projectId":"69d6611c850632e954fab09f","provider":"opensandbox","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:31.225Z"}
+{"fileCount":10,"language":"python","level":"debug","message":"Sandbox created","module":"opensandbox-provider","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:31.801Z"}
+{"langKey":"python","level":"debug","manifest":"requirements.txt","message":"Installing dependencies","module":"opensandbox-provider","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:31.969Z"}
 {"durationMs":8938,"level":"info","message":"Sandbox execution complete","module":"sandbox","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","success":true,"timestamp":"2026-04-08T14:07:40.473Z"}
 {"fileCount":10,"level":"info","message":"Persisting sandbox files to R2","module":"persist-files","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:40.477Z"}
 {"jobId":"sync-69d6611c850632e954fab09f","level":"info","message":"Indexing job started","module":"indexing-worker","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:44.128Z"}
@@ -64,6 +53,14 @@
 {"fileCount":6,"level":"info","message":"First sync: running full index","module":"merkle-sync","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:45.077Z"}
 {"error":"Parser.init is not a function","level":"warn","message":"Tree-sitter WASM init failed — will use text chunker fallback","module":"tree-sitter-chunker","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:45.080Z"}
 {"count":8,"level":"info","message":"Indexing project files","module":"rag-indexer","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:45.083Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:45.798Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.418Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.628Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.628Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.629Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.629Z"}
+{"count":2,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.629Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.691Z"}
 {"failed":0,"indexed":8,"level":"info","message":"Indexing complete","module":"rag-indexer","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.691Z"}
 {"added":6,"deleted":0,"indexed":8,"jobId":"sync-69d6611c850632e954fab09f","level":"info","message":"Indexing job complete","modified":0,"module":"indexing-worker","projectId":"69d6611c850632e954fab09f","removed":0,"sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.721Z"}
 {"jobId":"sync-69d6611c850632e954fab09f","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:46.738Z"}
@@ -73,13 +70,20 @@
 {"intent":"generate_project","jobId":"15","level":"info","message":"Orchestration job completed","module":"orchestration-worker","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:54.941Z"}
 {"level":"info","message":"JobTracker: Job 15 completed in 30659ms","timestamp":"2026-04-08T14:07:54.943Z"}
 {"jobId":"15","level":"info","message":"Job completed","module":"orchestration-worker","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:54.951Z"}
+{"channel":"projects/69d6611c850632e954fab09f","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:55.327Z"}
+{"channel":"projects/69d6611c850632e954fab09f","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:55.331Z"}
 {"jobId":"sync-69d6611c850632e954fab09f","level":"info","message":"Indexing job started","module":"indexing-worker","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:57.005Z"}
 {"error":"Parser.init is not a function","level":"warn","message":"Tree-sitter WASM init failed — will use text chunker fallback","module":"tree-sitter-chunker","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:57.008Z"}
 {"added":4,"deleted":0,"level":"info","message":"Sync detected changes","modified":0,"module":"merkle-sync","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:57.534Z"}
+{"count":2,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:58.483Z"}
+{"count":2,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:58.527Z"}
+{"count":3,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:58.543Z"}
+{"count":1,"level":"debug","message":"Indexed chunks","module":"chroma-client","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:58.564Z"}
 {"indexed":4,"level":"info","message":"Sync complete","module":"merkle-sync","projectId":"69d6611c850632e954fab09f","removed":0,"sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:58.671Z"}
 {"added":4,"deleted":0,"indexed":4,"jobId":"sync-69d6611c850632e954fab09f","level":"info","message":"Indexing job complete","modified":0,"module":"indexing-worker","projectId":"69d6611c850632e954fab09f","removed":0,"sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:58.682Z"}
 {"jobId":"sync-69d6611c850632e954fab09f","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:07:58.715Z"}
 {"language":"python","level":"info","message":"Starting project execution sandbox","module":"sandbox-execution","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:08:02.252Z"}
+{"fileCount":10,"level":"debug","message":"Execution sandbox created","module":"sandbox-execution","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:08:05.426Z"}
 {"cmd":"pip install -r /workspace/requirements.txt 2>&1","language":"python","level":"info","message":"Installing dependencies","module":"sandbox-execution","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:08:05.567Z"}
 {"exitCode":1,"level":"error","message":"Dependency installation failed (exit 1). Check requirements.txt and network access.","module":"sandbox-execution","projectId":"69d6611c850632e954fab09f","sessionId":"2026-04-08T14-06-11","timestamp":"2026-04-08T14:08:13.105Z"}
 {"error":"Dependency installation failed (exit 1). Check requirements.txt and network access.","level":"error","message":"Failed to start execution sandbox","module":"sessions-service","sessionId":"69d66142850632e954fab0ad","timestamp":"2026-04-08T14:08:13.106Z"}
