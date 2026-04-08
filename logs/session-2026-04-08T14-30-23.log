@@ -238,3 +238,7 @@
 }{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T14-30-23","timestamp":"2026-04-08T14:40:00.072Z"}
 {"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775659200000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T14-30-23","timestamp":"2026-04-08T14:40:00.075Z"}
 {"level":"info","message":"Execution sandbox stopped","module":"sessions-service","sessionId":"69d66854f3ed72f7415d6874","timestamp":"2026-04-08T14:40:02.122Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T14-30-23","timestamp":"2026-04-08T14:45:00.109Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775659500000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T14-30-23","timestamp":"2026-04-08T14:45:00.112Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T14-30-23","timestamp":"2026-04-08T14:50:00.031Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775659800000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T14-30-23","timestamp":"2026-04-08T14:50:00.032Z"}
