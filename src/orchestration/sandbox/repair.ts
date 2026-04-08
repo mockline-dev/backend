@@ -3,6 +3,7 @@ import { persistFiles } from '../pipeline/persist-files'
 import { createRouter } from '../providers/router'
 import { extractCodeBlocks } from './code-extractor'
 import { startProjectExecution, stopProjectExecution } from './execution'
+import type { HealthCheckFailure } from './execution'
 import { r2Client } from '../../storage/r2.client'
 import { sessionsPath } from '../../services/sessions/sessions.shared'
 import type { LLMMessage } from '../types'
@@ -142,10 +143,26 @@ export interface RepairParams {
   session: any
   failedSandbox: any
   serverLog: string
+  failureType?: HealthCheckFailure
   app: any
   emit: EmitFn
   activeSandboxes: Map<string, any>
   maxAttempts: number
+}
+
+function getFailureDiagnostic(failureType?: HealthCheckFailure): string {
+  switch (failureType) {
+    case 'port_never_opened':
+      return 'DIAGNOSTIC: The server process died before binding to the port — likely an import error or syntax error.\nFocus: imports, module names, requirements.txt correctness.\n\n'
+    case 'process_crashed':
+      return 'DIAGNOSTIC: The server started but then crashed at runtime.\nFocus: runtime errors, database connections, middleware initialization.\n\n'
+    case 'http_not_serving':
+      return 'DIAGNOSTIC: The port is open but the server is not responding to HTTP — likely a binding or routing issue.\nFocus: app binding address (must be 0.0.0.0), route configuration.\n\n'
+    case 'timeout':
+      return 'DIAGNOSTIC: The server timed out during startup.\nFocus: blocking calls, heavy initialization, slow imports.\n\n'
+    default:
+      return ''
+  }
 }
 
 /**
@@ -160,7 +177,7 @@ export interface RepairParams {
  *  6. Repeats up to maxAttempts
  */
 export async function repairExecutionSandbox(params: RepairParams): Promise<void> {
-  const { sessionId, session, failedSandbox, serverLog, app, emit, activeSandboxes, maxAttempts } = params
+  const { sessionId, session, failedSandbox, serverLog, failureType, app, emit, activeSandboxes, maxAttempts } = params
   const projectId = session.projectId.toString()
   const sandboxConfig = app.get('sandbox')
 
@@ -212,11 +229,12 @@ export async function repairExecutionSandbox(params: RepairParams): Promise<void
       })
 
       const router = createRouter(app)
+      const failureDiagnostic = getFailureDiagnostic(failureType)
       const messages: LLMMessage[] = [
         { role: 'system', content: REPAIR_SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `SERVER STARTUP LOG:\n\`\`\`\n${currentServerLog.slice(-2000)}\n\`\`\`\n\nCURRENT PROJECT FILES:\n${projectFilesPrompt}\n\nFix the server startup failure and return ALL files with the exact same file paths.`
+          content: `${failureDiagnostic}SERVER STARTUP LOG:\n\`\`\`\n${currentServerLog.slice(-2000)}\n\`\`\`\n\nCURRENT PROJECT FILES:\n${projectFilesPrompt}\n\nFix the server startup failure and return ALL files with the exact same file paths.`
         }
       ]
 
