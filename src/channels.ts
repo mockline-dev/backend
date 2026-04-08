@@ -63,8 +63,15 @@ export const channels = (app: Application) => {
     return projectId ? app.channel(`projects/${projectId}`) : []
   })
 
-  // eslint-disable-next-line no-unused-vars
-  app.publish((_data: any, _context: HookContext) => {
+  // Global catch-all: publish all other events to the authenticated channel.
+  // Terminal streaming events are excluded — they already have scoped publishers above
+  // (projects/${projectId} channel only). Without this exclusion, the global publisher
+  // would re-broadcast them to ALL authenticated users, causing the frontend to receive
+  // terminal events for sessions it doesn't own.
+  app.publish((data: any, _context: HookContext) => {
+    // Terminal streaming events carry a `phase` field (deps/start/server/repair).
+    // All other service events (CRUD, orchestration, etc.) don't use this field.
+    if (data?.phase !== undefined) return []
     return app.channel('authenticated')
   })
 }
