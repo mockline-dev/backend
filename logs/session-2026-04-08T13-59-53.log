@@ -1,0 +1,53 @@
+{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.443Z"}
+{"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-08T13:59:55.494Z"}
+{"level":"info","message":"Redis connected successfully","timestamp":"2026-04-08T13:59:55.498Z"}
+{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-08T13:59:55.503Z"}
+{"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.505Z"}
+{"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-08T13:59:55.503Z"}
+{"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-08T13:59:55.504Z"}
+{"level":"info","message":"Indexing worker started","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.505Z"}
+{"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.520Z"}
+{"level":"info","message":"Worker service started successfully","timestamp":"2026-04-08T13:59:55.520Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T13:59:55.986Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:00.057Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775656800000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:00.060Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:01.893Z"}
+{"language":"python","level":"info","message":"Starting project execution sandbox","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:03.164Z"}
+{"fileCount":11,"level":"debug","message":"Execution sandbox created","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:07.075Z"}
+{"cmd":"pip install --quiet -r /workspace/requirements.txt 2>&1 || true","language":"python","level":"info","message":"Installing dependencies","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:07.237Z"}
+{"exitCode":0,"level":"info","message":"Dependency install complete","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:12.791Z"}
+{"entryPoint":"main.py","language":"python","level":"debug","message":"Starting server","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:12.792Z"}
+{"cmd":"cd /workspace && (uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 || python3 main.py > /tmp/server.log 2>&1) &","level":"info","message":"Running start command","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:12.792Z"}
+{"level":"info","message":"Waiting for server to be ready","module":"sandbox-execution","port":8000,"projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:13.823Z"}
+{"level":"warn","maxAttempts":15,"message":"Server did not open port within timeout","module":"sandbox-execution","port":8000,"sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:44.995Z"}
+{"entryPoint":"main.py","level":"info","message":"Execution sandbox server ready","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","proxyUrl":"http://localhost:8080/sandboxes/a3464b72-ba4b-4528-9822-6d79cb08348c/proxy/8000","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:45.033Z"}
+{"level":"debug","message":"Starting server log tail","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-59-53","timestamp":"2026-04-08T14:00:45.034Z"}
+{"containerId":"a3464b72-ba4b-4528-9822-6d79cb08348c","level":"info","message":"Execution sandbox started","module":"sessions-service","proxyUrl":"http://localhost:8080/sandboxes/a3464b72-ba4b-4528-9822-6d79cb08348c/proxy/8000","sessionId":"69d65f63d5c26b833a6811c8","timestamp":"2026-04-08T14:00:45.045Z"}
+{
+  "session": {
+    "id": "69d65f63d5c26b833a6811c8",
+    "status": "running",
+    "proxyUrl": "http://localhost:8080/sandboxes/a3464b72-ba4b-4528-9822-6d79cb08348c/proxy/8000",
+    "port": 8000,
+    "containerId": "a3464b72-ba4b-4528-9822-6d79cb08348c",
+    "endpointHeaders": {},
+    "startedAt": 1775656845035
+  },
+  "sandbox": {
+    "active": true
+  },
+  "execRelay": {
+    "ok": false,
+    "error": "Unexpected end of JSON input"
+  },
+  "serverLog": "Traceback (most recent call last):  File \"/workspace/main.py\", line 2, in <module>    from fastapi import FastAPIModuleNotFoundError: No module named 'fastapi'",
+  "workspaceFiles": [
+    "/workspace/requirements.txt/workspace/pyproject.toml/workspace/routes/users.py/workspace/.env/workspace/models/like.py/workspace/models/comment.py/workspace/models/notification.py/workspace/models/post.py/workspace/models/user.py/workspace/models/follow.py/workspace/main.py"
+  ],
+  "port8000": "closed",
+  "directFetch": {
+    "ok": false,
+    "error": "The operation was aborted due to timeout",
+    "url": "http://localhost:8080/sandboxes/a3464b72-ba4b-4528-9822-6d79cb08348c/proxy/8000/openapi.json"
+  }
+}

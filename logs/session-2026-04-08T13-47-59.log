@@ -1,0 +1,38 @@
+{"level":"info","logDir":"/Users/shakhboz/Projects/mockline.dev/back/logs","message":"Session logger configured","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.027Z"}
+{"level":"info","message":"Feathers app listening on http://localhost:3030","timestamp":"2026-04-08T13:48:01.084Z"}
+{"level":"info","message":"Redis connected successfully","timestamp":"2026-04-08T13:48:01.110Z"}
+{"level":"info","message":"Redis ready to accept commands","timestamp":"2026-04-08T13:48:01.132Z"}
+{"level":"info","message":"Orchestration worker started","module":"orchestration-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.135Z"}
+{"level":"info","message":"Redis client initialized successfully","timestamp":"2026-04-08T13:48:01.132Z"}
+{"level":"info","message":"Bull Board integrated at http://localhost:3030/admin/queues","timestamp":"2026-04-08T13:48:01.134Z"}
+{"level":"info","message":"Indexing worker started","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.136Z"}
+{"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:01.153Z"}
+{"level":"info","message":"Worker service started successfully","timestamp":"2026-04-08T13:48:01.153Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.236Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.241Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.241Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.242Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.242Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.242Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.291Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.291Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.291Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.310Z"}
+{"channel":"projects/69d4f7d9b7f1f528a7793c21","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.310Z"}
+{"channel":"projects/69d4e7241b84c339a11314e8","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:07.310Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:09.256Z"}
+{"channel":"projects/69d65216d125b9ea0681f3b2","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:09.257Z"}
+{"language":"python","level":"info","message":"Starting project execution sandbox","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:11.206Z"}
+{"fileCount":11,"level":"debug","message":"Execution sandbox created","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:14.621Z"}
+{"cmd":"pip install --quiet -r /workspace/requirements.txt 2>&1 || true","language":"python","level":"info","message":"Installing dependencies","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:14.792Z"}
+{"exitCode":0,"level":"info","message":"Dependency install complete","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:19.230Z"}
+{"entryPoint":"main.py","language":"python","level":"debug","message":"Starting server","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:19.230Z"}
+{"cmd":"cd /workspace && (uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 || python3 main.py > /tmp/server.log 2>&1) &","level":"info","message":"Running start command","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:19.230Z"}
+{"level":"info","message":"Waiting for server to be ready","module":"sandbox-execution","port":8000,"projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:20.264Z"}
+{"entryPoint":"main.py","level":"info","message":"Execution sandbox server ready","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","proxyUrl":"http://localhost:8080/sandboxes/622afe0e-5565-4b0e-aadb-5af47ea6a4fe/proxy/8000","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:51.408Z"}
+{"level":"debug","message":"Starting server log tail","module":"sandbox-execution","projectId":"69d65216d125b9ea0681f3b2","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:48:51.409Z"}
+{"containerId":"622afe0e-5565-4b0e-aadb-5af47ea6a4fe","level":"info","message":"Execution sandbox started","module":"sessions-service","proxyUrl":"http://localhost:8080/sandboxes/622afe0e-5565-4b0e-aadb-5af47ea6a4fe/proxy/8000","sessionId":"69d65c9bc5b5ab9982d15fc5","timestamp":"2026-04-08T13:48:51.425Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:50:00.115Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775656200000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:50:00.129Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:55:00.105Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775656500000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T13-47-59","timestamp":"2026-04-08T13:55:00.108Z"}
