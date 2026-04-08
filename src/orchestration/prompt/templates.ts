@@ -14,12 +14,12 @@ function interpolate(template: string, ctx: TemplateContext): string {
 const DEPENDENCY_GUIDELINES = `
 
 DEPENDENCY GUIDELINES:
-- Use >= version constraints (e.g. fastapi>=0.100.0) instead of == exact pins
-- If you are not certain about a specific version number, omit the version entirely (e.g. just "fastapi")
-- NEVER invent or guess package version numbers — non-existent versions will cause installation failures
-- Only use well-known, widely-used packages that exist on PyPI / npm
-- For requirements.txt: prefer "package>=major.minor" or just "package" over "package==x.y.z"
-- For package.json: use caret ranges (e.g. "^4.18.0") which is already standard`
+- PREFER bare package names with NO version constraints (e.g. just "fastapi", "uvicorn", "passlib")
+- Only add a version constraint if you are 100% certain the exact version exists on PyPI/npm
+- NEVER guess or invent version numbers — non-existent versions will cause installation failures
+- Do NOT use >= constraints unless you verified the version exists (e.g. passlib has no version >= 1.8.0)
+- For requirements.txt: write one package per line, bare name preferred (e.g. "passlib", not "passlib>=1.9.0")
+- For package.json: use caret ranges only for well-known packages (e.g. "^4.18.0" for express)`
 
 const CODE_OUTPUT_FORMAT = `
 
@@ -45,8 +45,9 @@ app = FastAPI()
 
 \`\`\`python
 # filepath: requirements.txt
-fastapi>=0.104.0
-uvicorn>=0.24.0
+fastapi
+uvicorn
+sqlalchemy
 \`\`\`
 
 \`\`\`typescript
