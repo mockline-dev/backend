@@ -286,6 +286,42 @@ export function startOrchestrationWorker(app: any): Worker {
             })
           })
 
+        // ── Step 5.5: Auto-update project title and description ───────────────
+        if (result.intent === Intent.GenerateProject) {
+          try {
+            const titleResponse = await classifierProvider.chat(
+              [
+                {
+                  role: 'user',
+                  content: `Based on this project generation request, provide a short project title (max 50 chars) and a one-sentence description (max 150 chars).
+
+User request: "${prompt}"
+
+Respond in this exact JSON format only, no other text:
+{"title": "...", "description": "..."}`
+                }
+              ],
+              { temperature: 0.2, maxTokens: 128, timeoutMs: 10000 }
+            )
+
+            const parsed = JSON.parse(titleResponse.content.trim())
+            if (parsed.title && parsed.description) {
+              await app
+                .service('projects')
+                .patch(projectId, {
+                  name: String(parsed.title).slice(0, 100),
+                  description: String(parsed.description).slice(0, 500)
+                })
+              log.info('Project title/description auto-updated', { projectId, title: parsed.title })
+            }
+          } catch (err: unknown) {
+            log.warn('Failed to auto-update project title/description', {
+              projectId,
+              error: err instanceof Error ? err.message : String(err)
+            })
+          }
+        }
+
         // ── Step 6: Trigger async incremental re-index ────────────────────────
         indexingQueue
           .add(
