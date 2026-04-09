@@ -9,3 +9,9 @@
 {"intervalMs":300000,"level":"info","message":"Periodic indexing job scheduled","module":"indexing-job","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T19:52:32.177Z"}
 {"level":"info","message":"Worker service started successfully","timestamp":"2026-04-08T19:52:32.177Z"}
 {"channel":"projects/69d698169902e8d514b33e88","level":"debug","message":"Socket joined channel","module":"app-ts","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T19:52:33.753Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T19:55:00.098Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775678100000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T19:55:00.105Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T20:00:00.092Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775678400000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T20:00:00.094Z"}
+{"level":"debug","message":"Periodic sync job — no specific projectId, skipping (not yet implemented)","module":"indexing-worker","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T20:05:00.105Z"}
+{"jobId":"repeat:568d01d1da65ead9dfde0512e652141c:1775678700000","level":"info","message":"Job completed","module":"indexing-worker","sessionId":"2026-04-08T19-52-30","timestamp":"2026-04-08T20:05:00.109Z"}
