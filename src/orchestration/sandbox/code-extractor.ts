@@ -265,7 +265,80 @@ export function extractCodeBlocks(markdown: string): SandboxFile[] {
     files.push({ path: filePath, content: body, language: language || undefined })
   }
 
+  ensureInitPyFiles(files)
+  fixRequirementsTxt(files)
+
   return files
+}
+
+// Known import name → PyPI package name corrections.
+// The LLM frequently uses the import name in requirements.txt despite prompt instructions.
+const PYPI_NAME_FIXES: Record<string, string> = {
+  jwt: 'PyJWT',
+  pyjwt: 'PyJWT',
+  dotenv: 'python-dotenv',
+  yaml: 'PyYAML',
+  pyyaml: 'PyYAML',
+  bs4: 'beautifulsoup4',
+  pil: 'Pillow',
+  cv2: 'opencv-python',
+  sklearn: 'scikit-learn',
+  dateutil: 'python-dateutil',
+  serial: 'pyserial'
+}
+
+/**
+ * Auto-generate empty __init__.py files for any subdirectory that contains .py files
+ * but does not already have an __init__.py. Mutates files in-place.
+ *
+ * Example: models/user.py → adds models/__init__.py (if missing)
+ */
+function ensureInitPyFiles(files: SandboxFile[]): void {
+  const existingPaths = new Set(files.map(f => f.path))
+  const dirsNeeded = new Set<string>()
+
+  for (const f of files) {
+    if (!f.path.endsWith('.py')) continue
+    const parts = f.path.split('/')
+    // Collect every ancestor directory (skip root-level files — they have no parent dir)
+    for (let i = 1; i < parts.length; i++) {
+      dirsNeeded.add(parts.slice(0, i).join('/'))
+    }
+  }
+
+  for (const dir of dirsNeeded) {
+    const initPath = `${dir}/__init__.py`
+    if (!existingPaths.has(initPath)) {
+      files.push({ path: initPath, content: '', language: 'python' })
+      existingPaths.add(initPath)
+    }
+  }
+}
+
+/**
+ * Fix known import-name → PyPI-package-name mismatches in requirements.txt.
+ * Also normalises case for known packages. Mutates files in-place.
+ *
+ * Example: "jwt" → "PyJWT", "pyjwt==1.7.1" → "PyJWT"
+ */
+function fixRequirementsTxt(files: SandboxFile[]): void {
+  for (const f of files) {
+    if (f.path !== 'requirements.txt' && !f.path.endsWith('/requirements.txt')) continue
+    const lines = f.content.split('\n')
+    const fixed = lines.map(line => {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) return line
+      // Extract bare package name (before any version specifier or extras)
+      const nameMatch = trimmed.match(/^([A-Za-z0-9_-]+)/)
+      if (!nameMatch) return line
+      const key = nameMatch[1].toLowerCase()
+      const replacement = PYPI_NAME_FIXES[key]
+      if (!replacement) return line
+      // Replace name + strip any version pin the LLM may have invented
+      return replacement
+    })
+    f.content = fixed.join('\n')
+  }
 }
 
 /**
