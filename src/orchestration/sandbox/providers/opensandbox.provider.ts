@@ -49,7 +49,7 @@ for root,dirs,files in os.walk(ws):
    elif isinstance(node,ast.ImportFrom) and node.module and not node.level:mods=[node.module.split('.')[0]]
    for mod in mods:
     if mod in sys.stdlib_module_names:continue
-    if os.path.exists(f'{ws}/{mod}.py') or os.path.exists(f'{ws}/{mod}/__init__.py'):continue
+    if os.path.exists(f'{ws}/{mod}.py') or os.path.isdir(f'{ws}/{mod}'):continue
     try:__import__(mod)
     except ImportError:missing.append(mod)
 if missing:
@@ -275,7 +275,7 @@ export class OpenSandboxProvider implements ISandboxProvider {
           const pyPortCheck = `python3 -c "
 import socket,time,sys
 for _ in range(5):
- try:socket.create_connection(('localhost',8000),1).close();sys.exit(0)
+ try:socket.create_connection(('127.0.0.1',8000),1).close();sys.exit(0)
  except:time.sleep(2)
 sys.exit(1)
 "`
@@ -289,7 +289,7 @@ sys.exit(1)
               const pyHttpCheck = `python3 -c "
 import urllib.request, urllib.error, sys
 try:
- urllib.request.urlopen('http://localhost:8000/', timeout=5)
+ urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)
 except urllib.error.HTTPError:
  sys.exit(0)
 except Exception as e:

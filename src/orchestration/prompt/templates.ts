@@ -114,7 +114,8 @@ RUNTIME CORRECTNESS REQUIREMENTS:
 - Express: use \`app.listen(process.env.PORT || 8000, '0.0.0.0')\`
 - Every import MUST have a corresponding entry in requirements.txt/package.json — no implicit dependencies
 - Do NOT use env vars without defaults — the sandbox has no .env file
-- Mentally verify: "pip install -r requirements.txt && python main.py" opens port 8000${DATABASE_CONSTRAINTS}`
+- Mentally verify: "pip install -r requirements.txt && python main.py" opens port 8000
+- For Python packages with subdirectories (models/, routes/, schemas/, etc.), ALWAYS include an empty __init__.py in each package directory${DATABASE_CONSTRAINTS}`
 
 const TEMPLATES: Record<Intent, string> = {
   [Intent.GenerateProject]: `You are an expert backend architect specializing in {{framework}} and {{language}}.

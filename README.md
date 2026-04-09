@@ -1,55 +1,52 @@
-# booking-back
+# Mockline Backend
 
-> 
+AI-powered backend generator. Users describe what they want in natural language — the system generates a complete, runnable backend project.
 
-## About
+## Stack
 
-This project uses [Feathers](http://feathersjs.com). An open source framework for building APIs and real-time applications.
+- **Framework**: FeathersJS v5 + Koa (TypeScript)
+- **Database**: MongoDB + Cloudflare R2 (file storage) + ChromaDB (vectors)
+- **Queue**: BullMQ + Redis
+- **LLM**: Groq (primary) + MiniMax (fallback)
+- **Sandbox**: OpenSandbox (isolated Docker containers)
+- **Auth**: JWT + Firebase
 
 ## Getting Started
 
-1. Make sure you have [NodeJS](https://nodejs.org/) and [npm](https://www.npmjs.com/) installed.
-2. Install your dependencies
+```bash
+pnpm install
+pnpm run dev       # dev server with hot reload
+pnpm run compile   # compile TypeScript → lib/
+pnpm start         # run compiled output
+```
 
-    ```
-    cd path/to/booking-back
-    npm install
-    ```
+## Dev Infrastructure
 
-3. Start your app
-
-    ```
-    npm run compile # Compile TypeScript source
-    npm start
-    ```
-
-## Redis (Docker)
-
-Run Redis only (for local backend development):
+Requires Redis, ChromaDB, and OpenSandbox running locally:
 
 ```bash
-docker compose up -d redis
+./scripts/infra.sh start
 ```
 
-Stop Redis:
+| Service | Port |
+|---------|------|
+| Redis | `127.0.0.1:6379` |
+| ChromaDB | `127.0.0.1:8000` |
+| OpenSandbox | `127.0.0.1:8080` |
+
+## Tests
 
 ```bash
-docker compose stop redis
+npx vitest run              # unit tests (no live deps)
+npx vitest run src/path/to/file.test.ts  # single file
+pnpm test                   # integration tests (requires live services)
 ```
 
-## Testing
+## BullMQ Monitor
 
-Run `npm test` and all your tests in the `test/` directory will be run.
+`http://localhost:3030/admin/queues`
 
-## Scaffolding
+## Key Docs
 
-This app comes with a powerful command line interface for Feathers. Here are a few things it can do:
 
-```
-$ npx feathers help                           # Show all commands
-$ npx feathers generate service               # Generate a new Service
-```
 
-## Help
-
-For more information on all the things you can do with Feathers visit [docs.feathersjs.com](http://docs.feathersjs.com).

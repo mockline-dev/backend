@@ -39,6 +39,7 @@ DATABASE CONSTRAINT:
 DEPENDENCY RULES:
 - Use bare package names in requirements.txt (e.g. "fastapi", not "fastapi==0.99")
 - Correct name mappings: jwt→PyJWT, dotenv→python-dotenv, yaml→PyYAML, bs4→beautifulsoup4
+- For Python packages with subdirectories (models/, routes/, schemas/, etc.), ALWAYS include an empty __init__.py in each package directory
 
 CODE OUTPUT FORMAT:
 - Wrap each file in a fenced code block with the correct language identifier
@@ -161,7 +162,7 @@ function getFailureDiagnostic(failureType?: HealthCheckFailure): string {
     case 'port_never_opened':
       return 'DIAGNOSTIC: The server process died before binding to the port — likely an import error or syntax error.\nFocus: imports, module names, requirements.txt correctness.\n\n'
     case 'process_crashed':
-      return 'DIAGNOSTIC: The server started but then crashed at runtime.\nFocus: runtime errors, database connections, middleware initialization.\n\n'
+      return 'DIAGNOSTIC: The server process is alive but never opened port 8000 — it may be hanging on a blocking call, waiting for a DB connection, or crashing silently before binding.\nFocus: switch to SQLite if any DB connection errors, add missing __init__.py in package directories, fix import errors, remove blocking initialization code.\n\n'
     case 'http_not_serving':
       return 'DIAGNOSTIC: The port is open but the server is not responding to HTTP — likely a binding or routing issue.\nFocus: app binding address (must be 0.0.0.0), route configuration.\n\n'
     case 'timeout':
