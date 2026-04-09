@@ -267,6 +267,7 @@ export function extractCodeBlocks(markdown: string): SandboxFile[] {
 
   ensureInitPyFiles(files)
   fixRequirementsTxt(files)
+  fixPydanticV2(files)
 
   return files
 }
@@ -342,7 +343,80 @@ function fixRequirementsTxt(files: SandboxFile[]): void {
 }
 
 /**
- * Detect the primary programming language from a list of sandbox files.
+ * Fix Pydantic v2 incompatibilities in generated Python files.
+ * The sandbox runs pydantic 2.x — v1 patterns cause immediate ImportError crashes.
+ * Mutates files in-place.
+ *
+ * Fixes applied:
+ * - "from pydantic import BaseSettings" → removed (rewritten to use os.environ.get directly)
+ * - "from pydantic import validator" → "from pydantic import field_validator"
+ * - ".dict(" → ".model_dump("
+ * - "pydantic-settings" in requirements.txt → removed (no .env in sandbox)
+ */
+function fixPydanticV2(files: SandboxFile[]): void {
+  for (const f of files) {
+    if (f.path.endsWith('.py')) {
+      let content = f.content
+
+      // BaseSettings import crash: "from pydantic import BaseSettings" — v1 only
+      // Replace with a simple os.environ.get() helper comment so the file stays valid
+      if (content.includes('BaseSettings')) {
+        content = content.replace(
+          /from pydantic(?:_settings)? import .*?BaseSettings.*?\n/g,
+          '# BaseSettings removed: use os.environ.get("KEY", "default") directly\n'
+        )
+        // Remove any class that inherits BaseSettings (replace with plain dict approach)
+        content = content.replace(
+          /class\s+\w+\s*\(\s*BaseSettings\s*\)\s*:\s*\n([ \t]+.+\n)*/g,
+          '# Settings class removed — read config from os.environ.get() directly\n'
+        )
+      }
+
+      // validator → field_validator (deprecated in v2)
+      content = content.replace(
+        /from pydantic import (.*?)validator(.*?)(\n)/g,
+        (_, before, after, nl) => {
+          const cleaned = (before + 'field_validator' + after).replace(/,\s*,/g, ',').trim()
+          return `from pydantic import ${cleaned}${nl}`
+        }
+      )
+
+      // root_validator → model_validator
+      content = content.replace(/root_validator/g, 'model_validator')
+
+      // .dict( → .model_dump( (method calls)
+      content = content.replace(/\.dict\(/g, '.model_dump(')
+
+      // class Config: orm_mode = True → model_config = ConfigDict(from_attributes=True)
+      content = content.replace(
+        /class Config:\s*\n\s*orm_mode\s*=\s*True/g,
+        'model_config = ConfigDict(from_attributes=True)'
+      )
+      if (content.includes('ConfigDict') && !content.includes('from pydantic import')) {
+        // ConfigDict needs to be imported if used
+        content = content.replace(
+          /(from pydantic import\s+)([^\n]+)/,
+          (_, prefix, imports) => {
+            if (!imports.includes('ConfigDict')) return `${prefix}${imports}, ConfigDict`
+            return `${prefix}${imports}`
+          }
+        )
+      }
+
+      f.content = content
+    }
+
+    // Remove pydantic-settings from requirements.txt — sandbox has no .env
+    if (f.path === 'requirements.txt' || f.path.endsWith('/requirements.txt')) {
+      f.content = f.content
+        .split('\n')
+        .filter(line => !/^pydantic[-_]settings/i.test(line.trim()))
+        .join('\n')
+    }
+  }
+}
+
+/**
  * Returns 'typescript' by default.
  */
 export function detectPrimaryLanguage(files: SandboxFile[]): string {
