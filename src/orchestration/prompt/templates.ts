@@ -93,6 +93,18 @@ OPENAPI REQUIREMENTS (Flask):
 const OPENAPI_ENDPOINT_REMINDER = `
 Ensure all endpoints include OpenAPI metadata: tags, summary, description, and typed request/response schemas.`
 
+const PYDANTIC_V2_COMPAT = `
+
+PYDANTIC v2 COMPATIBILITY (sandbox runs pydantic 2.x — v1 patterns will crash):
+- BaseSettings MOVED: do NOT use "from pydantic import BaseSettings" — it no longer exists
+  → Read config with os.environ.get("KEY", "default") directly, no settings class needed
+- Validators: use @field_validator (not @validator), @model_validator (not @root_validator)
+- Config class: replace inner "class Config:" with model_config = ConfigDict(...)
+  → orm_mode=True → model_config = ConfigDict(from_attributes=True)
+- Methods: .model_dump() not .dict(), .model_dump_json() not .json()
+- Do NOT add pydantic-settings to requirements.txt — just use os.environ.get()
+- Optional fields: use "field: type | None = None" syntax (not Optional[type] = None)`
+
 const DATABASE_CONSTRAINTS = `
 
 DATABASE CONSTRAINTS (SANDBOX ENVIRONMENT):
@@ -115,7 +127,7 @@ RUNTIME CORRECTNESS REQUIREMENTS:
 - Every import MUST have a corresponding entry in requirements.txt/package.json — no implicit dependencies
 - Do NOT use env vars without defaults — the sandbox has no .env file
 - Mentally verify: "pip install -r requirements.txt && python main.py" opens port 8000
-- For Python packages with subdirectories (models/, routes/, schemas/, etc.), ALWAYS include an empty __init__.py in each package directory${DATABASE_CONSTRAINTS}`
+- For Python packages with subdirectories (models/, routes/, schemas/, etc.), ALWAYS include an empty __init__.py in each package directory${DATABASE_CONSTRAINTS}${PYDANTIC_V2_COMPAT}`
 
 const TEMPLATES: Record<Intent, string> = {
   [Intent.GenerateProject]: `You are an expert backend architect specializing in {{framework}} and {{language}}.

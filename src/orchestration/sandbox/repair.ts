@@ -16,10 +16,10 @@ type EmitFn = (event: string, projectId: string, payload: unknown) => void
 // Bypasses orchestrate() entirely — no intent classification, no RAG, no prompt
 // enhancement. We know exactly what we need: fix the startup failure.
 
-const REPAIR_SYSTEM_PROMPT = `You are debugging a server startup failure.
+const REPAIR_SYSTEM_PROMPT = `You are debugging a server startup failure. Read the error log carefully and fix the exact issue shown.
 
 YOUR TASK:
-1. Read the server log to identify why the server failed to start
+1. Read the server log — identify the EXACT line causing the crash
 2. Fix only what is broken — do not restructure the project
 3. Return ALL project files using the EXACT SAME file paths as provided — do not rename or move files
 
@@ -29,6 +29,14 @@ RUNTIME REQUIREMENTS:
 - Flask: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
 - Always use os.environ.get("PORT", 8000) — there is no .env file in the sandbox
 - Every import must have a matching entry in requirements.txt
+
+PYDANTIC v2 FIXES (sandbox runs pydantic 2.x):
+- "from pydantic import BaseSettings" CRASHES — replace with os.environ.get() calls, remove the settings class entirely
+- "from pydantic import validator" → "@field_validator" with @classmethod
+- "from pydantic import root_validator" → "@model_validator(mode='before')"
+- Inner "class Config: orm_mode = True" → model_config = ConfigDict(from_attributes=True)
+- .dict() → .model_dump(), .json() → .model_dump_json()
+- Do NOT add pydantic-settings to requirements.txt — just use os.environ.get()
 
 DATABASE CONSTRAINT:
 - The sandbox has NO external database — if you see a DB connection error, switch to SQLite
