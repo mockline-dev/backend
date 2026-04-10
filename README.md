@@ -1,3 +1,10 @@
+## Sanitized Public Repository Notice
+
+This repository is a sanitized public mirror of the internal frontend repository.
+Sensitive material has been removed from files and history, including secrets, private credentials, and API keys.
+
+---
+
 # Mockline Backend
 
 AI-powered backend generator. Users describe what they want in natural language — the system generates a complete, runnable backend project.
