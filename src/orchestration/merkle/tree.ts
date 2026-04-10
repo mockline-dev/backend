@@ -1,5 +1,5 @@
-import { hashContent, computeRootHash } from './hash'
-import type { MerkleFileNode, MerkleTreeDocument, ChangeSet } from './types'
+import { computeRootHash, hashContent } from './hash'
+import type { ChangeSet, MerkleFileNode, MerkleTreeDocument } from './types'
 
 /** Build a fresh merkle tree document from raw file data. */
 export function buildTree(
@@ -69,10 +69,8 @@ export function updateTree(
   const deletedSet = new Set(deletedPaths)
   const changedMap = new Map(changedFiles.map(f => [f.path, { hash: hashContent(f.content), size: f.size }]))
 
-  // Keep unchanged files, drop deleted
   const keptFiles = existing.files.filter(f => !deletedSet.has(f.path) && !changedMap.has(f.path))
 
-  // Add/update changed files
   const updatedNodes: MerkleFileNode[] = [
     ...keptFiles,
     ...changedFiles.map(f => ({

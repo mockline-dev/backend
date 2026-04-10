@@ -1,14 +1,12 @@
 import { encode } from 'gpt-tokenizer'
 import type { LLMMessage } from '../types'
 
-// Simple LRU cache for token counts
 const cache = new Map<string, number>()
 const MAX_CACHE = 200
 
 function cacheGet(key: string): number | undefined {
   const val = cache.get(key)
   if (val !== undefined) {
-    // Refresh position
     cache.delete(key)
     cache.set(key, val)
   }

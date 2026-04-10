@@ -1,14 +1,10 @@
+import * as path from 'path'
 import { countTokens } from '../prompt/token-counter'
 import type { CodeChunk } from '../types'
-import * as path from 'path'
 
 const DEFAULT_MAX_TOKENS = 300
 const OVERLAP_LINES = 3
 
-/**
- * Fallback text chunker — sliding-window line-based splitting.
- * Used for markdown, JSON, YAML, config files, and any non-code files.
- */
 export function chunkText(content: string, filepath: string, maxTokens = DEFAULT_MAX_TOKENS): CodeChunk[] {
   if (!content.trim()) return []
 

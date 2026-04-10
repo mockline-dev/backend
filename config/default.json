@@ -78,12 +78,12 @@
     },
     "llm": {
         "groq": {
-            $1REDACTED_API_KEY$2,
+            "apiKey": "$1REDACTED_API_KEY$2",
             "defaultModel": "llama-3.3-70b-versatile",
             "classifierModel": "llama-3.1-8b-instant"
         },
         "minimax": {
-            $1REDACTED_API_KEY$2,
+            "apiKey": "$1REDACTED_API_KEY$2",
             "baseUrl": "https://api.minimaxi.chat/v1",
             "defaultModel": "MiniMax-Text-01"
         },
@@ -103,7 +103,7 @@
         "maxRepairAttempts": 5,
         "opensandbox": {
             "domain": "localhost:8080",
-            $1REDACTED_API_KEY$2,
+            "apiKey": "$1REDACTED_API_KEY$2",
             "protocol": "http",
             "defaultImage": "python:3.11-slim"
         }

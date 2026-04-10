@@ -1,5 +1,5 @@
-import { ChromaClient, Collection } from 'chromadb'
 import { DefaultEmbeddingFunction } from '@chroma-core/default-embed'
+import { ChromaClient, Collection } from 'chromadb'
 import { createModuleLogger } from '../../logging'
 import type { CodeChunk } from '../types'
 
@@ -7,7 +7,6 @@ const log = createModuleLogger('chroma-client')
 
 const COLLECTION_PREFIX = 'proj'
 
-// Singleton embedding function — reused across all collections (model loads once)
 const embedFn = new DefaultEmbeddingFunction()
 
 /**
@@ -15,15 +14,10 @@ const embedFn = new DefaultEmbeddingFunction()
  * Rules: 3-512 chars, only [a-zA-Z0-9._-], must start AND end with [a-zA-Z0-9].
  */
 function sanitizeCollectionName(projectId: string): string {
-  // Replace anything that isn't alphanumeric, dot, hyphen, or underscore with a hyphen
   let name = `${COLLECTION_PREFIX}-${projectId}`.replace(/[^a-zA-Z0-9._-]/g, '-')
-  // Collapse runs of non-alphanumeric into a single hyphen
   name = name.replace(/[^a-zA-Z0-9]+/g, '-')
-  // Strip leading/trailing hyphens (start/end must be alphanumeric)
   name = name.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '')
-  // Ensure minimum length of 3
   if (name.length < 3) name = `prj${name}`
-  // Truncate to 512
   return name.slice(0, 512)
 }
 
@@ -143,7 +137,6 @@ export class ChromaVectorStore {
           symbolName: (metadatas[i] as any)?.symbolName || undefined,
           symbolKind: ((metadatas[i] as any)?.symbolKind as CodeChunk['symbolKind']) ?? 'block'
         },
-        // ChromaDB returns L2 distance; convert to similarity score (lower distance = higher score)
         score: 1 / (1 + (distances[i] ?? 1))
       }))
     } catch (err: unknown) {
@@ -192,7 +185,6 @@ export class ChromaVectorStore {
   }
 }
 
-// Module-level singleton
 let _store: ChromaVectorStore | null = null
 
 export function getVectorStore(app: { get: (key: string) => any }): ChromaVectorStore {

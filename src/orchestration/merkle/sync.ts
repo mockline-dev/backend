@@ -1,11 +1,11 @@
 import { createModuleLogger } from '../../logging'
-import { chunkCode, initTreeSitter, isCodeFile } from '../chunking/tree-sitter.chunker'
 import { chunkText } from '../chunking/text.chunker'
-import { indexProjectFiles } from '../rag/indexer'
-import { fetchFileContent } from '../rag/file-fetcher'
+import { chunkCode, initTreeSitter, isCodeFile } from '../chunking/tree-sitter.chunker'
 import type { ChromaVectorStore } from '../rag/chroma.client'
-import { buildTree, diffTrees } from './tree'
+import { fetchFileContent } from '../rag/file-fetcher'
+import { indexProjectFiles } from '../rag/indexer'
 import type { MerkleTreeStore } from './store'
+import { buildTree, diffTrees } from './tree'
 import type { ChangeSet } from './types'
 
 const log = createModuleLogger('merkle-sync')
@@ -34,7 +34,6 @@ export async function syncProjectIndex(
 
   const noChanges: ChangeSet = { added: [], modified: [], deleted: [], unchanged: 0 }
 
-  // Fetch all file records from MongoDB
   let files: FileRecord[] = []
   try {
     const result = await app.service('files').find({
@@ -55,7 +54,6 @@ export async function syncProjectIndex(
     return { changes: noChanges, indexed: 0, removed: 0 }
   }
 
-  // Fetch all file contents
   const fileContents = await Promise.all(
     files.map(async f => {
       const content = await fetchFileContent(f.key, app)
@@ -67,16 +65,13 @@ export async function syncProjectIndex(
     content: string
   }>
 
-  // Build new tree from current state
   const newTree = buildTree(
     projectId,
     available.map(fc => ({ path: fc.file.name, content: fc.content, size: fc.content.length }))
   )
 
-  // Load existing tree
   const oldTree = await store.get(projectId)
 
-  // First sync — full index
   if (!oldTree) {
     log.info('First sync: running full index', { projectId, fileCount: available.length })
     const { indexed } = await indexProjectFiles(projectId, app, vectorStore)
@@ -91,13 +86,11 @@ export async function syncProjectIndex(
     return { changes, indexed, removed: 0 }
   }
 
-  // Root hash match — nothing to do
   if (oldTree.rootHash === newTree.rootHash) {
     log.debug('No changes detected', { projectId, rootHash: newTree.rootHash })
     return { changes: { ...noChanges, unchanged: newTree.fileCount }, indexed: 0, removed: 0 }
   }
 
-  // Diff the trees
   const changes = diffTrees(oldTree, newTree)
   log.info('Sync detected changes', {
     projectId,
@@ -109,14 +102,12 @@ export async function syncProjectIndex(
   let indexed = 0
   let removed = 0
 
-  // Delete chunks for removed/modified files
   const toRemove = [...changes.deleted, ...changes.modified]
   for (const filepath of toRemove) {
     await vectorStore.deleteByFilepath(projectId, filepath)
     removed++
   }
 
-  // Re-index added and modified files
   const toIndex = [...changes.added, ...changes.modified]
   const contentMap = new Map(available.map(fc => [fc.file.name, { content: fc.content, file: fc.file }]))
 
@@ -145,7 +136,6 @@ export async function syncProjectIndex(
     )
   }
 
-  // Save updated tree
   newTree.version = oldTree.version + 1
   await store.save(newTree)
 

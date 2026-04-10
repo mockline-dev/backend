@@ -1,6 +1,6 @@
 import { createModuleLogger } from '../../logging'
-import { chunkCode, initTreeSitter, isCodeFile } from '../chunking/tree-sitter.chunker'
 import { chunkText } from '../chunking/text.chunker'
+import { chunkCode, initTreeSitter, isCodeFile } from '../chunking/tree-sitter.chunker'
 import type { ChromaVectorStore } from './chroma.client'
 import { fetchFileContent } from './file-fetcher'
 
@@ -35,7 +35,6 @@ export async function indexProjectFiles(
   let failed = 0
 
   try {
-    // Fetch file records from MongoDB
     const filesService = app.service('files')
     const result = await filesService.find({
       query: { projectId, $limit: 200 },
@@ -50,7 +49,6 @@ export async function indexProjectFiles(
 
     log.info('Indexing project files', { projectId, count: files.length })
 
-    // Process files in small batches to avoid overloading ChromaDB
     const BATCH_SIZE = 10
     for (let i = 0; i < files.length; i += BATCH_SIZE) {
       const batch = files.slice(i, i + BATCH_SIZE)
@@ -64,7 +62,6 @@ export async function indexProjectFiles(
               ? await chunkCode(content, file.name)
               : chunkText(content, file.name)
 
-            // Prefix chunk IDs with projectId to avoid collisions
             const prefixedChunks = chunks.map(c => ({
               ...c,
               id: `${projectId}:${c.id}`

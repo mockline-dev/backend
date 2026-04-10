@@ -12,10 +12,6 @@ const log = createModuleLogger('sandbox-repair')
 
 type EmitFn = (event: string, projectId: string, payload: unknown) => void
 
-// ─── System prompt for repair LLM call ────────────────────────────────────────
-// Bypasses orchestrate() entirely — no intent classification, no RAG, no prompt
-// enhancement. We know exactly what we need: fix the startup failure.
-
 const REPAIR_SYSTEM_PROMPT = `You are debugging a server startup failure. Read the error log carefully and fix the exact issue shown.
 
 YOUR TASK:
@@ -57,17 +53,8 @@ CODE OUTPUT FORMAT:
 - Use the EXACT SAME file paths as shown in the current files below
 - Return EVERY file in the project (complete contents, not diffs)`
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Reads all project files from R2 and returns:
- *   - `files`: array of { path, content } for stale-cleanup comparison
- *   - `prompt`: formatted as fenced code blocks for the LLM prompt
- *
- * Strips any existing `# filepath:` first-line comment from the content before
- * re-adding it as the code block header — prevents the double-comment bug that
- * caused the LLM to generate duplicate/renamed files.
- */
+// Strips leading `# filepath:` lines before re-adding them as code block headers
+// to avoid the LLM seeing duplicate filepath comments and generating renamed files.
 async function readProjectFilesFromR2(
   projectId: string
 ): Promise<{ files: { path: string; content: string }[]; prompt: string }> {
@@ -81,16 +68,9 @@ async function readProjectFilesFromR2(
 
   for (const obj of objects.slice(0, 20)) {
     try {
-      // r2Client.getObject returns a string directly — no stream iteration needed
       const content = await r2Client.getObject(obj.key)
       const relativePath = obj.key.replace(`projects/${projectId}/`, '')
 
-      // Strip the leading # filepath: line if present — we add our own header below.
-      // Without this, the prompt would contain double filepath comments like:
-      //   ```py
-      //   # filepath: main.py   ← our header
-      //   # filepath: main.py   ← already in file content
-      //   from fastapi import FastAPI
       const lines = content.split('\n')
       const hasFilepathLine = /^(?:#|\/\/|<!--)\s*filepath:/i.test(lines[0]?.trim() ?? '')
       const cleanContent = hasFilepathLine ? lines.slice(1).join('\n') : content
@@ -109,14 +89,8 @@ async function readProjectFilesFromR2(
   return { files, prompt: fileParts.join('\n\n') }
 }
 
-/**
- * Delete R2 files that were present before repair but were effectively renamed
- * by the LLM (same base filename, different directory path).
- *
- * Only deletes a file when a new file with the same base name exists at a
- * different path — this is a rename, not an omission. Files the LLM simply
- * didn't return (unchanged files) are left in R2.
- */
+// Deletes R2 files that share a base name with a new file at a different path —
+// treats this as a rename rather than an omission, so unchanged files are left alone.
 async function cleanupRenamedFiles(
   projectId: string,
   oldFiles: { path: string; content: string }[],
@@ -125,12 +99,10 @@ async function cleanupRenamedFiles(
   const oldPaths = new Set(oldFiles.map(f => f.path))
   const newPaths = new Set(newFiles.map(f => f.path))
 
-  // Find paths that appear in newFiles but not in oldFiles (potential renames)
   const addedPaths = [...newPaths].filter(p => !oldPaths.has(p))
 
   for (const addedPath of addedPaths) {
     const baseName = addedPath.split('/').pop()!
-    // Find an old file with the same base name at a different path
     const staleCounterpart = [...oldPaths].find(
       p => p.split('/').pop() === baseName && p !== addedPath
     )
@@ -150,8 +122,6 @@ async function cleanupRenamedFiles(
     }
   }
 }
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 export interface RepairParams {
   sessionId: string
@@ -180,23 +150,11 @@ function getFailureDiagnostic(failureType?: HealthCheckFailure): string {
   }
 }
 
-/**
- * Execution-time self-healing loop.
- *
- * When a server fails to start in the execution sandbox:
- *  1. Reads current project files from R2 (stripped of duplicate filepath comments)
- *  2. Calls the LLM DIRECTLY (bypassing orchestrate() to avoid intent misclassification)
- *  3. Cleans up any renamed R2 files to prevent stale duplicates in the workspace
- *  4. Persists fixed files to R2
- *  5. Kills failed sandbox, restarts execution
- *  6. Repeats up to maxAttempts
- */
 export async function repairExecutionSandbox(params: RepairParams): Promise<void> {
   const { sessionId, session, failedSandbox, serverLog, failureType, app, emit, activeSandboxes, maxAttempts } = params
   const projectId = session.projectId.toString()
   const sandboxConfig = app.get('sandbox')
 
-  // Kill the failed sandbox immediately
   activeSandboxes.delete(sessionId)
   await stopProjectExecution(failedSandbox)
 
@@ -219,7 +177,6 @@ export async function repairExecutionSandbox(params: RepairParams): Promise<void
       .catch(() => {})
 
     try {
-      // ── Step 1: Read project files from R2 ──────────────────────────────────
       const { files: existingFiles, prompt: projectFilesPrompt } = await readProjectFilesFromR2(projectId)
 
       if (existingFiles.length === 0) {
@@ -230,13 +187,6 @@ export async function repairExecutionSandbox(params: RepairParams): Promise<void
         })
         break
       }
-
-      // ── Step 2: Call LLM directly (no orchestrate overhead) ─────────────────
-      // Bypassing orchestrate() avoids:
-      //   - Intent misclassification (long prompts with code ≈ GenerateProject)
-      //   - Unnecessary RAG retrieval
-      //   - Prompt enhancement that could distort the fix request
-      //   - Spurious orchestration:* socket events on the project
 
       emit('terminal:stdout', projectId, {
         phase: 'repair',
@@ -258,7 +208,6 @@ export async function repairExecutionSandbox(params: RepairParams): Promise<void
         if (chunk.content) fullContent += chunk.content
       }
 
-      // ── Step 3: Extract files from LLM response ──────────────────────────────
       const newFiles = extractCodeBlocks(fullContent)
       if (newFiles.length === 0) {
         log.warn('LLM repair returned no code files', { sessionId, attempt })
@@ -275,19 +224,14 @@ export async function repairExecutionSandbox(params: RepairParams): Promise<void
         files: newFiles.map(f => f.path)
       })
 
-      // ── Step 4: Clean up renamed R2 files before persisting ─────────────────
-      // Prevents the workspace from having both `main.py` and `src/main.py`
-      // when the LLM moved the entry point to a subdirectory.
       await cleanupRenamedFiles(projectId, existingFiles, newFiles)
 
-      // ── Step 5: Persist fixed files to R2 ───────────────────────────────────
       emit('terminal:stdout', projectId, {
         phase: 'repair',
         text: `[Auto-repair ${attempt}/${maxAttempts}] Applying ${newFiles.length} fixed file(s): ${newFiles.map(f => f.path).join(', ')}\n`
       })
       await persistFiles(projectId, newFiles, null, app)
 
-      // ── Step 6: Restart execution sandbox ───────────────────────────────────
       emit('terminal:stdout', projectId, {
         phase: 'repair',
         text: `[Auto-repair ${attempt}/${maxAttempts}] Restarting server...\n`

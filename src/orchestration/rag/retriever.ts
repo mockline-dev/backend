@@ -30,7 +30,6 @@ export async function retrieveContext(
     return { chunks: [], totalTokens: 0 }
   }
 
-  // Sort by score descending
   results.sort((a, b) => b.score - a.score)
 
   let totalTokens = 0
